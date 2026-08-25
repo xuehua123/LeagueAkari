@@ -10,6 +10,10 @@ export type CoachEvidenceSource =
   | 'sgp-history'
   | 'minimap-replay'
   | 'replay-sidecar'
+  | 'fog-inference'
+  | 'item-guidance'
+  | 'combat-observer'
+  | 'authorized-audio'
   | 'user-input'
 
 export interface CoachClock {
@@ -46,6 +50,10 @@ export const coachEvidenceSourceSchema = z.enum([
   'sgp-history',
   'minimap-replay',
   'replay-sidecar',
+  'fog-inference',
+  'item-guidance',
+  'combat-observer',
+  'authorized-audio',
   'user-input'
 ])
 

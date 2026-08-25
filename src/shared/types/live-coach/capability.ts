@@ -1,7 +1,39 @@
 import { z } from 'zod'
 
+export type CoachCapabilityId =
+  | 'coach.offline-review'
+  | 'coach.capture.screen'
+  | 'coach.analyze.minimap-basic'
+  | 'coach.analyze.minimap-advanced'
+  | 'coach.analyze.fog-inference'
+  | 'coach.guidance.item-purchase'
+  | 'coach.guidance.micro'
+  | 'coach.track.cooldowns'
+  | 'coach.communication.ping'
+  | 'coach.communication.chat'
+  | 'coach.analyze.screen-multimodal'
+  | 'coach.output.shot-calling'
+  | 'coach.output.subtitle'
+  | 'coach.output.sound'
+  | 'coach.output.tts'
+  | 'coach.qa.text'
+  | 'coach.qa.microphone'
+  | 'coach.qa.wake-word'
+  | 'coach.qa.voice-analysis'
+  | 'coach.qa.cloud-asr'
+  | 'coach.qa.cloud-llm'
+  | 'coach.qa.cloud-tts'
+  | 'coach.history.sgp'
+  | 'coach.profile.longitudinal'
+  | 'coach.training.leaderboard'
+  | 'coach.data.sample-upload'
+  | 'coach.mode.aram'
+  | 'coach.mode.arena'
+  | 'coach.mode.rotating'
+  | 'coach.mode.spectator'
+
 export interface LiveCoachCapabilityRule {
-  id: string
+  id: CoachCapabilityId | string
   version: string
   enabled: boolean
   minPatch?: string
@@ -41,6 +73,39 @@ export type CoachUnavailableReason =
   | 'live-data-unavailable'
   | 'speech-unavailable'
   | 'internal-error'
+
+export const coachCapabilityIdSchema = z.enum([
+  'coach.offline-review',
+  'coach.capture.screen',
+  'coach.analyze.minimap-basic',
+  'coach.analyze.minimap-advanced',
+  'coach.analyze.fog-inference',
+  'coach.guidance.item-purchase',
+  'coach.guidance.micro',
+  'coach.track.cooldowns',
+  'coach.communication.ping',
+  'coach.communication.chat',
+  'coach.analyze.screen-multimodal',
+  'coach.output.shot-calling',
+  'coach.output.subtitle',
+  'coach.output.sound',
+  'coach.output.tts',
+  'coach.qa.text',
+  'coach.qa.microphone',
+  'coach.qa.wake-word',
+  'coach.qa.voice-analysis',
+  'coach.qa.cloud-asr',
+  'coach.qa.cloud-llm',
+  'coach.qa.cloud-tts',
+  'coach.history.sgp',
+  'coach.profile.longitudinal',
+  'coach.training.leaderboard',
+  'coach.data.sample-upload',
+  'coach.mode.aram',
+  'coach.mode.arena',
+  'coach.mode.rotating',
+  'coach.mode.spectator'
+])
 
 export const liveCoachCapabilityRuleSchema = z.object({
   id: z.string(),

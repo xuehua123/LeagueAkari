@@ -1,4 +1,4 @@
-import { CoachUnavailableReason } from '@shared/types/live-coach'
+import { CoachCapabilityId, CoachUnavailableReason } from '@shared/types/live-coach'
 
 import type { LiveCoachMainContext } from './context'
 
@@ -48,7 +48,23 @@ export class LiveCoachCapabilityController {
       return
     }
 
-    enabledFeatureIds.push('minimap-observer', 'live-client-data', 'rule-engine', 'local-speech')
+    // 注册 Phase 1 全部就绪能力 ID
+    const phase1Capabilities: CoachCapabilityId[] = [
+      'coach.offline-review',
+      'coach.capture.screen',
+      'coach.analyze.minimap-basic',
+      'coach.analyze.minimap-advanced',
+      'coach.analyze.fog-inference',
+      'coach.guidance.item-purchase',
+      'coach.communication.ping',
+      'coach.output.subtitle',
+      'coach.output.sound',
+      'coach.output.tts'
+    ]
+
+    enabledFeatureIds.push(...phase1Capabilities)
+    enabledFeatureIds.push('minimap-observer', 'live-game-data', 'rule-engine', 'local-speech')
+
     this._context.state.setCapability(enabledFeatureIds, {})
   }
 

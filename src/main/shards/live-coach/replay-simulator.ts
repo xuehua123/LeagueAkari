@@ -149,7 +149,7 @@ export class CoachReplaySimulator {
         durationSeconds: 900
       },
       frames: [
-        // Frame 1: 4:30 Dragon Spawn Warning
+        // Frame 1: 4:30 Dragon Spawn Warning & Item Guidance
         {
           timestamp: recordedAt + 270000,
           liveData: {
@@ -168,7 +168,7 @@ export class CoachReplaySimulator {
               riotIdTagLine: 'CN',
               championName: 'Ahri',
               level: 6,
-              currentGold: 850,
+              currentGold: 1250,
               team: 'ORDER',
               abilities: {}
             },
@@ -177,7 +177,83 @@ export class CoachReplaySimulator {
             sourceHealth: []
           }
         },
-        // Frame 2: 13:40 Turret Plating Fall Warning
+        // Frame 2: 7:15 Minimap Observation (Enemy Mid Last Seen)
+        {
+          timestamp: recordedAt + 435000,
+          minimap: {
+            sessionId: `replay_sample_${now}`,
+            patch: '14.15.1',
+            calibrationVersion: '1.0.0',
+            modelVersions: {},
+            frame: {
+              observedAt: recordedAt + 435000,
+              receivedAt: recordedAt + 435000,
+              sequence: 2,
+              ageMs: 15
+            },
+            health: 'healthy',
+            entities: [
+              {
+                trackId: 'enemy_mid_zed',
+                kind: 'enemy',
+                team: 'enemy',
+                championId: 238, // Zed
+                point: { x: 0.5, y: 0.5 },
+                regionId: 'mid_lane',
+                confidence: 0.95,
+                lifecycle: 'confirmed',
+                firstObservedAt: recordedAt + 435000,
+                lastObservedAt: recordedAt + 435000,
+                expiresAt: recordedAt + 440000
+              }
+            ],
+            events: []
+          }
+        },
+        // Frame 3: 7:25 Fog Inference Triggered (Enemy Mid Disappeared for 10s -> Roaming to Bot River)
+        {
+          timestamp: recordedAt + 445000,
+          liveData: {
+            sessionId: `replay_sample_${now}`,
+            patch: '14.15.1',
+            gameTimeSeconds: 445,
+            clock: {
+              observedAt: recordedAt + 445000,
+              receivedAt: recordedAt + 445000,
+              sequence: 3
+            },
+            activePlayer: {
+              summonerName: 'TestPlayer',
+              riotId: 'Test#CN',
+              riotIdGameName: 'Test',
+              riotIdTagLine: 'CN',
+              championName: 'Ahri',
+              level: 7,
+              currentGold: 300,
+              team: 'ORDER',
+              abilities: {}
+            },
+            players: [],
+            events: [],
+            sourceHealth: []
+          },
+          minimap: {
+            sessionId: `replay_sample_${now}`,
+            patch: '14.15.1',
+            calibrationVersion: '1.0.0',
+            modelVersions: {},
+            frame: {
+              observedAt: recordedAt + 445000,
+              receivedAt: recordedAt + 445000,
+              sequence: 4,
+              ageMs: 15
+            },
+            health: 'healthy',
+            entities: [], // Zed in fog
+            events: []
+          }
+        },
+        // Frame 4: 13:40 Turret Plating Fall Warning
         {
           timestamp: recordedAt + 820000,
           liveData: {
@@ -187,7 +263,7 @@ export class CoachReplaySimulator {
             clock: {
               observedAt: recordedAt + 820000,
               receivedAt: recordedAt + 820000,
-              sequence: 2
+              sequence: 5
             },
             activePlayer: {
               summonerName: 'TestPlayer',
@@ -196,7 +272,7 @@ export class CoachReplaySimulator {
               riotIdTagLine: 'CN',
               championName: 'Ahri',
               level: 10,
-              currentGold: 1200,
+              currentGold: 450,
               team: 'ORDER',
               abilities: {}
             },
@@ -205,7 +281,7 @@ export class CoachReplaySimulator {
             sourceHealth: []
           }
         },
-        // Frame 3: 14:10 Enemy Grouping in Mid Lane (3 enemies clustered)
+        // Frame 5: 14:10 Enemy Grouping in Mid Lane (3 enemies clustered)
         {
           timestamp: recordedAt + 850000,
           liveData: {
@@ -215,7 +291,7 @@ export class CoachReplaySimulator {
             clock: {
               observedAt: recordedAt + 850000,
               receivedAt: recordedAt + 850000,
-              sequence: 3
+              sequence: 6
             },
             activePlayer: {
               summonerName: 'TestPlayer',
@@ -240,7 +316,7 @@ export class CoachReplaySimulator {
             frame: {
               observedAt: recordedAt + 850000,
               receivedAt: recordedAt + 850000,
-              sequence: 3,
+              sequence: 7,
               ageMs: 15
             },
             health: 'healthy',
@@ -249,7 +325,7 @@ export class CoachReplaySimulator {
                 trackId: 'enemy_mid_1',
                 kind: 'enemy',
                 team: 'enemy',
-                championId: 103, // Ahri
+                championId: 103,
                 point: { x: 0.5, y: 0.5 },
                 regionId: 'mid',
                 confidence: 0.95,
@@ -262,7 +338,7 @@ export class CoachReplaySimulator {
                 trackId: 'enemy_jungle_2',
                 kind: 'enemy',
                 team: 'enemy',
-                championId: 64, // Lee Sin
+                championId: 64,
                 point: { x: 0.52, y: 0.48 },
                 regionId: 'mid_river',
                 confidence: 0.93,
@@ -275,7 +351,7 @@ export class CoachReplaySimulator {
                 trackId: 'enemy_support_3',
                 kind: 'enemy',
                 team: 'enemy',
-                championId: 412, // Thresh
+                championId: 412,
                 point: { x: 0.49, y: 0.53 },
                 regionId: 'mid',
                 confidence: 0.96,

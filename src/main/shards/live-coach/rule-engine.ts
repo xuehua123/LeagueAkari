@@ -18,7 +18,7 @@ export interface CoachRule {
 }
 
 /**
- * 规则 1：中立资源（巨龙 / 峡谷先锋 / 男爵）即将刷新提醒（第一期合规：纯客观事实与关注提示）
+ * 规则 1：中立资源（巨龙 / 峡谷先锋 / 男爵）即将刷新提醒
  */
 export class RuleObjectiveSpawn implements CoachRule {
   id = 'rule_objective_spawn'
@@ -60,13 +60,17 @@ export class RuleObjectiveSpawn implements CoachRule {
           id: 'opt_obj_river',
           label: '关注河道与龙坑动向',
           condition: null,
-          evidenceIds: [evidenceId]
+          evidenceIds: [evidenceId],
+          role: 'primary',
+          score: 0.9
         },
         {
           id: 'opt_obj_lanes',
           label: '留意中下路对线状态',
           condition: null,
-          evidenceIds: [evidenceId]
+          evidenceIds: [evidenceId],
+          role: 'alternative',
+          score: 0.7
         }
       ]
 
@@ -136,13 +140,17 @@ export class RuleTurretPlatingFall implements CoachRule {
           id: 'opt_plate_timing',
           label: '留意对线期结束时间节点',
           condition: null,
-          evidenceIds: [evidenceId]
+          evidenceIds: [evidenceId],
+          role: 'primary',
+          score: 0.85
         },
         {
           id: 'opt_plate_lanes',
           label: '关注各路防御塔状态',
           condition: null,
-          evidenceIds: [evidenceId]
+          evidenceIds: [evidenceId],
+          role: 'alternative',
+          score: 0.65
         }
       ]
 
@@ -170,7 +178,7 @@ export class RuleTurretPlatingFall implements CoachRule {
 }
 
 /**
- * 规则 3：小地图局部敌人聚集预警（基于 2D 空间聚类计算，第一期合规纯事实播报）
+ * 规则 3：小地图局部敌人聚集预警（基于 2D 空间聚类计算）
  */
 export class RuleMinimapEnemyGrouping implements CoachRule {
   id = 'rule_minimap_enemy_grouping'
@@ -223,7 +231,6 @@ export class RuleMinimapEnemyGrouping implements CoachRule {
     if (now - this._lastTriggerTime >= 20000) {
       this._lastTriggerTime = now
 
-      // 提取该聚类中所有敌方实体的真实证据 ID
       const eviIds: string[] = []
       for (const e of targetCluster) {
         const eviId = ctx.fusion.getMinimapEvidenceId(e.trackId)
@@ -237,13 +244,17 @@ export class RuleMinimapEnemyGrouping implements CoachRule {
           id: 'opt_group_watch',
           label: '关注该区域视野动向',
           condition: null,
-          evidenceIds: eviIds
+          evidenceIds: eviIds,
+          role: 'primary',
+          score: 0.95
         },
         {
           id: 'opt_group_safe',
           label: '保持安全防范距离',
           condition: null,
-          evidenceIds: eviIds
+          evidenceIds: eviIds,
+          role: 'alternative',
+          score: 0.8
         }
       ]
 
@@ -270,6 +281,297 @@ export class RuleMinimapEnemyGrouping implements CoachRule {
   }
 }
 
+/**
+ * 规则 4：战争迷雾与不可见敌人时空推断提醒（ENG-P1-020, ADR-0001）
+ */
+export class RuleFogInference implements CoachRule {
+  id = 'rule_fog_inference'
+  version = '1.0.0'
+  category = 'warning' as const
+  private _lastTriggerTime: number = 0
+
+  reset(): void {
+    this._lastTriggerTime = 0
+  }
+
+  evaluate(ctx: RuleEvaluationContext): CoachCue | null {
+    if (!ctx.enabledCategories[this.category]) return null
+
+    const inferences = ctx.fusion.getFogInferences()
+    const highRisk = inferences.find((f) => f.confidence >= 0.7 && f.arrivalWindow !== null)
+
+    if (!highRisk) return null
+
+    const now = Date.now()
+    if (now - this._lastTriggerTime >= 25000) {
+      this._lastTriggerTime = now
+
+      const topRegion = highRisk.predictedRegions[0]?.regionId || '河道'
+      const eviIds = [...highRisk.basisEvidenceIds]
+
+      const options: CoachOption[] = [
+        {
+          id: 'opt_fog_defend',
+          label: `防范迷雾游走（预计到达 ${topRegion}）`,
+          condition: null,
+          evidenceIds: eviIds,
+          role: 'primary',
+          score: 0.9
+        },
+        {
+          id: 'opt_fog_ward',
+          label: '在关键路口补充防守守卫',
+          condition: null,
+          evidenceIds: eviIds,
+          role: 'alternative',
+          score: 0.75
+        }
+      ]
+
+      return {
+        id: `cue_fog_${now}`,
+        sessionId: ctx.sessionId,
+        ruleId: this.id,
+        ruleVersion: this.version,
+        category: this.category,
+        priority: 70,
+        observationText: `[迷雾推断] 敌方可能正向 ${topRegion} 方向游走`,
+        impactText: `预计将在 15~25 秒内到达该区域，置信度 ${Math.round(highRisk.confidence * 100)}%`,
+        options,
+        spokenText: `迷雾推断提醒：敌方可能在向 ${topRegion} 游走，注意安全防范。`,
+        evidenceIds: eviIds,
+        createdAt: now,
+        expiresAt: now + 10000,
+        status: 'pending',
+        cancellationReason: null
+      }
+    }
+
+    return null
+  }
+}
+
+/**
+ * 规则 5：装备购买指导与备选出装推荐（ENG-P1-021, ADR-0001）
+ */
+export class RuleItemPurchaseGuidance implements CoachRule {
+  id = 'rule_item_purchase_guidance'
+  version = '1.0.0'
+  category = 'opportunity' as const
+  private _lastTriggerTime: number = 0
+
+  reset(): void {
+    this._lastTriggerTime = 0
+  }
+
+  evaluate(ctx: RuleEvaluationContext): CoachCue | null {
+    if (!ctx.enabledCategories[this.category]) return null
+
+    const guidance = ctx.fusion.getItemPurchaseGuidance()
+    if (!guidance) return null
+
+    // 当金币达到首选大件或重要组件阈值时触发建议
+    if (guidance.currentGold >= 850) {
+      const now = Date.now()
+      if (now - this._lastTriggerTime >= 45000) {
+        this._lastTriggerTime = now
+
+        const primary = guidance.primaryPlan
+        const primaryReason = primary.conditions[0] || '核心属性提升'
+
+        const options: CoachOption[] = [
+          {
+            id: 'opt_item_primary',
+            label: `首选方案：更新推荐组件（花费 ${primary.totalCost}g，余 ${primary.remainingGold}g）`,
+            condition: primaryReason,
+            evidenceIds: guidance.evidenceIds,
+            role: 'primary',
+            score: 0.95
+          },
+          {
+            id: 'opt_item_alt',
+            label: `备选方案：优先靴子与消耗品`,
+            condition: '游走机动性或视野防守',
+            evidenceIds: guidance.evidenceIds,
+            role: 'alternative',
+            score: 0.7
+          }
+        ]
+
+        return {
+          id: `cue_item_${now}`,
+          sessionId: ctx.sessionId,
+          ruleId: this.id,
+          ruleVersion: this.version,
+          category: this.category,
+          priority: 40,
+          observationText: `当前持有金币 ${guidance.currentGold}g，满足核心装备购买条件`,
+          impactText: `回城更新装备可提升对线战力：${primaryReason}`,
+          options,
+          spokenText: `当前金币充足，回城建议优先更新核心装备组件。`,
+          evidenceIds: guidance.evidenceIds,
+          createdAt: now,
+          expiresAt: now + 15000,
+          status: 'pending',
+          cancellationReason: null
+        }
+      }
+    }
+
+    return null
+  }
+}
+
+/**
+ * 规则 6：基础连招与对线防抓提醒
+ */
+export class RuleBasicSkillsAndTactics implements CoachRule {
+  id = 'rule_basic_skills_and_tactics'
+  version = '1.0.0'
+  category = 'information' as const
+  private _lastTriggerTime: number = 0
+
+  reset(): void {
+    this._lastTriggerTime = 0
+  }
+
+  evaluate(ctx: RuleEvaluationContext): CoachCue | null {
+    if (!ctx.enabledCategories[this.category]) return null
+
+    const gameTime = ctx.fusion.getGameTimeSeconds()
+    if (gameTime === null || gameTime < 180 || gameTime > 600) return null
+
+    const now = Date.now()
+    // 对线期 (3~10分钟) 周期性提醒基础控线与防抓
+    if (now - this._lastTriggerTime >= 90000) {
+      this._lastTriggerTime = now
+
+      const evidenceId = `evi_tactics_${now}`
+      ctx.fusion.addEvidence({
+        id: evidenceId,
+        sessionId: ctx.sessionId,
+        temporalScope: 'current',
+        source: 'live-client-data',
+        kind: 'lane-phase-tactics',
+        confidence: 1,
+        patch: ctx.patch,
+        clock: { observedAt: now, receivedAt: now, sequence: 1 },
+        freshness: { expiresAt: now + 20000, state: 'fresh' },
+        payload: { gameTime }
+      })
+
+      const options: CoachOption[] = [
+        {
+          id: 'opt_tactics_wave',
+          label: '保持兵线在靠近己方防御塔的安全位置',
+          condition: null,
+          evidenceIds: [evidenceId],
+          role: 'primary',
+          score: 0.8
+        },
+        {
+          id: 'opt_tactics_vision',
+          label: '在对线侧翼草丛留存防守眼位',
+          condition: null,
+          evidenceIds: [evidenceId],
+          role: 'alternative',
+          score: 0.75
+        }
+      ]
+
+      return {
+        id: `cue_tactics_${now}`,
+        sessionId: ctx.sessionId,
+        ruleId: this.id,
+        ruleVersion: this.version,
+        category: this.category,
+        priority: 35,
+        observationText: '对线期常规节奏关注',
+        impactText: '注意敌方打野动向与兵线安全位置',
+        options,
+        spokenText: '对线期注意保持兵线安全位置，留意侧翼视野。',
+        evidenceIds: [evidenceId],
+        createdAt: now,
+        expiresAt: now + 6000,
+        status: 'pending',
+        cancellationReason: null
+      }
+    }
+
+    return null
+  }
+}
+
+/**
+ * 规则 7：Ping 与沟通辅助建议（ENG-P1-011 沟通辅助）
+ */
+export class RuleCommunicationPing implements CoachRule {
+  id = 'rule_communication_ping'
+  version = '1.0.0'
+  category = 'information' as const
+  private _lastTriggerTime: number = 0
+
+  reset(): void {
+    this._lastTriggerTime = 0
+  }
+
+  evaluate(ctx: RuleEvaluationContext): CoachCue | null {
+    if (!ctx.enabledCategories[this.category]) return null
+
+    const inferences = ctx.fusion.getFogInferences()
+    const roamingEnemy = inferences.find((f) =>
+      f.intents.some((i) => i.kind === 'roam' && i.probability > 0.5)
+    )
+
+    if (!roamingEnemy) return null
+
+    const now = Date.now()
+    if (now - this._lastTriggerTime >= 30000) {
+      this._lastTriggerTime = now
+
+      const eviIds = [...roamingEnemy.basisEvidenceIds]
+      const options: CoachOption[] = [
+        {
+          id: 'opt_ping_danger',
+          label: '建议发送：给队友发送危险 (Danger) 警示信号',
+          condition: null,
+          evidenceIds: eviIds,
+          role: 'primary',
+          score: 0.95
+        },
+        {
+          id: 'opt_ping_missing',
+          label: '建议发送：发送对线敌人失踪 (Missing) 信号',
+          condition: null,
+          evidenceIds: eviIds,
+          role: 'alternative',
+          score: 0.85
+        }
+      ]
+
+      return {
+        id: `cue_ping_${now}`,
+        sessionId: ctx.sessionId,
+        ruleId: this.id,
+        ruleVersion: this.version,
+        category: this.category,
+        priority: 60,
+        observationText: '敌方对线英雄已脱离视野并疑似游走',
+        impactText: '可及时向边路队友同步信号',
+        options,
+        spokenText: '可向队友发送对线敌人失踪或危险信号。',
+        evidenceIds: eviIds,
+        createdAt: now,
+        expiresAt: now + 8000,
+        status: 'pending',
+        cancellationReason: null
+      }
+    }
+
+    return null
+  }
+}
+
 export class CoachRuleEngine {
   private readonly _rules: CoachRule[] = []
 
@@ -277,6 +579,10 @@ export class CoachRuleEngine {
     this._rules.push(new RuleObjectiveSpawn())
     this._rules.push(new RuleTurretPlatingFall())
     this._rules.push(new RuleMinimapEnemyGrouping())
+    this._rules.push(new RuleFogInference())
+    this._rules.push(new RuleItemPurchaseGuidance())
+    this._rules.push(new RuleBasicSkillsAndTactics())
+    this._rules.push(new RuleCommunicationPing())
   }
 
   public reset(): void {

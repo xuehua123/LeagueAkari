@@ -10,6 +10,8 @@ export interface CoachOption {
   label: string
   condition: string | null
   evidenceIds: string[]
+  role?: 'primary' | 'alternative'
+  score?: number
 }
 
 export interface CoachCue {
@@ -37,7 +39,7 @@ export interface CoachCuePublicDto {
   priority: number
   observationText: string
   impactText: string | null
-  options: Array<{ id: string; label: string }>
+  options: Array<{ id: string; label: string; role?: 'primary' | 'alternative' }>
   spokenText: string
   createdAt: number
   expiresAt: number
@@ -65,7 +67,9 @@ export const coachOptionSchema = z.object({
   id: z.string(),
   label: z.string(),
   condition: z.string().nullable(),
-  evidenceIds: z.array(z.string())
+  evidenceIds: z.array(z.string()),
+  role: z.enum(['primary', 'alternative']).optional(),
+  score: z.number().optional()
 })
 
 export const coachCueSchema = z.object({
@@ -74,7 +78,7 @@ export const coachCueSchema = z.object({
   ruleId: z.string(),
   ruleVersion: z.string(),
   category: coachCueCategorySchema,
-  priority: z.number(),
+  priority: z.number().min(0).max(100),
   observationText: z.string(),
   impactText: z.string().nullable(),
   options: z.array(coachOptionSchema).max(2),
@@ -90,10 +94,16 @@ export const coachCuePublicDtoSchema = z.object({
   id: z.string(),
   sessionId: z.string(),
   category: coachCueCategorySchema,
-  priority: z.number(),
+  priority: z.number().min(0).max(100),
   observationText: z.string(),
   impactText: z.string().nullable(),
-  options: z.array(z.object({ id: z.string(), label: z.string() })).max(2),
+  options: z.array(
+    z.object({
+      id: z.string(),
+      label: z.string(),
+      role: z.enum(['primary', 'alternative']).optional()
+    })
+  ),
   spokenText: z.string(),
   createdAt: z.number(),
   expiresAt: z.number(),

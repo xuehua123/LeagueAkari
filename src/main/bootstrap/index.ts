@@ -19,6 +19,7 @@ import { AkariIpcMain } from '@main/shards/ipc'
 import { KeyboardShortcutsMain } from '@main/shards/keyboard-shortcuts'
 import { LeagueClientMain } from '@main/shards/league-client'
 import { LeagueClientUxMain } from '@main/shards/league-client-ux'
+import { LiveGameDataMain } from '@main/shards/live-game-data'
 import { LoggerFactoryMain } from '@main/shards/logger-factory'
 import { MobxUtilsMain } from '@main/shards/mobx-utils'
 import { OngoingGameMain } from '@main/shards/ongoing-game'
@@ -319,6 +320,7 @@ export function bootstrap() {
     manager.use(GameClientMain)
     manager.use(LeagueClientMain)
     manager.use(LeagueClientUxMain)
+    manager.use(LiveGameDataMain)
     manager.use(RiotClientMain)
 
     // application specific shards

@@ -15,9 +15,10 @@ export interface MainToWorkerInitMessage {
 export interface MainToWorkerStartMessage {
   type: 'start'
   sessionId: string
+  patch?: string
   targetHwnd: number | null
   targetPid: number | null
-  backend: 'auto' | 'wgc' | 'dda'
+  backend: 'auto' | 'wgc' | 'dda' | 'desktopCapturer'
   captureConfig: {
     fps: number
     roi: { x: number; y: number; width: number; height: number }

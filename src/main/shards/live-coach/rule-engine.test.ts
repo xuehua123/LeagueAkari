@@ -797,7 +797,7 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
             trackId: 'track_enemy_1',
             kind: 'enemy',
             team: 'enemy',
-            championId: null,
+            championId: 64, // 显式匹配打野李青 ID
             point: { x: 0.25, y: 0.45 },
             regionId: 'top_jungle_river',
             confidence: 0.92,
@@ -812,7 +812,7 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
       now
     )
 
-    // 既然野区/河道已经有敌方实体，敌方打野不属于“位置完全未知”，防抓规则不应误报
+    // 敌方打野已显式捕获，防抓规则不应误报
     const cues = engine.evaluate({
       sessionId: 'sess_jg_seen',
       patch: '16.16.1',
@@ -825,11 +825,11 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     expect(cues.find((c) => c.ruleId === 'rule_basic_skills_and_tactics')).toBeUndefined()
   })
 
-  it('validates canonical Data Dragon 16.x item catalog definitions', () => {
+  it('validates canonical Data Dragon 16.16.1 item catalog definitions', () => {
     const fusion = new FactFusionEngine()
     const now = 1700000000000
 
-    // 法师阿狸（3000g）-> 验证推荐 6655 卢登的伙伴，其组件为 3802 遗失的章节 (1200g)
+    // 法师阿狸（3000g）-> 验证推荐 6655 卢登的伙伴 (2750g)，其组件为 3802 遗失的章节 (1200g) 与 3145 (1100g)
     fusion.updateLiveGameSnapshot(
       {
         sessionId: 'sess_dd_ahri',
@@ -872,6 +872,6 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     expect(guidance).toBeDefined()
     expect(guidance?.championId).toBe(103)
     expect(guidance?.primaryPlan.itemIds).toContain(6655)
-    expect(guidance?.primaryPlan.totalCost).toBe(2900)
+    expect(guidance?.primaryPlan.totalCost).toBe(2750)
   })
 })

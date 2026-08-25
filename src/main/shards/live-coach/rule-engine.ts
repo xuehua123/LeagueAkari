@@ -490,31 +490,22 @@ export class RuleBasicSkillsAndTactics implements CoachRule {
         (e) => (e.team === 'enemy' || e.kind === 'enemy') && e.lifecycle !== 'invalidated'
       )
 
-      // 检查敌方打野是否在小地图上可见：
-      // 1. 显式匹配（championId 或召唤师名匹配）
+      // 检查敌方打野是否确认在小地图上可见：
+      // 1. 显式身份识别匹配（championId 或召唤师名匹配）
       const isExplicitlySeen = visibleEnemyEntities.some(
         (e) =>
           (enemyJungler.championId && e.championId === enemyJungler.championId) ||
           e.trackId === enemyJungler.summonerName
       )
 
-      // 2. 空间区域关联匹配：若野区或河道有敌方实体，表明打野已被小地图捕获
-      const isEnemyInJungleOrRiver = visibleEnemyEntities.some(
-        (e) =>
-          e.regionId === 'top_jungle_river' ||
-          e.regionId === 'bot_jungle_river' ||
-          (e.point.y > 0.35 && e.point.y < 0.65 && (e.point.x < 0.35 || e.point.x > 0.65))
-      )
-
-      // 3. 全局数量覆盖匹配：若场上存活的所有敌方英雄均已在小地图各处可见，则打野必然可见
-      const livingEnemiesCount = players.filter((p) => p.team === enemyTeam && !p.isDead).length
+      // 2. 全局对线完全覆盖：若场上存活的所有敌方英雄（全量敌方）均已在小地图上可见，则打野必然已被捕获
+      const livingEnemies = players.filter((p) => p.team === enemyTeam && !p.isDead)
       const areAllLivingEnemiesVisible =
-        livingEnemiesCount > 0 && visibleEnemyEntities.length >= livingEnemiesCount
+        livingEnemies.length > 0 && visibleEnemyEntities.length >= livingEnemies.length
 
-      const isEnemyJunglerSeen =
-        isExplicitlySeen || isEnemyInJungleOrRiver || areAllLivingEnemiesVisible
+      const isEnemyJunglerSeen = isExplicitlySeen || areAllLivingEnemiesVisible
 
-      // 当敌方打野处于迷雾中且未在野区/河道被发现时，触发控线与防抓提醒
+      // 当敌方打野处于迷雾中时，触发控线与防抓提醒
       if (!isEnemyJunglerSeen) {
         this._lastTriggerTime = now
 

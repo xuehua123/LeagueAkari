@@ -36,7 +36,7 @@ const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
         name: '挺进破坏者',
         cost: 3300,
         components: [
-          { id: 3051, name: '提亚马特', cost: 1200 },
+          { id: 3077, name: '提亚马特', cost: 1200 }, // 提亚马特标准 ID: 3077
           { id: 3044, name: '净蚀', cost: 1100 },
           { id: 1042, name: '短剑', cost: 250 }
         ],
@@ -60,13 +60,12 @@ const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
     archetype: 'mage',
     coreItems: [
       {
-        id: 6655, // 卢登的伙伴 (Riot Data Dragon 6655)
+        id: 6655, // 卢登的伙伴 (Riot Data Dragon 16.16.1 标准总价 2750g)
         name: '卢登的伙伴',
-        cost: 2900,
+        cost: 2750,
         components: [
           { id: 3802, name: '遗失的章节', cost: 1200 }, // 遗失的章节标准 ID: 3802
-          { id: 3145, name: '海克斯科技发电机', cost: 1100 },
-          { id: 1052, name: '增幅典籍', cost: 400 }
+          { id: 3145, name: '海克斯科技发电机', cost: 1100 }
         ],
         reason: '法力续航与爆发伤害支点'
       },
@@ -88,9 +87,9 @@ const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
     archetype: 'marksman',
     coreItems: [
       {
-        id: 3031, // 无尽之刃
+        id: 3031, // 无尽之刃 (Riot Data Dragon 16.16.1 标准总价 3500g)
         name: '无尽之刃',
-        cost: 3400,
+        cost: 3500,
         components: [
           { id: 1038, name: '暴风之剑', cost: 1300 },
           { id: 1037, name: '十字镐', cost: 875 },
@@ -99,9 +98,9 @@ const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
         reason: '核心高额暴击伤害提升'
       },
       {
-        id: 6672, // 海妖杀手
+        id: 6672, // 海妖杀手 (Riot Data Dragon 16.16.1 标准总价 3000g)
         name: '海妖杀手',
-        cost: 3100,
+        cost: 3000,
         components: [
           { id: 1037, name: '十字镐', cost: 875 },
           { id: 3086, name: '狂热', cost: 1100 },

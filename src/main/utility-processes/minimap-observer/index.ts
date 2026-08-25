@@ -48,9 +48,11 @@ let latestFrameObservedAt = 0
 let latestFrameReceivedTime = 0
 let latestFrameSequence = 0
 let lastProcessedSequence = -1
+let lastProcessedHealth: 'healthy' | 'degraded' | 'unknown' = 'unknown'
 let latestPixelFormat: 'bgra' | 'rgba' = 'bgra'
 let frameWidth = 250
 let frameHeight = 250
+let currentPatch = '16.16.1'
 
 function sendMessage(msg: WorkerToMainMessage) {
   if (process.parentPort) {
@@ -227,13 +229,14 @@ function processMinimapFrame(
 
   // 4. 实体追踪与生命周期状态机 (Object Tracking)
   const activeIds = new Set<string>()
+  const matchedIdsInCurrentFrame = new Set<string>()
 
   for (const det of detections) {
     let matchedId: string | null = null
     let minDist = 0.08 // 匹配距离阈值
 
     for (const [id, entity] of trackedEntities.entries()) {
-      if (entity.team === det.team) {
+      if (entity.team === det.team && !matchedIdsInCurrentFrame.has(id)) {
         const dist = Math.sqrt((entity.point.x - det.x) ** 2 + (entity.point.y - det.y) ** 2)
         if (dist < minDist) {
           minDist = dist
@@ -243,6 +246,7 @@ function processMinimapFrame(
     }
 
     if (matchedId) {
+      matchedIdsInCurrentFrame.add(matchedId)
       const entity = trackedEntities.get(matchedId)!
       entity.point = { x: det.x, y: det.y }
       entity.regionId = getMapRegion(det.x, det.y)
@@ -273,6 +277,7 @@ function processMinimapFrame(
       }
       trackedEntities.set(newId, newEntity)
       activeIds.add(newId)
+      matchedIdsInCurrentFrame.add(newId)
     }
   }
 
@@ -333,10 +338,11 @@ function runDetectionTick() {
 
     if (!latestFrameBuffer || isFrameStale) {
       health = 'unknown'
+      lastProcessedHealth = 'unknown'
       entities = []
     } else if (isDuplicateFrame) {
-      // 重复帧不重新运行 CCL，也不重新自增 hitCount，返回现有实体快照
-      health = 'healthy'
+      // 重复帧继承上一帧的真实健康状态（而非硬编码 healthy），不重复自增 hitCount，返回现有实体快照
+      health = lastProcessedHealth
       entities = Array.from(trackedEntities.values()).map((e) => ({
         trackId: e.trackId,
         kind: e.kind,
@@ -360,6 +366,7 @@ function runDetectionTick() {
         latestPixelFormat
       )
       health = result.health
+      lastProcessedHealth = result.health
       entities = result.entities
     }
 
@@ -368,7 +375,7 @@ function runDetectionTick() {
     // 构建完整观测批次
     const batch: MinimapObservationBatch = {
       sessionId: currentSessionId,
-      patch: '16.16.1',
+      patch: currentPatch,
       calibrationVersion: '1.0.0',
       modelVersions: {
         'ccl-cluster': '1.2.0',
@@ -442,11 +449,15 @@ function handleMainMessage(rawMsg: unknown) {
       currentFps = msg.captureConfig?.fps || 15
       frameWidth = msg.captureConfig?.roi?.width || 250
       frameHeight = msg.captureConfig?.roi?.height || 250
+      if (msg.patch) {
+        currentPatch = msg.patch
+      }
       isRunning = true
       sequence = 0
       frameCount = 0
       lastFpsCheckTime = Date.now()
       lastProcessedSequence = -1
+      lastProcessedHealth = 'unknown'
 
       if (loopTimer) {
         clearInterval(loopTimer)

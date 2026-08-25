@@ -67,12 +67,19 @@ export class CaptureProcessSupervisorController {
     this._onObservationBatchCallback = cb
   }
 
-  public async startSupervising(sessionId: string, calibration: MinimapCalibration): Promise<void> {
+  private _currentPatch: string = '16.16.1'
+
+  public async startSupervising(
+    sessionId: string,
+    calibration: MinimapCalibration,
+    patch: string = '16.16.1'
+  ): Promise<void> {
     if (this._isSupervising && this._currentSessionId === sessionId) {
       return
     }
 
     this._currentSessionId = sessionId
+    this._currentPatch = patch
     this._isSupervising = true
     this._consecutiveCrashes = 0
     this._currentCalibration = calibration
@@ -200,6 +207,7 @@ export class CaptureProcessSupervisorController {
     child.postMessage({
       type: 'start',
       sessionId,
+      patch: this._currentPatch,
       targetHwnd: null,
       targetPid: this._targetPid,
       backend: 'desktopCapturer',

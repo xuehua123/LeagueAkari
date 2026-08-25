@@ -1,6 +1,7 @@
 import { CoachSessionState, MinimapObservationBatch } from '@shared/types/live-coach'
 import { LiveGameSnapshot } from '@shared/types/live-game-data'
 import { formatError } from '@shared/utils/errors'
+import { makeAutoObservable, observable } from 'mobx'
 
 import { LiveCoachCapabilityController } from './capability-controller'
 import type { LiveCoachMainContext } from './context'
@@ -15,7 +16,7 @@ export class LiveCoachSessionController {
   private _liveDataDisposer: (() => void) | null = null
   private _roiHealthDisposer: (() => void) | null = null
   private _isPaused = false
-  private _latestPatch: string | null = null
+  public latestPatch: string | null = null
 
   constructor(
     private readonly _context: LiveCoachMainContext,
@@ -24,6 +25,10 @@ export class LiveCoachSessionController {
   ) {
     this._fusion = new FactFusionEngine()
     this._ruleEngine = new CoachRuleEngine()
+
+    makeAutoObservable(this, {
+      latestPatch: observable
+    })
 
     // 监听证据失效事件并通知调度器取消对应 Cue（P1-005）
     this._fusion.onEvidenceInvalidated = (invalidatedIds) => {
@@ -38,8 +43,9 @@ export class LiveCoachSessionController {
   public init(): void {
     // 1. Subscribe to LiveGameDataMain
     this._liveDataDisposer = this._context.liveGameData.subscribe('game-stats', (snapshot) => {
-      if (snapshot.patch) {
-        this._latestPatch = snapshot.patch
+      if (snapshot.patch && snapshot.patch !== this.latestPatch) {
+        this.latestPatch = snapshot.patch
+        this._context.state.setSessionInfo({ patch: snapshot.patch })
       }
       this._onLiveGameSnapshot(snapshot)
     })
@@ -60,7 +66,7 @@ export class LiveCoachSessionController {
 
         const mapId = session?.map?.id ?? null
         const queueId = session?.gameData?.queue?.id ?? null
-        const patch = this._latestPatch || '14.15.1'
+        const patch = this.latestPatch || '16.16.1'
 
         this._capabilityController.evaluateCapabilities(mapId, queueId, patch, {
           roiHealth: this._context.state.capture.roiState
@@ -105,13 +111,13 @@ export class LiveCoachSessionController {
       () => ({
         roiState: this._context.state.capture.roiState,
         enabled: this._context.settings.enabled,
-        patch: this._latestPatch
+        patch: this.latestPatch
       }),
       ({ roiState, patch }) => {
         const session = this._context.leagueClient.data.gameflow.session
         const mapId = session?.map?.id ?? null
         const queueId = session?.gameData?.queue?.id ?? null
-        this._capabilityController.evaluateCapabilities(mapId, queueId, patch || '14.15.1', {
+        this._capabilityController.evaluateCapabilities(mapId, queueId, patch || '16.16.1', {
           roiHealth: roiState
         })
       }

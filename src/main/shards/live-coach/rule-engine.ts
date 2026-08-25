@@ -7,6 +7,7 @@ export interface RuleEvaluationContext {
   patch: string
   fusion: FactFusionEngine
   enabledCategories: Record<string, boolean>
+  enabledCapabilities?: Set<string>
   currentTime?: number
 }
 
@@ -188,14 +189,13 @@ export class RuleTurretPlatingFall implements CoachRule {
 }
 
 /**
- * 规则 3：小地图局部敌人聚集预警（基于 2D 空间聚类计算）
+ * 规则 3：小地图局部敌方多人聚集预警（基于欧氏几何空间距离聚类算法）
  */
 export class RuleMinimapEnemyGrouping implements CoachRule {
   id = 'rule_minimap_enemy_grouping'
   version = '1.1.0'
   category = 'warning' as const
   private _lastTriggerTime: number = 0
-  private readonly _clusterRadius = 0.18 // 归一化小地图距离阈值
 
   reset(): void {
     this._lastTriggerTime = 0
@@ -203,51 +203,49 @@ export class RuleMinimapEnemyGrouping implements CoachRule {
 
   evaluate(ctx: RuleEvaluationContext): CoachCue | null {
     if (!ctx.enabledCategories[this.category]) return null
+    if (ctx.enabledCapabilities && !ctx.enabledCapabilities.has('coach.analyze.minimap-advanced')) {
+      return null
+    }
 
     const entities = ctx.fusion.getMinimapEntities()
-    const enemyEntities = entities.filter((e) => e.team === 'enemy')
+    const enemyEntities = entities.filter(
+      (e) => (e.kind === 'enemy' || e.team === 'enemy') && e.lifecycle !== 'invalidated'
+    )
 
     if (enemyEntities.length < 3) {
       return null
     }
 
-    // 2D 空间聚类检测：寻找是否有半径 <= 0.18 内聚集 >= 3 个敌方单位的簇
-    let targetCluster: typeof enemyEntities | null = null
-
+    // 空间聚类：检查是否有 >= 3 名敌人在归一化小地图距离 < 0.18 内
+    let targetCluster: typeof enemyEntities = []
     for (let i = 0; i < enemyEntities.length; i++) {
-      const p1 = enemyEntities[i].point
       const cluster = [enemyEntities[i]]
-
       for (let j = 0; j < enemyEntities.length; j++) {
         if (i === j) continue
-        const p2 = enemyEntities[j].point
-        const dist = Math.sqrt((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2)
-        if (dist <= this._clusterRadius) {
+        const dx = enemyEntities[i].point.x - enemyEntities[j].point.x
+        const dy = enemyEntities[i].point.y - enemyEntities[j].point.y
+        const dist = Math.sqrt(dx * dx + dy * dy)
+        if (dist <= 0.18) {
           cluster.push(enemyEntities[j])
         }
       }
-
       if (cluster.length >= 3) {
         targetCluster = cluster
         break
       }
     }
 
-    if (!targetCluster) {
+    if (targetCluster.length < 3) {
       return null
     }
 
     const now = ctx.currentTime ?? Date.now()
-    if (now - this._lastTriggerTime >= 20000) {
+    if (now - this._lastTriggerTime >= 30000) {
       this._lastTriggerTime = now
 
-      const eviIds: string[] = []
-      for (const e of targetCluster) {
-        const eviId = ctx.fusion.getMinimapEvidenceId(e.trackId)
-        if (eviId) {
-          eviIds.push(eviId)
-        }
-      }
+      const eviIds = targetCluster
+        .map((e) => ctx.fusion.getMinimapEvidenceId(e.trackId))
+        .filter((id): id is string => Boolean(id))
 
       const options: CoachOption[] = [
         {
@@ -306,6 +304,9 @@ export class RuleFogInference implements CoachRule {
 
   evaluate(ctx: RuleEvaluationContext): CoachCue | null {
     if (!ctx.enabledCategories[this.category]) return null
+    if (ctx.enabledCapabilities && !ctx.enabledCapabilities.has('coach.analyze.fog-inference')) {
+      return null
+    }
 
     const now = ctx.currentTime ?? Date.now()
     const inferences = ctx.fusion.getFogInferences(now)
@@ -384,6 +385,9 @@ export class RuleItemPurchaseGuidance implements CoachRule {
 
   evaluate(ctx: RuleEvaluationContext): CoachCue | null {
     if (!ctx.enabledCategories[this.category]) return null
+    if (ctx.enabledCapabilities && !ctx.enabledCapabilities.has('coach.guidance.item-purchase')) {
+      return null
+    }
 
     const now = ctx.currentTime ?? Date.now()
     const guidance = ctx.fusion.getItemPurchaseGuidance(now)
@@ -441,7 +445,7 @@ export class RuleItemPurchaseGuidance implements CoachRule {
 }
 
 /**
- * 规则 6：对线期控线与防抓时机提醒（基于对线时长、打野在迷雾中未出现的事实依据）
+ * 规则 6：对线期控线与防抓时机提醒（基于红蓝方阵营、敌方打野在迷雾中未出现的事实依据）
  */
 export class RuleBasicSkillsAndTactics implements CoachRule {
   id = 'rule_basic_skills_and_tactics'
@@ -455,21 +459,33 @@ export class RuleBasicSkillsAndTactics implements CoachRule {
 
   evaluate(ctx: RuleEvaluationContext): CoachCue | null {
     if (!ctx.enabledCategories[this.category]) return null
+    if (ctx.enabledCapabilities && !ctx.enabledCapabilities.has('coach.analyze.minimap-basic')) {
+      return null
+    }
 
     const gameTime = ctx.fusion.getGameTimeSeconds()
     if (gameTime === null || gameTime < 180 || gameTime > 600) return null
 
     const now = ctx.currentTime ?? Date.now()
     if (now - this._lastTriggerTime >= 90000) {
+      const activePlayer = ctx.fusion.getActivePlayer()
+      const myTeam = activePlayer?.team
+      if (!myTeam) return null
+
+      const enemyTeam = myTeam === 'ORDER' ? 'CHAOS' : 'ORDER'
       const players = ctx.fusion.getPlayers()
       const minimapEntities = ctx.fusion.getMinimapEntities()
 
-      // 检查敌方打野是否在小地图上不可见
-      const enemyJungler = players.find(
-        (p) => (p.team === 'CHAOS' || (p as any).team === 'enemy') && p.position === 'JUNGLE'
-      )
+      // 准确查找敌方阵营的打野英雄
+      const enemyJungler = players.find((p) => p.team === enemyTeam && p.position === 'JUNGLE')
+      if (!enemyJungler) return null
+
+      // 检查敌方打野是否在小地图上可见
       const isEnemyJunglerSeen = minimapEntities.some(
-        (e) => e.team === 'enemy' && e.championId === enemyJungler?.championId
+        (e) =>
+          e.team === 'enemy' &&
+          ((enemyJungler.championId && e.championId === enemyJungler.championId) ||
+            e.trackId === enemyJungler.summonerName)
       )
 
       // 当敌方打野处于迷雾中时，触发控线与防抓提醒
@@ -489,7 +505,8 @@ export class RuleBasicSkillsAndTactics implements CoachRule {
           freshness: { expiresAt: now + 20000, state: 'fresh' },
           payload: {
             gameTime,
-            enemyJunglerChampionId: enemyJungler?.championId ?? null,
+            myTeam,
+            enemyJunglerChampionId: enemyJungler.championId ?? null,
             reason: 'enemy-jungler-in-fog'
           }
         })
@@ -552,6 +569,9 @@ export class RuleCommunicationPing implements CoachRule {
 
   evaluate(ctx: RuleEvaluationContext): CoachCue | null {
     if (!ctx.enabledCategories[this.category]) return null
+    if (ctx.enabledCapabilities && !ctx.enabledCapabilities.has('coach.communication.ping')) {
+      return null
+    }
 
     const inferences = ctx.fusion.getFogInferences()
     const roamingEnemy = inferences.find((f) =>

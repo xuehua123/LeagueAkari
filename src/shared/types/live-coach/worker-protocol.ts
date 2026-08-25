@@ -56,6 +56,14 @@ export interface MainToWorkerShutdownMessage {
   reason: string
 }
 
+export interface MainToWorkerFrameBufferMessage {
+  type: 'frame-buffer'
+  buffer: Uint8Array | Buffer | ArrayBuffer
+  width: number
+  height: number
+  observedAt: number
+}
+
 export type MainToWorkerMessage =
   | MainToWorkerInitMessage
   | MainToWorkerStartMessage
@@ -64,6 +72,7 @@ export type MainToWorkerMessage =
   | MainToWorkerRequestPreviewMessage
   | MainToWorkerPingMessage
   | MainToWorkerShutdownMessage
+  | MainToWorkerFrameBufferMessage
 
 export interface WorkerToMainReadyMessage {
   type: 'ready'

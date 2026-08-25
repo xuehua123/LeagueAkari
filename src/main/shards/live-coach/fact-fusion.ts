@@ -64,7 +64,7 @@ const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
         name: '卢登的伙伴',
         cost: 3000,
         components: [
-          { id: 3802, name: '遗失的章节', cost: 1200 },
+          { id: 3803, name: '遗失的章节', cost: 1200 }, // 修正 ID 为 3803，消除 3802 自引用冲突
           { id: 3145, name: '海克斯科技发电机', cost: 1100 },
           { id: 1052, name: '增幅典籍', cost: 400 }
         ],
@@ -193,12 +193,11 @@ const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
   }
 }
 
-// 英雄流派分类库（包含 Smolder 斯莫德及全部典型英雄）
+// 英雄流派分类库（包含 Smolder 斯莫德及全部英雄分类）
 const CHAMPION_ROLES_MAP: Record<
   string,
   'fighter' | 'mage' | 'marksman' | 'tank' | 'assassin' | 'support'
 > = {
-  // 射手
   smolder: 'marksman',
   jinx: 'marksman',
   ashe: 'marksman',
@@ -222,7 +221,6 @@ const CHAMPION_ROLES_MAP: Record<
   nilah: 'marksman',
   kalista: 'marksman',
   akshan: 'marksman',
-  // 法师
   ahri: 'mage',
   lux: 'mage',
   syndra: 'mage',
@@ -252,7 +250,6 @@ const CHAMPION_ROLES_MAP: Record<
   vladimir: 'mage',
   ziggs: 'mage',
   zoe: 'mage',
-  // 战士
   garen: 'fighter',
   darius: 'fighter',
   sett: 'fighter',
@@ -274,7 +271,6 @@ const CHAMPION_ROLES_MAP: Record<
   yasuo: 'fighter',
   briar: 'fighter',
   ambessa: 'fighter',
-  // 坦克
   malphite: 'tank',
   ornn: 'tank',
   sion: 'tank',
@@ -294,7 +290,6 @@ const CHAMPION_ROLES_MAP: Record<
   tahmkench: 'tank',
   taric: 'tank',
   zac: 'tank',
-  // 刺客
   zed: 'assassin',
   talon: 'assassin',
   khazix: 'assassin',
@@ -312,7 +307,6 @@ const CHAMPION_ROLES_MAP: Record<
   nocturne: 'assassin',
   rengar: 'assassin',
   shaco: 'assassin',
-  // 辅助
   lulu: 'support',
   nami: 'support',
   janna: 'support',
@@ -393,6 +387,11 @@ export class FactFusionEngine {
 
     if (batch.health === 'healthy') {
       for (const entity of batch.entities) {
+        // 关键修复：忽略 invalidated 轨迹，只有 candidate 或 confirmed 状态才视为当前可见实体！
+        if (entity.lifecycle === 'invalidated') {
+          continue
+        }
+
         const evidenceId = `evi_minimap_${entity.trackId}_${now}`
         this._trackIdToEvidenceId.set(entity.trackId, evidenceId)
 
@@ -448,14 +447,17 @@ export class FactFusionEngine {
   }
 
   /**
-   * 计算迷雾与不可见敌人时空推断（考虑速度向量、死亡状态、地图图结构与阵营）
+   * 计算迷雾与不可见敌人时空推断（考虑速度向量、死亡英雄 ID 抑制、地图图结构与阵营）
    */
   private _computeFogInferences(sessionId: string, patch: string, now: number): void {
     // 检查是否有玩家已死亡（死亡玩家不参与迷雾游走推断）
+    const deadChampionIds = new Set<number>()
     const deadTrackIds = new Set<string>()
+
     if (this._latestLiveGameSnapshot) {
       for (const p of this._latestLiveGameSnapshot.players) {
         if (p.isDead || (p.respawnTimer && p.respawnTimer > 0)) {
+          if (p.championId) deadChampionIds.add(p.championId)
           deadTrackIds.add(p.summonerName.toLowerCase())
           deadTrackIds.add(`enemy_${p.championName.toLowerCase()}`)
           if (p.championId) deadTrackIds.add(`enemy_${p.championId}`)
@@ -464,7 +466,11 @@ export class FactFusionEngine {
     }
 
     for (const [trackId, lastSeen] of this._lastSeenEnemies.entries()) {
-      if (deadTrackIds.has(trackId)) {
+      // 关键修复：通过 lastSeen.championId 与 deadChampionIds 精准匹配抑制死亡敌方英雄！
+      if (
+        (lastSeen.championId && deadChampionIds.has(lastSeen.championId)) ||
+        deadTrackIds.has(trackId.toLowerCase())
+      ) {
         this._fogInferences.delete(trackId)
         continue
       }
@@ -487,9 +493,10 @@ export class FactFusionEngine {
         const predictedRegions: Array<{ regionId: string; probability: number }> = []
         const candidateRoutes: Array<{ regionIds: string[]; probability: number }> = []
 
-        // 根据位置与运动向量推断
-        const isHeadingBot = vy > 0.005 || (vy >= -0.005 && lastSeen.point.y > 0.45)
-        const isHeadingTop = vy < -0.005 || (vy <= 0.005 && lastSeen.point.y < 0.55)
+        // 根据位置与运动向量推断（静止时对称分布，消除单向偏好退化）
+        const isMoving = Math.abs(vy) > 0.005
+        const isHeadingBot = isMoving && vy > 0.005
+        const isHeadingTop = isMoving && vy < -0.005
 
         if (
           lastSeen.regionId === 'mid_lane' ||
@@ -523,16 +530,17 @@ export class FactFusionEngine {
               probability: 0.25
             })
           } else {
+            // 静止时对称分布
             predictedRegions.push({ regionId: 'bot_river', probability: 0.45 })
-            predictedRegions.push({ regionId: 'top_river', probability: 0.35 })
-            predictedRegions.push({ regionId: 'base_recall', probability: 0.2 })
+            predictedRegions.push({ regionId: 'top_river', probability: 0.45 })
+            predictedRegions.push({ regionId: 'base_recall', probability: 0.1 })
             candidateRoutes.push({
               regionIds: ['mid_lane', 'bot_river', 'bot_lane'],
-              probability: 0.5
+              probability: 0.45
             })
             candidateRoutes.push({
               regionIds: ['mid_lane', 'top_river', 'top_lane'],
-              probability: 0.3
+              probability: 0.45
             })
           }
         } else if (lastSeen.point.y > 0.5) {
@@ -635,6 +643,12 @@ export class FactFusionEngine {
 
     const championNameClean = (active.championName || '').toLowerCase().replace(/[^a-z]/g, '')
     const championId = matchingPlayer?.championId ?? (active as any).championId ?? null
+
+    // 关键修复：当本人英雄无法确认 (championId === null 或非正数) 时，不生成非法 Guidance！
+    if (championId === null || typeof championId !== 'number' || championId <= 0) {
+      this._latestItemGuidance = null
+      return
+    }
 
     // 确定英雄流派
     let role = CHAMPION_ROLES_MAP[championNameClean]
@@ -889,5 +903,18 @@ export class FactFusionEngine {
 
   public getPlayers(): NormalizedPlayer[] {
     return this._latestLiveGameSnapshot?.players ?? []
+  }
+
+  public getActivePlayer(): NormalizedPlayer | null {
+    if (!this._latestLiveGameSnapshot?.activePlayer) return null
+    const active = this._latestLiveGameSnapshot.activePlayer
+    return (
+      this._latestLiveGameSnapshot.players.find(
+        (p) =>
+          p.summonerName === active.summonerName ||
+          p.riotId === active.riotId ||
+          p.championName === active.championName
+      ) || null
+    )
   }
 }

@@ -61,7 +61,9 @@ export class LiveCoachSessionController {
         const queueId = session?.gameData?.queue?.id ?? null
         const patch = this._latestPatch || '14.15.1'
 
-        this._capabilityController.evaluateCapabilities(mapId, queueId, patch)
+        this._capabilityController.evaluateCapabilities(mapId, queueId, patch, {
+          roiHealth: this._context.state.capture.roiState
+        })
 
         if (phase === 'InProgress') {
           // 严格检查：非召唤师峡谷（Map 11）或非 Windows 环境，阻断启动
@@ -181,11 +183,13 @@ export class LiveCoachSessionController {
       const sessionId = this._context.state.session.id || batch.sessionId
       const patch = this._context.state.session.patch || batch.patch
 
+      const enabledCapabilities = new Set(this._context.state.capability.enabledFeatureIds)
       const cues = this._ruleEngine.evaluate({
         sessionId,
         patch,
         fusion: this._fusion,
-        enabledCategories: this._context.settings.cueCategories
+        enabledCategories: this._context.settings.cueCategories,
+        enabledCapabilities
       })
 
       if (cues.length > 0) {
@@ -207,11 +211,13 @@ export class LiveCoachSessionController {
       const sessionId = this._context.state.session.id || snapshot.sessionId
       const patch = this._context.state.session.patch || snapshot.patch
 
+      const enabledCapabilities = new Set(this._context.state.capability.enabledFeatureIds)
       const cues = this._ruleEngine.evaluate({
         sessionId,
         patch,
         fusion: this._fusion,
-        enabledCategories: this._context.settings.cueCategories
+        enabledCategories: this._context.settings.cueCategories,
+        enabledCapabilities
       })
 
       if (cues.length > 0) {

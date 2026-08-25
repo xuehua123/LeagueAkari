@@ -4,10 +4,11 @@ import {
   WorkerToMainMessage,
   workerToMainMessageSchema
 } from '@shared/types/live-coach'
-import { type UtilityProcess, app, utilityProcess } from 'electron'
+import { type UtilityProcess, app, desktopCapturer, utilityProcess } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
 
+import { getPidsByName } from '../../native'
 import type { MinimapCalibrationController } from './calibration-controller'
 import type { MinimapObserverMainContext } from './context'
 import type { MinimapObservationController } from './observation-controller'
@@ -19,8 +20,11 @@ export class CaptureProcessSupervisorController {
   private _consecutiveCrashes = 0
   private readonly _maxCrashLimit = 3
   private _gameflowDisposer: (() => void) | null = null
+  private _captureTimer: NodeJS.Timeout | null = null
   private _simulationTimer: NodeJS.Timeout | null = null
   private _onObservationBatchCallback: ((batch: MinimapObservationBatch) => void) | null = null
+  private _currentCalibration: MinimapCalibration | null = null
+  private _targetPid: number | null = null
 
   constructor(
     private readonly _context: MinimapObserverMainContext,
@@ -63,7 +67,7 @@ export class CaptureProcessSupervisorController {
     this._onObservationBatchCallback = cb
   }
 
-  public startSupervising(sessionId: string, calibration: MinimapCalibration): void {
+  public async startSupervising(sessionId: string, calibration: MinimapCalibration): Promise<void> {
     if (this._isSupervising && this._currentSessionId === sessionId) {
       return
     }
@@ -71,6 +75,7 @@ export class CaptureProcessSupervisorController {
     this._currentSessionId = sessionId
     this._isSupervising = true
     this._consecutiveCrashes = 0
+    this._currentCalibration = calibration
 
     this._context.logger.info(
       `Starting MinimapObserver capture supervisor for session: ${sessionId}`
@@ -79,23 +84,26 @@ export class CaptureProcessSupervisorController {
     this._context.state.setBackend('wgc')
     this._context.state.setFps(15)
 
-    // 将归一化 ROI (0~1) 转换为像素级实际画面 ROI
-    const screenWidth = 1920
-    const screenHeight = 1080
-    const pixelRoi = {
-      x: Math.round(calibration.roi.x * screenWidth),
-      y: Math.round(calibration.roi.y * screenHeight),
-      width: Math.round(calibration.roi.width * screenWidth),
-      height: Math.round(calibration.roi.height * screenHeight)
+    // 查找英雄联盟游戏客户端进程 PID
+    try {
+      if (process.platform === 'win32') {
+        const pids = await getPidsByName('League of Legends.exe')
+        if (pids && pids.length > 0) {
+          this._targetPid = pids[0]
+        }
+      }
+    } catch {
+      // 忽略未找到进程错误
     }
 
     try {
-      this._spawnWorker(sessionId, pixelRoi)
+      this._spawnWorker(sessionId, calibration)
+      this._startCaptureLoop()
     } catch (err: any) {
       this._context.logger.warn(
-        `Failed to spawn utility worker: ${err.message}. Falling back to internal loop.`
+        `Failed to spawn utility worker: ${err.message}. Falling back to degraded status.`
       )
-      this._startInternalPipeline(sessionId, pixelRoi)
+      this._startInternalPipeline(sessionId, calibration.roi)
     }
   }
 
@@ -106,7 +114,14 @@ export class CaptureProcessSupervisorController {
 
     this._isSupervising = false
     this._currentSessionId = ''
+    this._currentCalibration = null
+    this._targetPid = null
     this._context.state.reset()
+
+    if (this._captureTimer) {
+      clearInterval(this._captureTimer)
+      this._captureTimer = null
+    }
 
     if (this._simulationTimer) {
       clearInterval(this._simulationTimer)
@@ -130,10 +145,7 @@ export class CaptureProcessSupervisorController {
     this._context.logger.info('Stopped MinimapObserver capture supervisor')
   }
 
-  private _spawnWorker(
-    sessionId: string,
-    pixelRoi: { x: number; y: number; width: number; height: number }
-  ): void {
+  private _spawnWorker(sessionId: string, calibration: MinimapCalibration): void {
     const candidatePaths = [
       path.join(__dirname, 'minimap-observer-worker.js'),
       path.join(__dirname, '../utility-processes/minimap-observer/index.js'),
@@ -146,7 +158,7 @@ export class CaptureProcessSupervisorController {
       this._context.logger.info(
         'Worker bundle not found on disk, running internal observation pipeline'
       )
-      this._startInternalPipeline(sessionId, pixelRoi)
+      this._startInternalPipeline(sessionId, calibration.roi)
       return
     }
 
@@ -170,10 +182,10 @@ export class CaptureProcessSupervisorController {
 
       if (this._isSupervising) {
         if (this._consecutiveCrashes >= this._maxCrashLimit) {
-          this._context.logger.error('Worker exceeded crash limit, switching to internal pipeline')
-          this._startInternalPipeline(sessionId, pixelRoi)
+          this._context.logger.error('Worker exceeded crash limit, switching to degraded pipeline')
+          this._startInternalPipeline(sessionId, calibration.roi)
         } else {
-          this._spawnWorker(sessionId, pixelRoi)
+          this._spawnWorker(sessionId, calibration)
         }
       }
     })
@@ -189,14 +201,70 @@ export class CaptureProcessSupervisorController {
       type: 'start',
       sessionId,
       targetHwnd: null,
-      targetPid: null,
+      targetPid: this._targetPid,
       backend: 'wgc',
       detectors: ['enemy-champions', 'neutral-objectives'],
       captureConfig: {
         fps: 15,
-        roi: pixelRoi
+        roi: {
+          x: Math.round(calibration.roi.x * 1920),
+          y: Math.round(calibration.roi.y * 1080),
+          width: Math.round(calibration.roi.width * 1920),
+          height: Math.round(calibration.roi.height * 1080)
+        }
       }
     })
+  }
+
+  private _startCaptureLoop(): void {
+    if (this._captureTimer) {
+      clearInterval(this._captureTimer)
+    }
+
+    // 10 FPS 采样向 Worker 提供真实画面帧（支持 4K / 2K / 1080p 动态分辨率）
+    this._captureTimer = setInterval(async () => {
+      if (!this._isSupervising || !this._worker || !this._currentCalibration) {
+        return
+      }
+
+      try {
+        const sources = await desktopCapturer.getSources({
+          types: ['window', 'screen'],
+          thumbnailSize: { width: 3840, height: 2160 }
+        })
+
+        // 优先匹配英雄联盟游戏客户端窗口
+        const gameSource = sources.find((s) => s.name.includes('League of Legends')) || sources[0]
+
+        if (gameSource && gameSource.thumbnail) {
+          const size = gameSource.thumbnail.getSize()
+          if (size.width > 100 && size.height > 100) {
+            const cal = this._currentCalibration
+            const pixelRoi = {
+              x: Math.max(0, Math.round(cal.roi.x * size.width)),
+              y: Math.max(0, Math.round(cal.roi.y * size.height)),
+              width: Math.min(size.width, Math.round(cal.roi.width * size.width)),
+              height: Math.min(size.height, Math.round(cal.roi.height * size.height))
+            }
+
+            if (pixelRoi.width > 20 && pixelRoi.height > 20) {
+              const minimapCrop = gameSource.thumbnail.crop(pixelRoi)
+              const rawBitmap = minimapCrop.toBitmap()
+
+              this._worker.postMessage({
+                type: 'frame-buffer',
+                buffer: rawBitmap,
+                width: pixelRoi.width,
+                height: pixelRoi.height,
+                observedAt: Date.now()
+              })
+            }
+          }
+        }
+      } catch {
+        // 捕获异常保持稳定运行
+      }
+    }, 100)
   }
 
   private _handleWorkerMessage(msg: WorkerToMainMessage): void {
@@ -207,6 +275,7 @@ export class CaptureProcessSupervisorController {
         break
       case 'observation-batch':
         this._context.state.setFrameAgeMs(msg.batch.frame.ageMs)
+        this._context.state.setRoiHealth(msg.batch.health)
         if (this._onObservationBatchCallback) {
           this._onObservationBatchCallback(msg.batch)
         }
@@ -214,10 +283,14 @@ export class CaptureProcessSupervisorController {
         break
       case 'error':
         this._context.logger.warn(`Worker reported error [${msg.code}]: ${msg.details}`)
+        this._context.state.setRoiHealth('degraded')
         break
     }
   }
 
+  /**
+   * 内部回退循环：无真实 Worker 或画面时必须标记为 unknown/degraded，绝不伪造 healthy
+   */
   private _startInternalPipeline(
     sessionId: string,
     _roi: { x: number; y: number; width: number; height: number }
@@ -226,6 +299,8 @@ export class CaptureProcessSupervisorController {
       clearInterval(this._simulationTimer)
     }
 
+    this._context.state.setRoiHealth('unknown')
+
     let sequence = 0
     this._simulationTimer = setInterval(() => {
       if (!this._isSupervising) return
@@ -233,6 +308,7 @@ export class CaptureProcessSupervisorController {
       sequence++
       const now = Date.now()
 
+      // 无传感器数据时，报告 health: 'unknown'，entities: []
       const batch: MinimapObservationBatch = {
         sessionId,
         patch: '14.15.1',
@@ -242,9 +318,9 @@ export class CaptureProcessSupervisorController {
           observedAt: now,
           receivedAt: now,
           sequence,
-          ageMs: 10
+          ageMs: 0
         },
-        health: 'healthy',
+        health: 'unknown',
         entities: [],
         events: []
       }

@@ -377,6 +377,15 @@ function handleMainMessage(rawMsg: unknown) {
       break
     }
 
+    case 'frame-buffer': {
+      latestFrameBuffer = Buffer.isBuffer(msg.buffer)
+        ? msg.buffer
+        : new Uint8Array(msg.buffer as any)
+      if (msg.width) frameWidth = msg.width
+      if (msg.height) frameHeight = msg.height
+      break
+    }
+
     case 'shutdown': {
       isRunning = false
       if (loopTimer) {

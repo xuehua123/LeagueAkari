@@ -60,12 +60,21 @@ export class LiveCoachCapabilityController {
     // 4. 补丁检查
     if (patch && !patch.startsWith('14.') && !patch.startsWith('15.')) {
       unavailable['patch'] = 'unsupported-patch'
+      unavailable['coach.analyze.fog-inference'] = 'unsupported-patch'
+      unavailable['coach.guidance.item-purchase'] = 'unsupported-patch'
+      unavailable['coach.analyze.minimap-basic'] = 'unsupported-patch'
+      unavailable['coach.analyze.minimap-advanced'] = 'unsupported-patch'
     }
 
     // 5. 采集状态与 ROI 健康检查
-    if (workerStatus?.roiHealth === 'degraded' || workerStatus?.roiHealth === 'occluded') {
+    if (
+      workerStatus?.roiHealth === 'unknown' ||
+      workerStatus?.roiHealth === 'degraded' ||
+      workerStatus?.roiHealth === 'occluded'
+    ) {
       unavailable['coach.capture.screen'] = 'roi-occluded'
       unavailable['coach.analyze.minimap-basic'] = 'roi-occluded'
+      unavailable['coach.analyze.minimap-advanced'] = 'roi-occluded'
       unavailable['coach.analyze.fog-inference'] = 'roi-occluded'
     } else if (workerStatus?.state === 'error' || workerStatus?.state === 'stopped') {
       unavailable['coach.capture.screen'] = 'capture-stalled'

@@ -8,7 +8,8 @@ export class CueSchedulerController {
   private _pendingCues: CoachCue[] = []
   private _currentSpeakingCue: CoachCue | null = null
   private _lastSpokenTime = 0
-  private readonly _minSpokenIntervalMs = 3000
+  private readonly _minSpokenIntervalMs = 2500
+  private _nextCueTimer: NodeJS.Timeout | null = null
 
   constructor(
     private readonly _context: LiveCoachMainContext,
@@ -22,13 +23,56 @@ export class CueSchedulerController {
   }
 
   public submitCues(cues: CoachCue[]): void {
+    const now = Date.now()
+    const categories = this._context.settings.cueCategories
+    const mode = this._context.settings.coachMode
+
+    // 模式门槛判定：minimal 仅放行 >= 70 高危提示，balanced 放行 >= 40，training 放行 >= 20
+    const minPriorityThreshold = mode === 'minimal' ? 70 : mode === 'balanced' ? 40 : 20
+
+    let highestNewPriority = 0
+
     for (const cue of cues) {
+      // 1. 过滤已关闭类别
+      if (categories && categories[cue.category] === false) {
+        continue
+      }
+      // 2. 过滤不满足模式门槛的提示
+      if (cue.priority < minPriorityThreshold) {
+        continue
+      }
+      // 3. 过滤已过期的提示
+      if (cue.expiresAt <= now) {
+        continue
+      }
+
       this._cues.set(cue.id, cue)
       this._pendingCues.push(cue)
+      if (cue.priority > highestNewPriority) {
+        highestNewPriority = cue.priority
+      }
     }
 
     // 按优先级降序排序 (Priority 越高越先播放)
     this._pendingCues.sort((a, b) => b.priority - a.priority)
+
+    // 限制队列上限（保留最高优先级的 5 条提示）
+    if (this._pendingCues.length > 5) {
+      this._pendingCues = this._pendingCues.slice(0, 5)
+    }
+
+    // 高优先级打断低优先级播报（Preemption）
+    if (
+      this._currentSpeakingCue &&
+      highestNewPriority >= 70 &&
+      highestNewPriority > this._currentSpeakingCue.priority + 15
+    ) {
+      const interruptedCueId = this._currentSpeakingCue.id
+      this._speechExecutor.cancel()
+      this._currentSpeakingCue = null
+      this._notifyCueCancelled(interruptedCueId, 'interrupted-by-higher-priority')
+    }
+
     this._processNextCue()
   }
 
@@ -45,6 +89,7 @@ export class CueSchedulerController {
       this._currentSpeakingCue = null
       this._context.state.setSpeechState('idle')
       this._context.state.setCue(null)
+      this._scheduleNextProcess(100)
     }
 
     this._notifyCueCancelled(cueId, reason)
@@ -77,6 +122,7 @@ export class CueSchedulerController {
       this._currentSpeakingCue = null
       this._context.state.setSpeechState('idle')
       this._context.state.setCue(null)
+      this._scheduleNextProcess(100)
     }
 
     for (const id of cancelledIds) {
@@ -85,12 +131,26 @@ export class CueSchedulerController {
   }
 
   public reset(): void {
+    if (this._nextCueTimer) {
+      clearTimeout(this._nextCueTimer)
+      this._nextCueTimer = null
+    }
     this._speechExecutor.cancel()
     this._pendingCues = []
     this._currentSpeakingCue = null
     this._cues.clear()
     this._context.state.setCue(null)
     this._context.state.setSpeechState('idle')
+  }
+
+  private _scheduleNextProcess(delayMs: number): void {
+    if (this._nextCueTimer) {
+      clearTimeout(this._nextCueTimer)
+    }
+    this._nextCueTimer = setTimeout(() => {
+      this._nextCueTimer = null
+      this._processNextCue()
+    }, delayMs)
   }
 
   private async _processNextCue(): Promise<void> {
@@ -108,12 +168,16 @@ export class CueSchedulerController {
     }
     this._pendingCues = unexpired
 
-    // 2. 检查当前是否正在播报或处于最小间隔期
+    // 2. 检查当前是否正在播报
     if (this._speechExecutor.isSpeaking || this._currentSpeakingCue) {
       return
     }
 
-    if (now - this._lastSpokenTime < this._minSpokenIntervalMs) {
+    // 3. 检查最小播报时间间隔
+    const elapsedSinceLastSpoken = now - this._lastSpokenTime
+    if (elapsedSinceLastSpoken < this._minSpokenIntervalMs) {
+      const waitTime = this._minSpokenIntervalMs - elapsedSinceLastSpoken
+      this._scheduleNextProcess(waitTime)
       return
     }
 
@@ -149,15 +213,18 @@ export class CueSchedulerController {
     const outputs = this._context.settings.outputMode
     const shouldSpeak = this._context.settings.speechEnabled && outputs.includes('speech')
 
-    if (shouldSpeak) {
-      await this._speechExecutor.speak(nextCue.spokenText, {
-        volume: this._context.settings.speechVolume,
-        rate: this._context.settings.speechRate,
-        voiceId: this._context.settings.speechVoiceId
-      })
-    } else {
-      // 字幕模式模拟显示时长
-      await new Promise((r) => setTimeout(r, 2500))
+    try {
+      if (shouldSpeak) {
+        await this._speechExecutor.speak(nextCue.spokenText, {
+          volume: this._context.settings.speechVolume,
+          rate: this._context.settings.speechRate,
+          voiceId: this._context.settings.speechVoiceId
+        })
+      } else {
+        await new Promise((r) => setTimeout(r, 2000))
+      }
+    } catch {
+      // 忽略播报中途被打断或取消错误
     }
 
     if (this._currentSpeakingCue === nextCue) {
@@ -170,6 +237,9 @@ export class CueSchedulerController {
           this._context.state.setCue(null)
         }
       }, 2000)
+
+      // 4. 关键修复：播报完成后自动继续调度队列中的后续 Cue！
+      this._scheduleNextProcess(this._minSpokenIntervalMs)
     }
   }
 

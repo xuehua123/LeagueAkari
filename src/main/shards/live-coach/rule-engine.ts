@@ -317,7 +317,8 @@ export class RuleFogInference implements CoachRule {
       this._lastTriggerTime = now
 
       const topRegion = highRisk.predictedRegions[0]?.regionId || '河道'
-      const eviIds = [...highRisk.basisEvidenceIds]
+      const fogEvidenceId = `evi_fog_${highRisk.id}`
+      const eviIds = [...highRisk.basisEvidenceIds, fogEvidenceId]
 
       // 动态计算预计到达秒数范围（消除硬编码 15~25s 矛盾）
       const minSec = Math.max(1, Math.round((highRisk.arrivalWindow.earliestAt - now) / 1000))
@@ -388,13 +389,12 @@ export class RuleItemPurchaseGuidance implements CoachRule {
     const guidance = ctx.fusion.getItemPurchaseGuidance(now)
     if (!guidance) return null
 
-    // 当金币满足购买推荐大件或重要组件时触发建议
-    if (guidance.currentGold >= 800) {
-      const now = ctx.currentTime ?? Date.now()
+    // 关键修复：仅当玩家金币真正满足核心装备或组件的购买总额 (missingGold === 0) 时才触发建议！
+    const primary = guidance.primaryPlan
+    if (primary && primary.missingGold === 0 && primary.totalCost > 0) {
       if (now - this._lastTriggerTime >= 40000) {
         this._lastTriggerTime = now
 
-        const primary = guidance.primaryPlan
         const primaryReason = primary.conditions[0] || '核心属性提升'
 
         const options: CoachOption[] = [
@@ -441,7 +441,7 @@ export class RuleItemPurchaseGuidance implements CoachRule {
 }
 
 /**
- * 规则 6：对线期控线与防抓时机提醒（基于对线时长与玩家位置证据）
+ * 规则 6：对线期控线与防抓时机提醒（基于对线时长、打野在迷雾中未出现的事实依据）
  */
 export class RuleBasicSkillsAndTactics implements CoachRule {
   id = 'rule_basic_skills_and_tactics'
@@ -461,57 +461,75 @@ export class RuleBasicSkillsAndTactics implements CoachRule {
 
     const now = ctx.currentTime ?? Date.now()
     if (now - this._lastTriggerTime >= 90000) {
-      this._lastTriggerTime = now
+      const players = ctx.fusion.getPlayers()
+      const minimapEntities = ctx.fusion.getMinimapEntities()
 
-      const evidenceId = `evi_tactics_${now}`
-      ctx.fusion.addEvidence({
-        id: evidenceId,
-        sessionId: ctx.sessionId,
-        temporalScope: 'current',
-        source: 'live-client-data',
-        kind: 'lane-phase-tactics',
-        confidence: 0.75, // 真实评估置信度 0.75，非虚假 1.0
-        patch: ctx.patch,
-        clock: { observedAt: now, receivedAt: now, sequence: 1 },
-        freshness: { expiresAt: now + 20000, state: 'fresh' },
-        payload: { gameTime }
-      })
+      // 检查敌方打野是否在小地图上不可见
+      const enemyJungler = players.find(
+        (p) => (p.team === 'CHAOS' || (p as any).team === 'enemy') && p.position === 'JUNGLE'
+      )
+      const isEnemyJunglerSeen = minimapEntities.some(
+        (e) => e.team === 'enemy' && e.championId === enemyJungler?.championId
+      )
 
-      const options: CoachOption[] = [
-        {
-          id: 'opt_tactics_wave',
-          label: '保持兵线在靠近己方防御塔的安全位置',
-          condition: null,
+      // 当敌方打野处于迷雾中时，触发控线与防抓提醒
+      if (!isEnemyJunglerSeen) {
+        this._lastTriggerTime = now
+
+        const evidenceId = `evi_tactics_${now}`
+        ctx.fusion.addEvidence({
+          id: evidenceId,
+          sessionId: ctx.sessionId,
+          temporalScope: 'current',
+          source: 'live-client-data',
+          kind: 'lane-phase-tactics',
+          confidence: 0.75,
+          patch: ctx.patch,
+          clock: { observedAt: now, receivedAt: now, sequence: 1 },
+          freshness: { expiresAt: now + 20000, state: 'fresh' },
+          payload: {
+            gameTime,
+            enemyJunglerChampionId: enemyJungler?.championId ?? null,
+            reason: 'enemy-jungler-in-fog'
+          }
+        })
+
+        const options: CoachOption[] = [
+          {
+            id: 'opt_tactics_wave',
+            label: '保持兵线在靠近己方防御塔的安全位置',
+            condition: null,
+            evidenceIds: [evidenceId],
+            role: 'primary',
+            score: 0.8
+          },
+          {
+            id: 'opt_tactics_vision',
+            label: '在对线侧翼草丛留存防守眼位',
+            condition: null,
+            evidenceIds: [evidenceId],
+            role: 'alternative',
+            score: 0.75
+          }
+        ]
+
+        return {
+          id: `cue_tactics_${now}`,
+          sessionId: ctx.sessionId,
+          ruleId: this.id,
+          ruleVersion: this.version,
+          category: this.category,
+          priority: 35,
+          observationText: '敌方打野位置在迷雾中未知',
+          impactText: '注意对线期防抓与兵线安全位置',
+          options,
+          spokenText: '敌方打野位置未知，对线期注意保持兵线安全位置，留意侧翼视野。',
           evidenceIds: [evidenceId],
-          role: 'primary',
-          score: 0.8
-        },
-        {
-          id: 'opt_tactics_vision',
-          label: '在对线侧翼草丛留存防守眼位',
-          condition: null,
-          evidenceIds: [evidenceId],
-          role: 'alternative',
-          score: 0.75
+          createdAt: now,
+          expiresAt: now + 6000,
+          status: 'pending',
+          cancellationReason: null
         }
-      ]
-
-      return {
-        id: `cue_tactics_${now}`,
-        sessionId: ctx.sessionId,
-        ruleId: this.id,
-        ruleVersion: this.version,
-        category: this.category,
-        priority: 35,
-        observationText: '对线期常规节奏关注',
-        impactText: '注意敌方打野动向与兵线安全位置',
-        options,
-        spokenText: '对线期注意保持兵线安全位置，留意侧翼视野。',
-        evidenceIds: [evidenceId],
-        createdAt: now,
-        expiresAt: now + 6000,
-        status: 'pending',
-        cancellationReason: null
       }
     }
 

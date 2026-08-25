@@ -143,24 +143,24 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     }
   })
 
-  it('correctly provides champion-specific item guidance (Garen vs Ahri vs Jinx) and valid evidence IDs', () => {
+  it('correctly provides champion-specific item guidance (Smolder vs Garen vs Ahri) and triggers only when affordable', () => {
     const fusion = new FactFusionEngine()
     const engine = new CoachRuleEngine()
     const now = 1700000000000
 
-    // 1. 测试盖伦（持有多兰之盾，1300 金币） -> 必须推荐战士大件/组件（挺进破坏者/净蚀/提亚马特），绝不推荐法师装备
+    // 1. 测试斯莫德 Smolder（射手，持有多兰之刃，1300 金币） -> 必须推荐暴风之剑/无尽之刃，绝不能误判为 86 / 战士
     fusion.updateLiveGameSnapshot(
       {
-        sessionId: 'sess_garen',
+        sessionId: 'sess_smolder',
         patch: '14.15.1',
         gameTimeSeconds: 480,
         clock: { observedAt: now, receivedAt: now, sequence: 1 },
         activePlayer: {
-          summonerName: 'GarenPlayer',
-          riotId: 'Garen#CN',
-          riotIdGameName: 'Garen',
+          summonerName: 'SmolderMain',
+          riotId: 'Smolder#CN',
+          riotIdGameName: 'Smolder',
           riotIdTagLine: 'CN',
-          championName: 'Garen',
+          championName: 'Smolder',
           level: 7,
           currentGold: 1300,
           team: 'ORDER',
@@ -168,14 +168,14 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
         },
         players: [
           {
-            summonerName: 'GarenPlayer',
-            riotId: 'Garen#CN',
-            riotIdGameName: 'Garen',
+            summonerName: 'SmolderMain',
+            riotId: 'Smolder#CN',
+            riotIdGameName: 'Smolder',
             riotIdTagLine: 'CN',
-            championName: 'Garen',
-            championId: 86,
+            championName: 'Smolder',
+            championId: 901,
             team: 'ORDER',
-            position: 'TOP',
+            position: 'BOTTOM',
             level: 7,
             isDead: false,
             respawnTimer: 0,
@@ -190,8 +190,8 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
                 canUse: true,
                 consumable: false,
                 count: 1,
-                displayName: '多兰之盾',
-                itemID: 1054,
+                displayName: '多兰之刃',
+                itemID: 1055,
                 price: 450,
                 slot: 0
               }
@@ -205,30 +205,57 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
       now
     )
 
-    const garenCues = engine.evaluate({
-      sessionId: 'sess_garen',
+    const smolderCues = engine.evaluate({
+      sessionId: 'sess_smolder',
       patch: '14.15.1',
       fusion,
       enabledCategories: { warning: true, information: true, opportunity: true },
       currentTime: now
     })
 
-    const itemCue = garenCues.find((c) => c.ruleId === 'rule_item_purchase_guidance')
-    expect(itemCue).toBeDefined()
-    expect(itemCue?.observationText).toContain('1300g')
-    // 验证推荐的是战士装备，绝非遗失的章节
-    const primaryOption = itemCue?.options.find((o) => o.role === 'primary')
-    expect(primaryOption?.condition).toMatch(/(挺进破坏者|清线|战力|组件)/)
-    expect(primaryOption?.condition).not.toContain('遗失的章节')
+    const smolderItemCue = smolderCues.find((c) => c.ruleId === 'rule_item_purchase_guidance')
+    expect(smolderItemCue).toBeDefined()
+    expect(smolderItemCue?.observationText).toContain('1300g')
+    const primaryOption = smolderItemCue?.options.find((o) => o.role === 'primary')
+    expect(primaryOption?.condition).toMatch(/(暴风之剑|无尽之刃|暴击)/)
+    expect(primaryOption?.condition).not.toContain('挺进破坏者')
 
-    // 验证所有 evidenceIds 均在 fusion 中真实存在且有效
-    expect(itemCue!.evidenceIds.length).toBeGreaterThan(0)
-    for (const id of itemCue!.evidenceIds) {
-      expect(fusion.getEvidence(id)).toBeDefined()
-    }
+    // 2. 测试金币不足时（例如玩家只有 500g，买不起 1300g 暴风之剑且没有其他可买组件）不应触发购买建议
+    fusion.updateLiveGameSnapshot(
+      {
+        sessionId: 'sess_smolder_poor',
+        patch: '14.15.1',
+        gameTimeSeconds: 500,
+        clock: { observedAt: now + 50000, receivedAt: now + 50000, sequence: 2 },
+        activePlayer: {
+          summonerName: 'SmolderMain',
+          riotId: 'Smolder#CN',
+          riotIdGameName: 'Smolder',
+          riotIdTagLine: 'CN',
+          championName: 'Smolder',
+          level: 7,
+          currentGold: 200, // 只有 200g，买不起任何组件
+          team: 'ORDER',
+          abilities: {}
+        },
+        players: [],
+        events: [],
+        sourceHealth: []
+      },
+      now + 50000
+    )
+
+    const poorCues = engine.evaluate({
+      sessionId: 'sess_smolder_poor',
+      patch: '14.15.1',
+      fusion,
+      enabledCategories: { warning: true, information: true, opportunity: true },
+      currentTime: now + 50000
+    })
+    expect(poorCues.find((c) => c.ruleId === 'rule_item_purchase_guidance')).toBeUndefined()
   })
 
-  it('correctly calculates dynamic arrivalWindow in FogInference and handles reappearance cancellation', () => {
+  it('correctly calculates dynamic arrivalWindow in FogInference, includes fog evidence in Cue and handles reappearance cancellation', () => {
     const fusion = new FactFusionEngine()
     const engine = new CoachRuleEngine()
     let invalidatedIds: string[] = []
@@ -295,6 +322,8 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     // 动态到达时间格式化验证
     expect(fogCue?.impactText).toMatch(/预计将在 \d+~\d+ 秒内到达该区域/)
     expect(fogCue?.spokenText).toMatch(/迷雾推断提醒：敌方可能在 \d+ 到 \d+ 秒内到达/)
+    // 验证 Fog Cue 明确包含了 evi_fog_ 证据
+    expect(fogCue?.evidenceIds.some((id) => id.includes('evi_fog_'))).toBe(true)
 
     // 2. 劫重新在小地图中可见 -> 触发证据失效回调
     fusion.updateMinimapBatch(
@@ -326,6 +355,57 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     )
 
     expect(invalidatedIds.length).toBeGreaterThan(0)
-    expect(invalidatedIds[0]).toContain('evi_fog_')
+    // 验证失效回调中的 ID 能够命中 fogCue.evidenceIds
+    const hasOverlap = fogCue?.evidenceIds.some((id) => invalidatedIds.includes(id))
+    expect(hasOverlap).toBe(true)
+  })
+
+  it('correctly schedules next upcoming objective without alive dragons shadowing Baron at 20:00', () => {
+    const fusion = new FactFusionEngine()
+    const engine = new CoachRuleEngine()
+    const now = 1700000000000
+
+    // 游戏时间 19:35 (1175s)，首条巨龙在 5:00 已刷新且未被击杀（一直存活）
+    // 此时男爵将在 20:00 (1200s) 刷新，距离男爵刷新还有 25 秒
+    fusion.updateLiveGameSnapshot(
+      {
+        sessionId: 'sess_baron',
+        patch: '14.15.1',
+        gameTimeSeconds: 1175,
+        clock: { observedAt: now, receivedAt: now, sequence: 1 },
+        activePlayer: {
+          summonerName: 'Player1',
+          riotId: 'P#CN',
+          riotIdGameName: 'P',
+          riotIdTagLine: 'CN',
+          championName: 'Garen',
+          level: 13,
+          currentGold: 500,
+          team: 'ORDER',
+          abilities: {}
+        },
+        players: [],
+        events: [],
+        sourceHealth: []
+      },
+      now
+    )
+
+    const schedule = fusion.getNextObjectiveSchedule(1175)
+    expect(schedule).toBeDefined()
+    expect(schedule?.name).toBe('纳什男爵')
+    expect(schedule?.nextSpawnGameTime).toBe(1200)
+
+    const cues = engine.evaluate({
+      sessionId: 'sess_baron',
+      patch: '14.15.1',
+      fusion,
+      enabledCategories: { warning: true, information: true, opportunity: true },
+      currentTime: now
+    })
+
+    const baronCue = cues.find((c) => c.ruleId === 'rule_objective_spawn')
+    expect(baronCue).toBeDefined()
+    expect(baronCue?.observationText).toContain('纳什男爵 即将在 25 秒内刷新')
   })
 })

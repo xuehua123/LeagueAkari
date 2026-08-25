@@ -79,13 +79,23 @@ export class CaptureProcessSupervisorController {
     this._context.state.setBackend('wgc')
     this._context.state.setFps(15)
 
+    // 将归一化 ROI (0~1) 转换为像素级实际画面 ROI
+    const screenWidth = 1920
+    const screenHeight = 1080
+    const pixelRoi = {
+      x: Math.round(calibration.roi.x * screenWidth),
+      y: Math.round(calibration.roi.y * screenHeight),
+      width: Math.round(calibration.roi.width * screenWidth),
+      height: Math.round(calibration.roi.height * screenHeight)
+    }
+
     try {
-      this._spawnWorker(sessionId, calibration.roi)
+      this._spawnWorker(sessionId, pixelRoi)
     } catch (err: any) {
       this._context.logger.warn(
         `Failed to spawn utility worker: ${err.message}. Falling back to internal loop.`
       )
-      this._startInternalPipeline(sessionId, calibration.roi)
+      this._startInternalPipeline(sessionId, pixelRoi)
     }
   }
 
@@ -122,7 +132,7 @@ export class CaptureProcessSupervisorController {
 
   private _spawnWorker(
     sessionId: string,
-    roi: { x: number; y: number; width: number; height: number }
+    pixelRoi: { x: number; y: number; width: number; height: number }
   ): void {
     const candidatePaths = [
       path.join(__dirname, 'minimap-observer-worker.js'),
@@ -136,7 +146,7 @@ export class CaptureProcessSupervisorController {
       this._context.logger.info(
         'Worker bundle not found on disk, running internal observation pipeline'
       )
-      this._startInternalPipeline(sessionId, roi)
+      this._startInternalPipeline(sessionId, pixelRoi)
       return
     }
 
@@ -161,9 +171,9 @@ export class CaptureProcessSupervisorController {
       if (this._isSupervising) {
         if (this._consecutiveCrashes >= this._maxCrashLimit) {
           this._context.logger.error('Worker exceeded crash limit, switching to internal pipeline')
-          this._startInternalPipeline(sessionId, roi)
+          this._startInternalPipeline(sessionId, pixelRoi)
         } else {
-          this._spawnWorker(sessionId, roi)
+          this._spawnWorker(sessionId, pixelRoi)
         }
       }
     })
@@ -184,7 +194,7 @@ export class CaptureProcessSupervisorController {
       detectors: ['enemy-champions', 'neutral-objectives'],
       captureConfig: {
         fps: 15,
-        roi
+        roi: pixelRoi
       }
     })
   }
@@ -218,9 +228,7 @@ export class CaptureProcessSupervisorController {
 
     let sequence = 0
     this._simulationTimer = setInterval(() => {
-      if (!this._isSupervising) {
-        return
-      }
+      if (!this._isSupervising) return
 
       sequence++
       const now = Date.now()
@@ -229,25 +237,19 @@ export class CaptureProcessSupervisorController {
         sessionId,
         patch: '14.15.1',
         calibrationVersion: '1.0.0',
-        modelVersions: {},
+        modelVersions: { cnn: '1.0.0' },
         frame: {
           observedAt: now,
           receivedAt: now,
           sequence,
-          ageMs: 16
+          ageMs: 10
         },
         health: 'healthy',
         entities: [],
         events: []
       }
 
-      this._context.state.setFps(15)
-      this._context.state.setRoiHealth('healthy')
-
-      if (this._onObservationBatchCallback) {
-        this._onObservationBatchCallback(batch)
-      }
       this._observationController.handleObservationBatch(batch)
-    }, 66) // ~15 FPS
+    }, 1000)
   }
 }

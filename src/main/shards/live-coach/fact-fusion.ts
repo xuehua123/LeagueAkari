@@ -28,7 +28,6 @@ export interface ChampionBuildDefinition {
 }
 
 const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
-  // 战士 / 重装战士（如 盖伦、德莱厄斯、瑟提等）
   fighter: {
     archetype: 'fighter',
     coreItems: [
@@ -57,7 +56,6 @@ const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
     ],
     boots: { id: 3047, name: '铁板靴', cost: 1100, reason: '物理抗性与减伤' }
   },
-  // 法师 / AP（如 阿狸、拉克丝、辛德拉等）
   mage: {
     archetype: 'mage',
     coreItems: [
@@ -85,7 +83,6 @@ const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
     ],
     boots: { id: 3020, name: '法师之靴', cost: 1100, reason: '法术穿透' }
   },
-  // 射手 / ADC（如 金克丝、艾希、凯特琳等）
   marksman: {
     archetype: 'marksman',
     coreItems: [
@@ -98,22 +95,22 @@ const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
           { id: 875, name: '十字镐', cost: 875 },
           { id: 3123, name: '灵巧披风', cost: 600 }
         ],
-        reason: '暴击与物理爆发核心'
+        reason: '核心高额暴击伤害提升'
       },
       {
         id: 6672, // 海妖杀手
         name: '海妖杀手',
         cost: 3100,
         components: [
-          { id: 6670, name: '正午箭袋', cost: 1300 },
-          { id: 3101, name: '缚炉之斧', cost: 1150 }
+          { id: 1037, name: '正午箭袋', cost: 1300 },
+          { id: 3123, name: '灵巧披风', cost: 600 },
+          { id: 1042, name: '短剑', cost: 250 }
         ],
-        reason: '持续普攻特效与攻速'
+        reason: '持续攻速与击中特效输出'
       }
     ],
-    boots: { id: 3006, name: '狂战士胫甲', cost: 1100, reason: '攻击速度' }
+    boots: { id: 3006, name: '狂战士胫甲', cost: 1100, reason: '攻速提升' }
   },
-  // 坦克（如 墨菲特、奥恩、塞恩等）
   tank: {
     archetype: 'tank',
     coreItems: [
@@ -122,116 +119,294 @@ const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
         name: '日炎圣盾',
         cost: 2700,
         components: [
-          { id: 3751, name: '斑比的熔渣', cost: 1000 },
-          { id: 1031, name: '锁子甲', cost: 800 }
+          { id: 3751, name: '斑比的熔渣', cost: 900 },
+          { id: 1031, name: '锁子甲', cost: 800 },
+          { id: 1028, name: '红水晶', cost: 400 }
         ],
-        reason: '范围灼烧与物理防御'
+        reason: '持续魔法伤害与坦度'
+      },
+      {
+        id: 3083, // 狂徒铠甲
+        name: '狂徒铠甲',
+        cost: 3100,
+        components: [
+          { id: 3801, name: '晶体护臂', cost: 800 },
+          { id: 3067, name: '燃烧宝石', cost: 800 },
+          { id: 3134, name: '巨人腰带', cost: 900 }
+        ],
+        reason: '脱战高额生命恢复'
       }
     ],
-    boots: { id: 3047, name: '铁板靴', cost: 1100, reason: '物理抗性' }
+    boots: { id: 3111, name: '水银之靴', cost: 1100, reason: '韧性与魔抗' }
   },
-  // 刺客（如 劫、泰隆、卡兹克等）
   assassin: {
     archetype: 'assassin',
     coreItems: [
       {
         id: 3142, // 幽梦之灵
         name: '幽梦之灵',
-        cost: 2800,
+        cost: 2700,
         components: [
           { id: 3134, name: '锯齿短匕', cost: 1000 },
           { id: 3133, name: '考尔菲德的战锤', cost: 1100 }
         ],
-        reason: '穿甲与游走机动性'
+        reason: '爆发穿甲与高额游走移速'
+      },
+      {
+        id: 3814, // 夜之锋刃
+        name: '夜之锋刃',
+        cost: 2800,
+        components: [
+          { id: 3134, name: '锯齿短匕', cost: 1000 },
+          { id: 3134, name: '巨人腰带', cost: 900 }
+        ],
+        reason: '法术护盾防先手'
       }
     ],
     boots: { id: 3158, name: '明朗之靴', cost: 900, reason: '技能急速' }
+  },
+  support: {
+    archetype: 'support',
+    coreItems: [
+      {
+        id: 3504, // 炽热香炉
+        name: '炽热香炉',
+        cost: 2300,
+        components: [
+          { id: 3113, name: '以太精魂', cost: 850 },
+          { id: 3114, name: '禁忌雕像', cost: 800 }
+        ],
+        reason: '护盾强度与友方攻速增益'
+      },
+      {
+        id: 6617, // 月石再生器
+        name: '月石再生器',
+        cost: 2200,
+        components: [
+          { id: 3108, name: '恶魔法典', cost: 900 },
+          { id: 3067, name: '燃烧宝石', cost: 800 }
+        ],
+        reason: '连锁治疗与护盾扩散'
+      }
+    ],
+    boots: { id: 3158, name: '明朗之靴', cost: 900, reason: '技能与召唤师技能急速' }
   }
+}
+
+// 英雄流派分类库（包含 Smolder 斯莫德及全部典型英雄）
+const CHAMPION_ROLES_MAP: Record<
+  string,
+  'fighter' | 'mage' | 'marksman' | 'tank' | 'assassin' | 'support'
+> = {
+  // 射手
+  smolder: 'marksman',
+  jinx: 'marksman',
+  ashe: 'marksman',
+  caitlyn: 'marksman',
+  vayne: 'marksman',
+  kaisa: 'marksman',
+  ezreal: 'marksman',
+  tristana: 'marksman',
+  lucian: 'marksman',
+  jhin: 'marksman',
+  varus: 'marksman',
+  samira: 'marksman',
+  draven: 'marksman',
+  aphelios: 'marksman',
+  zeri: 'marksman',
+  kogmaw: 'marksman',
+  missfortune: 'marksman',
+  sivir: 'marksman',
+  twitch: 'marksman',
+  xayah: 'marksman',
+  nilah: 'marksman',
+  kalista: 'marksman',
+  akshan: 'marksman',
+  // 法师
+  ahri: 'mage',
+  lux: 'mage',
+  syndra: 'mage',
+  orianna: 'mage',
+  veigar: 'mage',
+  viktor: 'mage',
+  xerath: 'mage',
+  annie: 'mage',
+  anivia: 'mage',
+  aurelionsol: 'mage',
+  azir: 'mage',
+  brand: 'mage',
+  cassiopeia: 'mage',
+  hwei: 'mage',
+  karma: 'mage',
+  karthus: 'mage',
+  leblanc: 'mage',
+  lissandra: 'mage',
+  malzahar: 'mage',
+  neeko: 'mage',
+  ryze: 'mage',
+  swain: 'mage',
+  taliyah: 'mage',
+  twistedfate: 'mage',
+  velkoz: 'mage',
+  vex: 'mage',
+  vladimir: 'mage',
+  ziggs: 'mage',
+  zoe: 'mage',
+  // 战士
+  garen: 'fighter',
+  darius: 'fighter',
+  sett: 'fighter',
+  renekton: 'fighter',
+  aatrox: 'fighter',
+  camille: 'fighter',
+  fiora: 'fighter',
+  irelia: 'fighter',
+  jax: 'fighter',
+  kled: 'fighter',
+  mordekaiser: 'fighter',
+  olaf: 'fighter',
+  pantheon: 'fighter',
+  riven: 'fighter',
+  warwick: 'fighter',
+  wukong: 'fighter',
+  xinzhao: 'fighter',
+  yone: 'fighter',
+  yasuo: 'fighter',
+  briar: 'fighter',
+  ambessa: 'fighter',
+  // 坦克
+  malphite: 'tank',
+  ornn: 'tank',
+  sion: 'tank',
+  leona: 'tank',
+  nautilus: 'tank',
+  shen: 'tank',
+  chogath: 'tank',
+  alistar: 'tank',
+  amumu: 'tank',
+  braum: 'tank',
+  ksante: 'tank',
+  maokai: 'tank',
+  poppy: 'tank',
+  rammus: 'tank',
+  rell: 'tank',
+  sejuani: 'tank',
+  tahmkench: 'tank',
+  taric: 'tank',
+  zac: 'tank',
+  // 刺客
+  zed: 'assassin',
+  talon: 'assassin',
+  khazix: 'assassin',
+  kayn: 'assassin',
+  qiyana: 'assassin',
+  pyke: 'assassin',
+  akali: 'assassin',
+  diana: 'assassin',
+  ekko: 'assassin',
+  evelynn: 'assassin',
+  fizz: 'assassin',
+  kassadin: 'assassin',
+  katarina: 'assassin',
+  naafiri: 'assassin',
+  nocturne: 'assassin',
+  rengar: 'assassin',
+  shaco: 'assassin',
+  // 辅助
+  lulu: 'support',
+  nami: 'support',
+  janna: 'support',
+  sona: 'support',
+  soraka: 'support',
+  yuumi: 'support',
+  milio: 'support',
+  rakan: 'support',
+  bard: 'support',
+  senna: 'support',
+  zilean: 'support'
 }
 
 export class FactFusionEngine {
   private readonly _evidences = new Map<string, CoachEvidence>()
-  private readonly _trackIdToEvidenceId = new Map<string, string>()
   private readonly _fogInferences = new Map<string, FogInference>()
+  private _latestLiveGameSnapshot: LiveGameSnapshot | null = null
+  private _latestMinimapBatch: MinimapObservationBatch | null = null
+  private _latestItemGuidance: ItemPurchaseGuidance | null = null
+  private readonly _trackIdToEvidenceId = new Map<string, string>()
+
+  // 记录历史可见轨迹以计算速度向量
   private readonly _lastSeenEnemies = new Map<
     string,
     {
       trackId: string
       lastObservedAt: number
+      prevObservedAt?: number
       point: NormalizedMapPoint
+      prevPoint?: NormalizedMapPoint
       championId: number | null
       regionId: string | null
     }
   >()
 
-  private _latestLiveGameSnapshot: LiveGameSnapshot | null = null
-  private _latestMinimapBatch: MinimapObservationBatch | null = null
-  private _latestItemGuidance: ItemPurchaseGuidance | null = null
-
-  // 证据失效回调，用于向调度器传播取消 Pending Cues
+  /** 证据失效回调（通知调度器撤销受影响的 Cue） */
   public onEvidenceInvalidated?: (invalidatedEvidenceIds: string[]) => void
 
   public reset(): void {
     this._evidences.clear()
-    this._trackIdToEvidenceId.clear()
     this._fogInferences.clear()
-    this._lastSeenEnemies.clear()
     this._latestLiveGameSnapshot = null
     this._latestMinimapBatch = null
     this._latestItemGuidance = null
+    this._trackIdToEvidenceId.clear()
+    this._lastSeenEnemies.clear()
   }
 
-  public updateLiveGameSnapshot(snapshot: LiveGameSnapshot, virtualNow: number = Date.now()): void {
+  public updateLiveGameSnapshot(snapshot: LiveGameSnapshot, virtualNow?: number): void {
     this._latestLiveGameSnapshot = snapshot
+    const now = virtualNow ?? Date.now()
 
+    // 1. 同步玩家经济与状态证据
     if (snapshot.activePlayer) {
-      const eviId = `evi_active_player_${virtualNow}`
+      const activeEviId = `evi_active_player_${now}`
       this.addEvidence({
-        id: eviId,
+        id: activeEviId,
         sessionId: snapshot.sessionId,
         temporalScope: 'current',
         source: 'live-client-data',
-        kind: 'active-player-status',
+        kind: 'player-economy-inventory',
         confidence: 1,
-        patch: snapshot.patch,
-        clock: {
-          observedAt: virtualNow,
-          receivedAt: virtualNow,
-          sequence: snapshot.clock.sequence
-        },
-        freshness: {
-          expiresAt: virtualNow + 30000,
-          state: 'fresh'
-        },
+        patch: snapshot.patch || '14.15.1',
+        clock: { observedAt: now, receivedAt: now, sequence: 1 },
+        freshness: { expiresAt: now + 35000, state: 'fresh' },
         payload: snapshot.activePlayer
       })
-
-      // 实时计算基于本人英雄和已有装备的购买指导
-      this._computeItemGuidance(snapshot, virtualNow)
     }
+
+    // 2. 运行动态装备流派与组件抵扣计算
+    this._computeItemGuidance(snapshot, now)
   }
 
-  public updateMinimapBatch(batch: MinimapObservationBatch, virtualNow: number = Date.now()): void {
+  public updateMinimapBatch(batch: MinimapObservationBatch, virtualNow?: number): void {
     this._latestMinimapBatch = batch
-
+    const now = virtualNow ?? Date.now()
     const invalidatedEvidenceIds: string[] = []
 
-    for (const entity of batch.entities) {
-      if (entity.lifecycle === 'confirmed' || entity.lifecycle === 'candidate') {
-        const eviId = `evi_minimap_${entity.trackId}_${virtualNow}`
-        this._trackIdToEvidenceId.set(entity.trackId, eviId)
+    if (batch.health === 'healthy') {
+      for (const entity of batch.entities) {
+        const evidenceId = `evi_minimap_${entity.trackId}_${now}`
+        this._trackIdToEvidenceId.set(entity.trackId, evidenceId)
 
         this.addEvidence({
-          id: eviId,
+          id: evidenceId,
           sessionId: batch.sessionId,
           temporalScope: 'current',
           source: 'minimap',
-          kind: `entity-${entity.kind}`,
+          kind: entity.kind === 'enemy' ? 'enemy-seen' : 'neutral-seen',
           confidence: entity.confidence,
           patch: batch.patch,
           clock: {
             observedAt: entity.lastObservedAt,
-            receivedAt: virtualNow,
+            receivedAt: batch.frame.receivedAt,
             sequence: batch.frame.sequence
           },
           freshness: {
@@ -242,18 +417,22 @@ export class FactFusionEngine {
         })
 
         if (entity.team === 'enemy') {
+          const prev = this._lastSeenEnemies.get(entity.trackId)
           this._lastSeenEnemies.set(entity.trackId, {
             trackId: entity.trackId,
             lastObservedAt: entity.lastObservedAt,
+            prevObservedAt: prev?.lastObservedAt,
             point: entity.point,
+            prevPoint: prev?.point,
             championId: entity.championId,
             regionId: entity.regionId
           })
 
-          // 如果敌人在小地图上重新出现，立即撤销之前的迷雾推断及关联 Cue
+          // 如果敌人在小地图上重新出现，立即撤销之前的迷雾推断及关联证据
           const oldFog = this._fogInferences.get(entity.trackId)
           if (oldFog) {
             invalidatedEvidenceIds.push(`evi_fog_${oldFog.id}`)
+            invalidatedEvidenceIds.push(...oldFog.basisEvidenceIds)
             this._fogInferences.delete(entity.trackId)
           }
         }
@@ -264,27 +443,54 @@ export class FactFusionEngine {
       this.onEvidenceInvalidated(invalidatedEvidenceIds)
     }
 
-    // 运行迷雾与不可见敌人时空推断
-    this._computeFogInferences(batch.sessionId, batch.patch, virtualNow)
+    // 运行迷雾时空推断
+    this._computeFogInferences(batch.sessionId, batch.patch, now)
   }
 
   /**
-   * 计算迷雾与不可见敌人空间概率区域、候选路线与到达时间区间
+   * 计算迷雾与不可见敌人时空推断（考虑速度向量、死亡状态、地图图结构与阵营）
    */
   private _computeFogInferences(sessionId: string, patch: string, now: number): void {
+    // 检查是否有玩家已死亡（死亡玩家不参与迷雾游走推断）
+    const deadTrackIds = new Set<string>()
+    if (this._latestLiveGameSnapshot) {
+      for (const p of this._latestLiveGameSnapshot.players) {
+        if (p.isDead || (p.respawnTimer && p.respawnTimer > 0)) {
+          deadTrackIds.add(p.summonerName.toLowerCase())
+          deadTrackIds.add(`enemy_${p.championName.toLowerCase()}`)
+          if (p.championId) deadTrackIds.add(`enemy_${p.championId}`)
+        }
+      }
+    }
+
     for (const [trackId, lastSeen] of this._lastSeenEnemies.entries()) {
+      if (deadTrackIds.has(trackId)) {
+        this._fogInferences.delete(trackId)
+        continue
+      }
+
       const elapsedSec = Math.max(0, (now - lastSeen.lastObservedAt) / 1000)
 
-      // 敌方英雄消失在迷雾中 3 秒至 30 秒之间进行有效空间推断
+      // 敌方英雄消失在迷雾中 3 秒至 30 秒之间进行空间推断
       if (elapsedSec >= 3 && elapsedSec <= 30) {
-        // 真实英雄移动速度归一化计算：约 340 码/s -> 归一化小地图距离约 0.022 / s
+        // 计算运动方向向量
+        let vy = 0
+        if (lastSeen.prevPoint && lastSeen.prevObservedAt) {
+          const dt = Math.max(0.1, (lastSeen.lastObservedAt - lastSeen.prevObservedAt) / 1000)
+          vy = (lastSeen.point.y - lastSeen.prevPoint.y) / dt
+        }
+
+        // 英雄移动速度：归一化速度约 0.022 / s (340 码/s)
         const heroSpeed = 0.022
         const moveDist = elapsedSec * heroSpeed
 
         const predictedRegions: Array<{ regionId: string; probability: number }> = []
         const candidateRoutes: Array<{ regionIds: string[]; probability: number }> = []
 
-        // 根据最后可见位置与地图可达路径动态计算概率
+        // 根据位置与运动向量推断
+        const isHeadingBot = vy > 0.005 || (vy >= -0.005 && lastSeen.point.y > 0.45)
+        const isHeadingTop = vy < -0.005 || (vy <= 0.005 && lastSeen.point.y < 0.55)
+
         if (
           lastSeen.regionId === 'mid_lane' ||
           (lastSeen.point.x > 0.35 &&
@@ -292,19 +498,43 @@ export class FactFusionEngine {
             lastSeen.point.y > 0.35 &&
             lastSeen.point.y < 0.65)
         ) {
-          predictedRegions.push({ regionId: 'bot_river', probability: 0.45 })
-          predictedRegions.push({ regionId: 'top_river', probability: 0.35 })
-          predictedRegions.push({ regionId: 'base_recall', probability: 0.2 })
-
-          candidateRoutes.push({
-            regionIds: ['mid_lane', 'bot_river', 'bot_lane'],
-            probability: 0.5
-          })
-          candidateRoutes.push({
-            regionIds: ['mid_lane', 'top_river', 'top_lane'],
-            probability: 0.3
-          })
-          candidateRoutes.push({ regionIds: ['mid_lane', 'base'], probability: 0.2 })
+          if (isHeadingBot) {
+            predictedRegions.push({ regionId: 'bot_river', probability: 0.65 })
+            predictedRegions.push({ regionId: 'top_river', probability: 0.25 })
+            predictedRegions.push({ regionId: 'base_recall', probability: 0.1 })
+            candidateRoutes.push({
+              regionIds: ['mid_lane', 'bot_river', 'bot_lane'],
+              probability: 0.65
+            })
+            candidateRoutes.push({
+              regionIds: ['mid_lane', 'top_river', 'top_lane'],
+              probability: 0.25
+            })
+          } else if (isHeadingTop) {
+            predictedRegions.push({ regionId: 'top_river', probability: 0.65 })
+            predictedRegions.push({ regionId: 'bot_river', probability: 0.25 })
+            predictedRegions.push({ regionId: 'base_recall', probability: 0.1 })
+            candidateRoutes.push({
+              regionIds: ['mid_lane', 'top_river', 'top_lane'],
+              probability: 0.65
+            })
+            candidateRoutes.push({
+              regionIds: ['mid_lane', 'bot_river', 'bot_lane'],
+              probability: 0.25
+            })
+          } else {
+            predictedRegions.push({ regionId: 'bot_river', probability: 0.45 })
+            predictedRegions.push({ regionId: 'top_river', probability: 0.35 })
+            predictedRegions.push({ regionId: 'base_recall', probability: 0.2 })
+            candidateRoutes.push({
+              regionIds: ['mid_lane', 'bot_river', 'bot_lane'],
+              probability: 0.5
+            })
+            candidateRoutes.push({
+              regionIds: ['mid_lane', 'top_river', 'top_lane'],
+              probability: 0.3
+            })
+          }
         } else if (lastSeen.point.y > 0.5) {
           predictedRegions.push({ regionId: 'bot_lane', probability: 0.6 })
           predictedRegions.push({ regionId: 'dragon_pit', probability: 0.4 })
@@ -317,13 +547,13 @@ export class FactFusionEngine {
           candidateRoutes.push({ regionIds: ['top_lane', 'top_jungle'], probability: 0.4 })
         }
 
-        // 动态到达时间计算：基于距离与速度
-        const targetDist = 0.25 // 到达关键路口/河道距离
-        const remainingDist = Math.max(0.04, targetDist - moveDist)
-        const minArrivalSec = Math.max(1, Math.round(remainingDist / heroSpeed))
+        // 到达时间动态区间计算
+        const targetDist = 0.22
+        const remainingDist = Math.max(0.03, targetDist - moveDist)
+        const minArrivalSec = Math.max(1, Math.round(remainingDist / (heroSpeed * 1.2)))
         const maxArrivalSec = Math.max(
           minArrivalSec + 3,
-          Math.round((remainingDist + 0.15) / heroSpeed)
+          Math.round((remainingDist + 0.12) / (heroSpeed * 0.85))
         )
 
         const arrivalWindow = {
@@ -331,7 +561,6 @@ export class FactFusionEngine {
           latestAt: now + maxArrivalSec * 1000
         }
 
-        // 确保证据 ID 真实存在
         let basisEviId = this._trackIdToEvidenceId.get(trackId)
         if (!basisEviId || !this._evidences.has(basisEviId)) {
           basisEviId = `evi_last_seen_${trackId}_${now}`
@@ -350,8 +579,9 @@ export class FactFusionEngine {
           this._trackIdToEvidenceId.set(trackId, basisEviId)
         }
 
+        const fogEviId = `evi_fog_${trackId}_${now}`
         const inference: FogInference = {
-          id: `fog_${trackId}_${now}`,
+          id: `${trackId}_${now}`,
           sessionId,
           enemyTrackId: trackId,
           basisEvidenceIds: [basisEviId],
@@ -359,12 +589,8 @@ export class FactFusionEngine {
           predictedRegions,
           candidateRoutes,
           arrivalWindow,
-          intents: [
-            { kind: 'roam', probability: 0.55 },
-            { kind: 'ambush', probability: 0.25 },
-            { kind: 'recall', probability: 0.2 }
-          ],
-          confidence: Math.max(0.6, 0.95 - elapsedSec * 0.012),
+          intents: [{ kind: 'roam', probability: predictedRegions[0].probability }],
+          confidence: Math.max(0.65, Math.min(0.95, 1 - elapsedSec / 35)),
           createdAt: now,
           expiresAt: now + 25000,
           modelVersion: '1.2.0'
@@ -372,9 +598,8 @@ export class FactFusionEngine {
 
         this._fogInferences.set(trackId, inference)
 
-        const eviId = `evi_fog_${inference.id}`
         this.addEvidence({
-          id: eviId,
+          id: fogEviId,
           sessionId,
           temporalScope: 'current',
           source: 'fog-inference',
@@ -392,7 +617,7 @@ export class FactFusionEngine {
   }
 
   /**
-   * 基于本人真实英雄、已有装备、当前金币与补丁数据计算装备购买指导
+   * 基于本人真实英雄、已有装备、当前金币与流派数据计算装备购买指导
    */
   private _computeItemGuidance(snapshot: LiveGameSnapshot, now: number): void {
     const active = snapshot.activePlayer
@@ -408,34 +633,26 @@ export class FactFusionEngine {
         p.championName === active.championName
     )
 
-    const championName = active.championName.toLowerCase()
-    const championId = matchingPlayer?.championId ?? 86 // 默认非硬编码阿狸
+    const championNameClean = (active.championName || '').toLowerCase().replace(/[^a-z]/g, '')
+    const championId = matchingPlayer?.championId ?? (active as any).championId ?? null
 
-    // 确定英雄流派构建表
-    let buildDef = CHAMPION_BUILDS.fighter
-    if (
-      ['ahri', 'lux', 'syndra', 'orianna', 'veigar', 'viktor', 'xerath', 'annie'].includes(
-        championName
-      )
-    ) {
-      buildDef = CHAMPION_BUILDS.mage
-    } else if (
-      ['jinx', 'ashe', 'caitlyn', 'vayne', 'kaisa', 'ezreal', 'tristana', 'lucian'].includes(
-        championName
-      )
-    ) {
-      buildDef = CHAMPION_BUILDS.marksman
-    } else if (['zed', 'talon', 'khazix', 'kayn', 'qiyana', 'pyke'].includes(championName)) {
-      buildDef = CHAMPION_BUILDS.assassin
-    } else if (
-      ['malphite', 'ornn', 'sion', 'leona', 'nautilus', 'shen', 'chogath'].includes(championName)
-    ) {
-      buildDef = CHAMPION_BUILDS.tank
+    // 确定英雄流派
+    let role = CHAMPION_ROLES_MAP[championNameClean]
+    if (!role && matchingPlayer?.position) {
+      const pos = matchingPlayer.position.toUpperCase()
+      if (pos === 'TOP' || pos === 'JUNGLE') role = 'fighter'
+      else if (pos === 'MIDDLE') role = 'mage'
+      else if (pos === 'BOTTOM') role = 'marksman'
+      else if (pos === 'UTILITY') role = 'support'
+    }
+    if (!role) {
+      role = 'fighter'
     }
 
+    const buildDef = CHAMPION_BUILDS[role] || CHAMPION_BUILDS.fighter
     const inventoryItemIds = (matchingPlayer?.items ?? []).map((i) => i.itemID)
 
-    // 1. 先创建并持久化底层的金币与装备 Evidence，保证 evidenceIds 100% 可解析
+    // 1. 创建并持久化金币与装备 Evidence
     const goldEvidenceId = `evi_gold_inv_${now}`
     this.addEvidence({
       id: goldEvidenceId,
@@ -455,12 +672,12 @@ export class FactFusionEngine {
       }
     })
 
-    // 2. 找到尚未完成的第一个核心装备
+    // 2. 找到尚未完成的第一个核心大件
     const uncompletedCore =
       buildDef.coreItems.find((item) => !inventoryItemIds.includes(item.id)) ||
       buildDef.coreItems[0]
 
-    // 检查已拥有的组件并抵扣价格
+    // 检查已拥有的组件并抵扣总花费
     let netCost = uncompletedCore.cost
     const ownedComponents = uncompletedCore.components.filter((comp) =>
       inventoryItemIds.includes(comp.id)
@@ -470,7 +687,7 @@ export class FactFusionEngine {
     }
     netCost = Math.max(0, netCost)
 
-    // 推荐购买方案
+    // 3. 构建购买方案
     let primaryPlan: ItemPurchasePlan
     if (currentGold >= netCost) {
       primaryPlan = {
@@ -482,23 +699,35 @@ export class FactFusionEngine {
         conditions: [`完成核心装备：${uncompletedCore.name}（${uncompletedCore.reason}）`]
       }
     } else {
-      // 推荐未拥有且当前金币最接近的大件组件
-      const affordableComponent =
-        uncompletedCore.components.find(
-          (comp) => !inventoryItemIds.includes(comp.id) && currentGold >= comp.cost
-        ) || uncompletedCore.components[0]
+      // 检查是否有玩家买得起的未拥有组件
+      const affordableUnownedComp = uncompletedCore.components.find(
+        (comp) => !inventoryItemIds.includes(comp.id) && currentGold >= comp.cost
+      )
 
-      primaryPlan = {
-        itemIds: [affordableComponent.id],
-        totalCost: affordableComponent.cost,
-        remainingGold: Math.max(0, currentGold - affordableComponent.cost),
-        missingGold: Math.max(0, affordableComponent.cost - currentGold),
-        reasonCodes: ['CORE_COMPONENT_PROGRESSION'],
-        conditions: [`合成 ${uncompletedCore.name} 组件：${affordableComponent.name}`]
+      if (affordableUnownedComp) {
+        primaryPlan = {
+          itemIds: [affordableUnownedComp.id],
+          totalCost: affordableUnownedComp.cost,
+          remainingGold: currentGold - affordableUnownedComp.cost,
+          missingGold: 0,
+          reasonCodes: ['CORE_COMPONENT_AFFORDABLE'],
+          conditions: [`合成 ${uncompletedCore.name} 组件：${affordableUnownedComp.name}`]
+        }
+      } else {
+        const nextComp =
+          uncompletedCore.components.find((comp) => !inventoryItemIds.includes(comp.id)) ||
+          uncompletedCore.components[0]
+        primaryPlan = {
+          itemIds: [nextComp.id],
+          totalCost: nextComp.cost,
+          remainingGold: 0,
+          missingGold: Math.max(0, nextComp.cost - currentGold),
+          reasonCodes: ['CORE_COMPONENT_PROGRESSION'],
+          conditions: [`合成 ${uncompletedCore.name} 组件：${nextComp.name}`]
+        }
       }
     }
 
-    // 备选方案：靴子或视野消耗品
     const alternativePlans: ItemPurchasePlan[] = [
       {
         itemIds: [buildDef.boots.id],
@@ -551,50 +780,65 @@ export class FactFusionEngine {
   }
 
   /**
-   * 解析对局中立资源（巨龙 / 峡谷先锋 / 男爵 / 巢虫）的真实刷新时间
+   * 解析对局中立资源（巨龙 / 峡谷先锋 / 男爵 / 巢虫）即将刷新的准确时间（排除已存活对象）
    */
   public getNextObjectiveSchedule(gameTimeSeconds: number | null): ObjectiveSchedule | null {
     if (gameTimeSeconds === null) return null
 
     const events = this._latestLiveGameSnapshot?.events ?? []
 
-    // 1. 查找最后一条巨龙击杀事件
+    // 1. 巨龙击杀事件与下次刷新
     let lastDragonKillTime: number | null = null
     for (const ev of events) {
       if (ev.eventName === 'DragonKill') {
         lastDragonKillTime = ev.eventTime
       }
     }
+    const dragonSpawnTime = lastDragonKillTime === null ? 300 : lastDragonKillTime + 300
 
-    let nextDragonTime = 300 // 默认首条龙 5:00 (300s)
-    if (lastDragonKillTime !== null) {
-      nextDragonTime = lastDragonKillTime + 300 // 击杀后 5 分钟复活
-    }
+    // 2. 虚空巢虫（6:00 刷新，14:00 绝版）
+    const grubsSpawnTime = 360
 
-    // 2. 男爵刷新（20:00，击杀后 6 分钟）
+    // 3. 峡谷先锋（14:00 刷新，19:55 绝版）
+    const heraldSpawnTime = 840
+
+    // 4. 纳什男爵（20:00 刷新，击杀后 6 分钟）
     let lastBaronKillTime: number | null = null
     for (const ev of events) {
       if (ev.eventName === 'BaronKill') {
         lastBaronKillTime = ev.eventTime
       }
     }
-    let nextBaronTime = 1200 // 20:00
-    if (lastBaronKillTime !== null) {
-      nextBaronTime = lastBaronKillTime + 360
+    const baronSpawnTime = lastBaronKillTime === null ? 1200 : lastBaronKillTime + 360
+
+    // 收集所有在未来的刷新事件
+    const upcomingCandidates: Array<{ name: string; spawnTime: number }> = []
+
+    if (gameTimeSeconds < dragonSpawnTime) {
+      upcomingCandidates.push({ name: '巨龙', spawnTime: dragonSpawnTime })
+    }
+    if (gameTimeSeconds < grubsSpawnTime) {
+      upcomingCandidates.push({ name: '虚空巢虫', spawnTime: grubsSpawnTime })
+    }
+    if (gameTimeSeconds >= 800 && gameTimeSeconds < heraldSpawnTime) {
+      upcomingCandidates.push({ name: '峡谷先锋', spawnTime: heraldSpawnTime })
+    }
+    if (gameTimeSeconds < baronSpawnTime) {
+      upcomingCandidates.push({ name: '纳什男爵', spawnTime: baronSpawnTime })
     }
 
-    if (gameTimeSeconds < 1200 || nextDragonTime <= nextBaronTime) {
-      return {
-        name: '巨龙',
-        nextSpawnGameTime: nextDragonTime,
-        isAlive: gameTimeSeconds >= nextDragonTime
-      }
+    if (upcomingCandidates.length === 0) {
+      return null
     }
+
+    // 按未来刷新时间升序排序，返回最近即将刷新的中立资源
+    upcomingCandidates.sort((a, b) => a.spawnTime - b.spawnTime)
+    const next = upcomingCandidates[0]
 
     return {
-      name: '纳什男爵',
-      nextSpawnGameTime: nextBaronTime,
-      isAlive: gameTimeSeconds >= nextBaronTime
+      name: next.name,
+      nextSpawnGameTime: next.spawnTime,
+      isAlive: false
     }
   }
 

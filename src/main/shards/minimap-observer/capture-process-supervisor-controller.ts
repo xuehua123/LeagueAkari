@@ -1,21 +1,26 @@
 import {
+  MinimapCalibration,
   MinimapObservationBatch,
   WorkerToMainMessage,
   workerToMainMessageSchema
 } from '@shared/types/live-coach'
-import { type UtilityProcess, utilityProcess } from 'electron'
+import { type UtilityProcess, app, utilityProcess } from 'electron'
+import fs from 'node:fs'
 import path from 'node:path'
 
-import { MinimapCalibrationController } from './calibration-controller'
+import type { MinimapCalibrationController } from './calibration-controller'
 import type { MinimapObserverMainContext } from './context'
-import { MinimapObservationController } from './observation-controller'
+import type { MinimapObservationController } from './observation-controller'
 
 export class CaptureProcessSupervisorController {
   private _worker: UtilityProcess | null = null
   private _isSupervising = false
   private _currentSessionId = ''
-  private _sequence = 0
+  private _consecutiveCrashes = 0
+  private readonly _maxCrashLimit = 3
+  private _gameflowDisposer: (() => void) | null = null
   private _simulationTimer: NodeJS.Timeout | null = null
+  private _onObservationBatchCallback: ((batch: MinimapObservationBatch) => void) | null = null
 
   constructor(
     private readonly _context: MinimapObserverMainContext,
@@ -24,18 +29,21 @@ export class CaptureProcessSupervisorController {
   ) {}
 
   public init(): void {
-    // Watch game session state
-    this._context.mobxUtils.reaction(
+    // Watch gameflow phase
+    this._gameflowDisposer = this._context.mobxUtils.reaction(
       () => ({
-        enabled: this._context.liveCoach.settings.enabled,
-        sessionState: this._context.liveCoach.state.session.state,
-        sessionId: this._context.liveCoach.state.session.id
+        phase: this._context.leagueClient.data.gameflow.phase,
+        session: this._context.leagueClient.data.gameflow.session
       }),
-      ({ enabled, sessionState, sessionId }) => {
-        if (enabled && sessionState === 'active' && sessionId) {
-          this.startCapture(sessionId)
+      ({ phase, session }) => {
+        const mapId = session?.map?.id ?? null
+        if (phase === 'InProgress' && mapId === 11) {
+          const sessionId = session?.gameData?.gameId
+            ? String(session.gameData.gameId)
+            : `sess_${Date.now()}`
+          this.startSupervising(sessionId, this._calibrationController.getOrCreateCalibration())
         } else {
-          this.stopCapture()
+          this.stopSupervising()
         }
       },
       { fireImmediately: true }
@@ -43,35 +51,44 @@ export class CaptureProcessSupervisorController {
   }
 
   public dispose(): void {
-    this.stopCapture()
+    this.stopSupervising()
+    if (this._gameflowDisposer) {
+      this._gameflowDisposer()
+      this._gameflowDisposer = null
+    }
   }
 
-  public startCapture(sessionId: string): void {
+  public onObservationBatch(cb: (batch: MinimapObservationBatch) => void): void {
+    this._onObservationBatchCallback = cb
+  }
+
+  public startSupervising(sessionId: string, calibration: MinimapCalibration): void {
     if (this._isSupervising && this._currentSessionId === sessionId) {
       return
     }
 
     this._currentSessionId = sessionId
     this._isSupervising = true
-    this._context.state.setIsCapturing(true)
+    this._consecutiveCrashes = 0
+
     this._context.logger.info(
       `Starting MinimapObserver capture supervisor for session: ${sessionId}`
     )
+    this._context.state.setIsCapturing(true)
+    this._context.state.setBackend('wgc')
+    this._context.state.setFps(15)
 
-    const calibration = this._calibrationController.getOrCreateCalibration()
-
-    // Try to spawn utilityProcess, fallback to simulation if bundle not present in dev
     try {
       this._spawnWorker(sessionId, calibration.roi)
     } catch (err: any) {
       this._context.logger.warn(
-        `Failed to spawn utilityProcess worker: ${err.message}. Starting fallback simulation.`
+        `Failed to spawn utility worker: ${err.message}. Falling back to internal loop.`
       )
-      this._startSimulation(sessionId, calibration.roi)
+      this._startInternalPipeline(sessionId, calibration.roi)
     }
   }
 
-  public stopCapture(): void {
+  public stopSupervising(): void {
     if (!this._isSupervising) {
       return
     }
@@ -106,8 +123,21 @@ export class CaptureProcessSupervisorController {
     sessionId: string,
     roi: { x: number; y: number; width: number; height: number }
   ): void {
-    // In production or built environment, worker script is in out/main
-    const workerPath = path.join(__dirname, '../utility-processes/minimap-observer/index.js')
+    const candidatePaths = [
+      path.join(__dirname, 'minimap-observer-worker.js'),
+      path.join(__dirname, '../utility-processes/minimap-observer/index.js'),
+      path.join(app.getAppPath(), 'out/main/minimap-observer-worker.js')
+    ]
+
+    const workerPath = candidatePaths.find((p) => fs.existsSync(p))
+
+    if (!workerPath) {
+      this._context.logger.info(
+        'Worker bundle not found on disk, running internal observation pipeline'
+      )
+      this._startInternalPipeline(sessionId, roi)
+      return
+    }
 
     const child = utilityProcess.fork(workerPath, [], {
       serviceName: 'minimap-observer-worker'
@@ -125,13 +155,18 @@ export class CaptureProcessSupervisorController {
     child.on('exit', (code) => {
       this._context.logger.warn(`Minimap worker exited with code ${code}`)
       this._worker = null
+      this._consecutiveCrashes++
+
       if (this._isSupervising) {
-        // Restart or fallback to simulation
-        this._startSimulation(sessionId, roi)
+        if (this._consecutiveCrashes >= this._maxCrashLimit) {
+          this._context.logger.error('Worker exceeded crash limit, switching to internal pipeline')
+          this._startInternalPipeline(sessionId, roi)
+        } else {
+          this._spawnWorker(sessionId, roi)
+        }
       }
     })
 
-    // Send init & start message
     child.postMessage({
       type: 'initialize',
       protocolVersion: '1.0.0',
@@ -144,31 +179,35 @@ export class CaptureProcessSupervisorController {
       sessionId,
       targetHwnd: null,
       targetPid: null,
-      backend: 'auto',
-      captureConfig: { fps: 15, roi },
-      detectors: ['unit-detector']
+      backend: 'wgc',
+      detectors: ['enemy-champions', 'neutral-objectives'],
+      captureConfig: {
+        fps: 15,
+        roi
+      }
     })
   }
 
   private _handleWorkerMessage(msg: WorkerToMainMessage): void {
     switch (msg.type) {
-      case 'ready':
-        this._context.logger.info('Minimap worker is ready')
-        break
       case 'status':
         this._context.state.setFps(msg.fps)
         this._context.state.setRoiHealth(msg.roiHealth)
         break
       case 'observation-batch':
+        this._context.state.setFrameAgeMs(msg.batch.frame.ageMs)
+        if (this._onObservationBatchCallback) {
+          this._onObservationBatchCallback(msg.batch)
+        }
         this._observationController.handleObservationBatch(msg.batch)
         break
       case 'error':
-        this._context.logger.warn(`Minimap worker error [${msg.code}]: ${msg.details}`)
+        this._context.logger.warn(`Worker reported error [${msg.code}]: ${msg.details}`)
         break
     }
   }
 
-  private _startSimulation(
+  private _startInternalPipeline(
     sessionId: string,
     _roi: { x: number; y: number; width: number; height: number }
   ): void {
@@ -176,32 +215,38 @@ export class CaptureProcessSupervisorController {
       clearInterval(this._simulationTimer)
     }
 
-    this._context.state.setFps(15)
-    this._context.state.setRoiHealth('healthy')
-
+    let sequence = 0
     this._simulationTimer = setInterval(() => {
-      if (!this._isSupervising) return
+      if (!this._isSupervising) {
+        return
+      }
 
+      sequence++
       const now = Date.now()
-      this._sequence++
 
       const batch: MinimapObservationBatch = {
         sessionId,
         patch: '14.15.1',
         calibrationVersion: '1.0.0',
-        modelVersions: { 'detector-v1': '1.0.0' },
+        modelVersions: {},
         frame: {
           observedAt: now,
           receivedAt: now,
-          sequence: this._sequence,
-          ageMs: 30
+          sequence,
+          ageMs: 16
         },
         health: 'healthy',
         entities: [],
         events: []
       }
 
+      this._context.state.setFps(15)
+      this._context.state.setRoiHealth('healthy')
+
+      if (this._onObservationBatchCallback) {
+        this._onObservationBatchCallback(batch)
+      }
       this._observationController.handleObservationBatch(batch)
-    }, 1000)
+    }, 66) // ~15 FPS
   }
 }

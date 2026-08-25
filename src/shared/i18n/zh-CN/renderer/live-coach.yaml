@@ -8,20 +8,70 @@ liveCoach:
     reviews: 战术复盘
     privacy: 隐私与授权
     diagnostics: 运行诊断
+  overlay:
+    activeTitle: AI 教练实时监测中
+    idleTitle: AI 教练空闲
+    waiting: 等待战术时机触发...
+    optionPrefix: '建议选项:'
   overview:
     mainSwitch: 实时语音 AI 教练
     mainSwitchDesc: 在召唤师峡谷对局中，基于小地图可见事实与 Live Client Data 提供实时确定性决策与语音辅助。
     sessionStatus: 当前会话状态
     latestCue: 实时提示预览
+    noCue: 当前暂无正在播报的战术提示
+    state:
+      idle: 空闲中（等待进入召唤师峡谷）
+      active: 对局活跃中
+      paused: 已暂停
+      unsupported: 当前对局地图或环境不受支持
+      disabled: 功能已关闭
   calibration:
     title: 小地图 ROI 标定与环境指纹
+    desc: 为了确保小地图视觉观察的准确性，系统会自动检测游戏窗口分辨率与小地图位置。你也可以在右侧或左侧小地图布局中进行手动微调。
+    sideTitle: 小地图屏幕位置
+    sideDesc: 选择游戏内 HUD 设置中的小地图左右侧布局
+    autoSide: 自动检测
+    rightSide: 右下角（默认）
+    leftSide: 左下角
+    backendTitle: 采集后端选择
+    backendDesc: Windows 10/11 优先使用 Windows Graphics Capture (WGC)
   settings:
-    coachMode: 教练模式与提醒策略
+    title: 教练模式与提醒策略
+    coachModeTitle: 教练提醒模式
+    modeMinimal: 极简模式（仅高危预警）
+    modeBalanced: 平衡模式（推荐）
+    modeTraining: 教学强化模式
+    outputModeTitle: 提示输出方式
+    outputSpeech: 本地语音播报
+    outputSubtitle: 独立悬浮字幕
+    overlaySwitchTitle: 启用独立透明置顶悬浮窗
+    overlaySwitchDesc: 在游戏画面上方展示半透明提示卡片，支持鼠标点击穿透
+    opacityTitle: 悬浮窗不透明度
   voice:
     title: 语音播报与 TTS 设置
+    enableSwitch: 启用本地语音播报
+    enableDesc: 使用 Windows SAPI 5.4 离线语音引擎进行战术播报
+    voiceSelectTitle: 系统 SAPI 语音包选择
+    voiceSelectDesc: 选择用于播报的系统本地语音
+    volumeTitle: 播报音量
+    volumeDesc: 设置 TTS 语音输出音量
+    rateTitle: 语速调节
+    rateDesc: 0.5x ~ 1.5x 倍速
+    testBtn: 测试当前语音输出
   reviews:
-    title: 战术复盘与会话记录
+    title: 战术复盘与离线录像分析
+    desc: 离线分析对局回放与录像数据，回溯战术关键决策点与小地图事实证据链。
+    loadDemoBtn: 加载标准对局演示
+    exportSidecarBtn: 导出 Sidecar JSON
+    exportMarkdownBtn: 导出 Markdown 报告
+    emptyText: 暂无复盘数据，可点击上方「加载标准对局演示」体验离线录像与战术时间轴生成
   privacy:
     title: 隐私保护与数据授权
+    localComputeTitle: 纯本地运算保障
+    localComputeDesc: 所有 Live Client Data 与小地图视觉帧分析均在本地隔离子进程中完成，不上传任何游戏画面至云端。
+    noAntiCheatTitle: 反作弊合规基线
+    noAntiCheatDesc: 仅读取 Riot 官方 2999 端口与小地图公开信息，不进行内存读写或游戏注入，严格遵守 Riot 第三方应用开发者协议。
   diagnostics:
     title: 运行诊断与状态监控
+    matrixTitle: 系统支持矩阵与能力检查
+    metricsTitle: 实时性能指标与管道状态

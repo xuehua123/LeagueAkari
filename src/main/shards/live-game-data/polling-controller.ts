@@ -63,6 +63,10 @@ export class LiveGameDataPollingController {
       return
     }
 
+    if (this._isPollingActive) {
+      this.stopPolling()
+    }
+
     this._currentSessionId = sessionId
     this._currentPatch = patch
     this._isPollingActive = true
@@ -102,31 +106,34 @@ export class LiveGameDataPollingController {
       return
     }
 
+    if (this._timer) {
+      clearTimeout(this._timer)
+      this._timer = null
+    }
+
     this._timer = setTimeout(async () => {
       if (!this._isPollingActive) {
         return
       }
 
-      const start = Date.now()
       try {
         const snapshot = await this._loader.fetchSnapshot(
           this._currentSessionId,
           this._currentPatch
         )
 
-        const duration = Date.now() - start
-        this._context.state.setLastPollDurationMs(duration)
-
         if (snapshot) {
           this._context.state.setSnapshot(snapshot)
           this._notifyAllSubscribers(snapshot)
+          this._scheduleNextPoll(1000)
+        } else {
+          // Poll failed or empty, backoff 3s
+          this._scheduleNextPoll(3000)
         }
       } catch (err) {
-        this._context.logger.warn(`LiveGameData poll error: ${formatError(err)}`)
+        this._context.logger.warn(`Error during LiveGameData poll tick: ${formatError(err)}`)
+        this._scheduleNextPoll(3000)
       }
-
-      // Interval 500ms - 1000ms
-      this._scheduleNextPoll(800)
     }, delayMs)
   }
 

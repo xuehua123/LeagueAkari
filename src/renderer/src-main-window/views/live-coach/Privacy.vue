@@ -2,33 +2,36 @@
   <div class="max-w-4xl space-y-4">
     <NCard size="small" :title="t('liveCoach.privacy.title', '隐私保护与数据授权')">
       <div class="space-y-4">
-        <div class="text-sm text-gray-500">
-          League Akari
-          严格遵循本地优先原则：所有原始画面默认仅在本地内存中处理，不自动落盘，不上传任何云端服务器。
+        <div
+          class="rounded border border-gray-100 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800"
+        >
+          <div class="mb-1 text-sm font-medium">
+            {{ t('liveCoach.privacy.localComputeTitle', '纯本地运算保障') }}
+          </div>
+          <div class="text-xs leading-relaxed text-gray-500">
+            {{
+              t(
+                'liveCoach.privacy.localComputeDesc',
+                '所有 Live Client Data 与小地图视觉帧分析均在本地隔离子进程中完成，不上传任何游戏画面至云端。'
+              )
+            }}
+          </div>
         </div>
 
         <div
-          class="flex items-center justify-between rounded border border-gray-100 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800"
+          class="rounded border border-gray-100 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800"
         >
-          <div>
-            <div class="text-sm font-medium">麦克风语音采集授权（第三期）</div>
-            <div class="text-xs text-gray-400">
-              仅在按住 Push-to-Talk 快捷键时触发本地麦克风监听
-            </div>
+          <div class="mb-1 text-sm font-medium">
+            {{ t('liveCoach.privacy.noAntiCheatTitle', '反作弊合规基线') }}
           </div>
-          <NTag size="small" type="default">未启用</NTag>
-        </div>
-
-        <div
-          class="flex items-center justify-between rounded border border-gray-100 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800"
-        >
-          <div>
-            <div class="text-sm font-medium">第三方 AI Provider 直连（第三期 BYOK）</div>
-            <div class="text-xs text-gray-400">
-              采用用户自有 API Key 直连，密钥通过 Windows DPAPI 本地加密存储
-            </div>
+          <div class="text-xs leading-relaxed text-gray-500">
+            {{
+              t(
+                'liveCoach.privacy.noAntiCheatDesc',
+                '仅读取 Riot 官方 2999 端口与小地图公开信息，不进行内存读写或游戏注入，严格遵守 Riot 第三方应用开发者协议。'
+              )
+            }}
           </div>
-          <NTag size="small" type="default">未配置</NTag>
         </div>
       </div>
     </NCard>
@@ -37,7 +40,7 @@
 
 <script setup lang="ts">
 import { useTranslation } from 'i18next-vue'
-import { NCard, NTag } from 'naive-ui'
+import { NCard } from 'naive-ui'
 
 const { t } = useTranslation()
 </script>

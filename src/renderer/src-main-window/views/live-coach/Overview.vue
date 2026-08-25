@@ -25,13 +25,15 @@
           class="rounded border border-gray-100 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800"
         >
           <div class="text-xs text-gray-400">会话状态</div>
-          <div class="text-base font-semibold capitalize">{{ coachStore.session.state }}</div>
+          <div class="font-mono text-base font-semibold capitalize">
+            {{ coachStore.session.state }}
+          </div>
         </div>
         <div
           class="rounded border border-gray-100 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800"
         >
           <div class="text-xs text-gray-400">采集后端</div>
-          <div class="text-base font-semibold uppercase">
+          <div class="font-mono text-base font-semibold uppercase">
             {{ coachStore.capture.backend || 'WGC' }} ({{ coachStore.capture.fps }} FPS)
           </div>
         </div>
@@ -39,13 +41,17 @@
           class="rounded border border-gray-100 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800"
         >
           <div class="text-xs text-gray-400">Live Data</div>
-          <div class="text-base font-semibold capitalize">{{ coachStore.liveData.state }}</div>
+          <div class="font-mono text-base font-semibold capitalize">
+            {{ coachStore.liveData.state }}
+          </div>
         </div>
         <div
           class="rounded border border-gray-100 bg-gray-50 p-3 dark:border-gray-700 dark:bg-gray-800"
         >
           <div class="text-xs text-gray-400">语音播报</div>
-          <div class="text-base font-semibold capitalize">{{ coachStore.speech.state }}</div>
+          <div class="font-mono text-base font-semibold capitalize">
+            {{ coachStore.speech.state }}
+          </div>
         </div>
       </div>
 
@@ -92,7 +98,7 @@
         </div>
       </div>
       <div v-else class="py-6 text-center text-sm text-gray-400">
-        暂无活跃提示（仅在检测到满足条件的战术时机时播报）
+        {{ t('liveCoach.overview.noCue', '当前暂无正在播报的战术提示') }}
       </div>
     </NCard>
   </div>

@@ -76,6 +76,7 @@ export class AkariCoachOverlayWindow extends BaseAkariWindow<
   public override async onInit(): Promise<void> {
     await super.onInit()
 
+    // 1. 监听全局初始化完成和开关，自动创建/销毁窗口
     this._mobxUtils.reaction(
       () => [this.settings.enabled, this._windowManager.state.isManagerFinishedInit],
       ([enabled, finishedInit]) => {
@@ -96,18 +97,35 @@ export class AkariCoachOverlayWindow extends BaseAkariWindow<
       }
     )
 
+    // 2. 窗口 Ready 后显示并设置点击穿透
     this._mobxUtils.reaction(
       () => this.state.ready,
       (ready) => {
-        if (ready) {
+        if (ready && this._window) {
           this._applyOverlayWindowBehavior()
+          this.show()
 
-          this._window?.on('show', () => {
+          this._window.on('show', () => {
             this._applyOverlayWindowBehavior()
           })
         }
       },
       { fireImmediately: true, equals: comparer.shallow }
+    )
+
+    // 3. 对局内根据 Gameflow 联动显示与隐藏
+    this._mobxUtils.reaction(
+      () => this._leagueClient.data.gameflow.phase,
+      (phase) => {
+        if (this._window && !this._window.isDestroyed()) {
+          if (phase === 'InProgress') {
+            this.show()
+            this._applyOverlayWindowBehavior()
+          } else if (phase === 'PreEndOfGame' || phase === 'EndOfGame') {
+            // 对局结束可保留悬浮窗展示或淡出
+          }
+        }
+      }
     )
   }
 }

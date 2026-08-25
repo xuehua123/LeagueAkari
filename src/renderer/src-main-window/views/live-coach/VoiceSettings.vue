@@ -17,6 +17,22 @@
 
         <div class="flex items-center justify-between">
           <div>
+            <div class="text-sm font-medium">系统 SAPI 语音包选择</div>
+            <div class="text-xs text-gray-400">选择用于播报的系统本地语音</div>
+          </div>
+          <NSelect
+            style="width: 220px"
+            size="small"
+            :value="coachStore.settings.speechVoiceId"
+            :options="voiceOptions"
+            placeholder="跟随系统默认语音"
+            clearable
+            @update:value="(val) => handleSelectVoice(val)"
+          />
+        </div>
+
+        <div class="flex items-center justify-between">
+          <div>
             <div class="text-sm font-medium">播报音量</div>
             <div class="text-xs text-gray-400">设置 TTS 语音输出音量</div>
           </div>
@@ -34,7 +50,7 @@
         <div class="flex items-center justify-between">
           <div>
             <div class="text-sm font-medium">语速调节</div>
-            <div class="text-xs text-gray-400">0.75x ~ 1.5x 倍速</div>
+            <div class="text-xs text-gray-400">0.5x ~ 1.5x 倍速</div>
           </div>
           <div class="w-48">
             <NSlider
@@ -60,19 +76,41 @@ import { useInstance } from '@renderer-shared/shards'
 import { LiveCoachRenderer } from '@renderer-shared/shards/live-coach'
 import { useLiveCoachStore } from '@renderer-shared/shards/live-coach/store'
 import { useTranslation } from 'i18next-vue'
-import { NButton, NCard, NDivider, NSlider, NSwitch, useMessage } from 'naive-ui'
+import { NButton, NCard, NDivider, NSelect, NSlider, NSwitch, useMessage } from 'naive-ui'
+import { onMounted, ref } from 'vue'
 
 const { t } = useTranslation()
 const message = useMessage()
 const coachStore = useLiveCoachStore()
 const coachShard = useInstance(LiveCoachRenderer)
 
-const handleTestVoice = async () => {
+const voiceOptions = ref<Array<{ label: string; value: string }>>([])
+
+onMounted(async () => {
   try {
-    await coachShard.testSpeech({ text: '语音引擎连接正常，音量与语速配置已生效。' })
-    message.success('已触发测试播报')
+    const list = await coachShard.listVoices()
+    voiceOptions.value = list.map((v) => ({
+      label: `${v.name} (${v.culture})`,
+      value: v.id
+    }))
+  } catch {
+    voiceOptions.value = [{ label: '系统默认语音', value: 'default' }]
+  }
+})
+
+function handleSelectVoice(voiceId: string | null) {
+  coachShard.setSpeechVoiceId(voiceId)
+}
+
+async function handleTestVoice() {
+  try {
+    await coachShard.testSpeech({
+      text: '实时语音 AI 教练测试播报，音量与语速正常。',
+      voiceId: coachStore.settings.speechVoiceId
+    })
+    message.success('已触发语音测试')
   } catch (err: any) {
-    message.error(`测试失败: ${err.message}`)
+    message.error(`语音测试失败: ${err?.message || err}`)
   }
 }
 </script>

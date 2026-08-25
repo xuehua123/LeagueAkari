@@ -14,6 +14,7 @@ export class LiveCoachSessionController {
   private _gameflowDisposer: (() => void) | null = null
   private _liveDataDisposer: (() => void) | null = null
   private _isPaused = false
+  private _latestPatch: string | null = null
 
   constructor(
     private readonly _context: LiveCoachMainContext,
@@ -31,6 +32,9 @@ export class LiveCoachSessionController {
   public init(): void {
     // 1. Subscribe to LiveGameDataMain
     this._liveDataDisposer = this._context.liveGameData.subscribe('game-stats', (snapshot) => {
+      if (snapshot.patch) {
+        this._latestPatch = snapshot.patch
+      }
       this._onLiveGameSnapshot(snapshot)
     })
 
@@ -50,11 +54,26 @@ export class LiveCoachSessionController {
 
         const mapId = session?.map?.id ?? null
         const queueId = session?.gameData?.queue?.id ?? null
-        const patch = session?.map?.gameMode ?? null
+        const patch = this._latestPatch || '14.15.1'
 
         this._capabilityController.evaluateCapabilities(mapId, queueId, patch)
 
         if (phase === 'InProgress') {
+          // 严格检查：非召唤师峡谷（Map 11）或非 Windows 环境，阻断启动
+          if (mapId !== null && mapId !== 11) {
+            this._context.logger.info(
+              `LiveCoach: mapId ${mapId} is not Summoner's Rift (11). Session blocked.`
+            )
+            this.setSessionState('degraded')
+            this._scheduler.cancelAll('unsupported-map')
+            return
+          }
+
+          if (process.platform !== 'win32') {
+            this.setSessionState('degraded')
+            return
+          }
+
           const sessionId = session?.gameData?.gameId
             ? String(session.gameData.gameId)
             : `sess_${Date.now()}`
@@ -62,7 +81,10 @@ export class LiveCoachSessionController {
         } else if (phase === 'PreEndOfGame' || phase === 'EndOfGame') {
           this.endSession('game-ended')
         } else {
-          if (this._context.state.session.state !== 'idle') {
+          if (
+            this._context.state.session.state !== 'idle' &&
+            this._context.state.session.state !== 'disabled'
+          ) {
             this.setSessionState('idle')
           }
         }
@@ -93,8 +115,13 @@ export class LiveCoachSessionController {
     queueId: number | null,
     patch: string | null
   ): void {
+    if (mapId !== null && mapId !== 11) {
+      this.setSessionState('degraded')
+      return
+    }
+
     this._context.logger.info(
-      `Starting coach session: ${sessionId} (Map: ${mapId}, Queue: ${queueId})`
+      `Starting coach session: ${sessionId} (Map: ${mapId}, Queue: ${queueId}, Patch: ${patch})`
     )
     this._fusion.reset()
     this._isPaused = false

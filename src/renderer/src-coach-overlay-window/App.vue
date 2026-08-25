@@ -25,7 +25,9 @@
             ]"
           ></span>
           <span>{{
-            coachStore.session.state === 'active' ? 'AI 教练实时监测中' : 'AI 教练空闲'
+            coachStore.session.state === 'active'
+              ? t('liveCoach.overlay.activeTitle', 'AI 教练实时监测中')
+              : t('liveCoach.overlay.idleTitle', 'AI 教练空闲')
           }}</span>
         </div>
         <div class="font-mono text-[10px] text-white/50 uppercase">
@@ -64,12 +66,14 @@
               :key="opt.id"
               class="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/80"
             >
-              选项: {{ opt.label }}
+              {{ t('liveCoach.overlay.optionPrefix', '选项:') }} {{ opt.label }}
             </span>
           </div>
         </div>
 
-        <div v-else class="py-2 text-center text-xs text-white/40 italic">等待战术时机触发...</div>
+        <div v-else class="py-2 text-center text-xs text-white/40 italic">
+          {{ t('liveCoach.overlay.waiting', '等待战术时机触发...') }}
+        </div>
       </div>
     </div>
   </div>
@@ -77,7 +81,9 @@
 
 <script setup lang="ts">
 import { useLiveCoachStore } from '@renderer-shared/shards/live-coach/store'
+import { useTranslation } from 'i18next-vue'
 
+const { t } = useTranslation()
 const coachStore = useLiveCoachStore()
 </script>
 

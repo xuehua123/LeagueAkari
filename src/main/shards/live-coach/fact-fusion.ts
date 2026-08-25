@@ -7,23 +7,25 @@ import { LiveGameSnapshot, NormalizedPlayer } from '@shared/types/live-game-data
 
 export class FactFusionEngine {
   private readonly _evidences = new Map<string, CoachEvidence>()
+  private readonly _trackIdToEvidenceId = new Map<string, string>()
   private _latestLiveGameSnapshot: LiveGameSnapshot | null = null
   private _latestMinimapBatch: MinimapObservationBatch | null = null
 
   public reset(): void {
     this._evidences.clear()
+    this._trackIdToEvidenceId.clear()
     this._latestLiveGameSnapshot = null
     this._latestMinimapBatch = null
   }
 
   public updateLiveGameSnapshot(snapshot: LiveGameSnapshot): void {
     this._latestLiveGameSnapshot = snapshot
-
-    // Create evidence for active player state or dead players
     const now = Date.now()
+
     if (snapshot.activePlayer) {
+      const eviId = `evi_active_player_${now}`
       this.addEvidence({
-        id: `evi_active_player_${now}`,
+        id: eviId,
         sessionId: snapshot.sessionId,
         temporalScope: 'current',
         source: 'live-client-data',
@@ -46,8 +48,11 @@ export class FactFusionEngine {
 
     for (const entity of batch.entities) {
       if (entity.lifecycle === 'confirmed' || entity.lifecycle === 'candidate') {
+        const eviId = `evi_minimap_${entity.trackId}_${now}`
+        this._trackIdToEvidenceId.set(entity.trackId, eviId)
+
         this.addEvidence({
-          id: `evi_minimap_${entity.trackId}_${now}`,
+          id: eviId,
           sessionId: batch.sessionId,
           temporalScope: 'current',
           source: 'minimap',
@@ -82,6 +87,15 @@ export class FactFusionEngine {
         this._evidences.delete(id)
       }
     }
+  }
+
+  public getEvidence(id: string): CoachEvidence | null {
+    this.cleanupExpiredEvidence()
+    return this._evidences.get(id) || null
+  }
+
+  public getMinimapEvidenceId(trackId: string): string | null {
+    return this._trackIdToEvidenceId.get(trackId) || null
   }
 
   public getActiveEvidences(): CoachEvidence[] {

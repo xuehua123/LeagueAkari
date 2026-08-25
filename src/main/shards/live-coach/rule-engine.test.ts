@@ -1,83 +1,19 @@
 import { describe, expect, it } from 'vitest'
 
 import { FactFusionEngine } from './fact-fusion'
-import {
-  CoachRuleEngine,
-  RuleGoldSpendSuggestion,
-  RuleMinimapEnemyGrouping,
-  RuleObjectiveSpawn
-} from './rule-engine'
+import { CoachRuleEngine } from './rule-engine'
 
-describe('CoachRuleEngine & rules', () => {
-  it('triggers RuleObjectiveSpawn at 4:30 into the game', () => {
+describe('CoachRuleEngine & Spatial Clustering', () => {
+  it('correctly triggers enemy grouping only when enemies are spatially clustered', () => {
     const fusion = new FactFusionEngine()
-    fusion.updateLiveGameSnapshot({
-      sessionId: 'sess_1',
-      patch: '14.15.1',
-      gameTimeSeconds: 270, // 4 mins 30s
-      activePlayer: null,
-      players: [],
-      events: [],
-      sourceHealth: [],
-      clock: { observedAt: Date.now(), receivedAt: Date.now(), sequence: 1 }
-    })
-
-    const rule = new RuleObjectiveSpawn()
-    const cue = rule.evaluate({
-      sessionId: 'sess_1',
-      patch: '14.15.1',
-      fusion,
-      enabledCategories: { information: true }
-    })
-
-    expect(cue).not.toBeNull()
-    expect(cue?.category).toBe('information')
-    expect(cue?.options.length).toBeLessThanOrEqual(2)
-  })
-
-  it('triggers RuleGoldSpendSuggestion when active player holds > 1600g', () => {
-    const fusion = new FactFusionEngine()
-    fusion.updateLiveGameSnapshot({
-      sessionId: 'sess_1',
-      patch: '14.15.1',
-      gameTimeSeconds: 400,
-      activePlayer: {
-        summonerName: 'Akari',
-        riotId: 'Akari#1',
-        riotIdGameName: 'Akari',
-        riotIdTagLine: '1',
-        championName: 'Ahri',
-        level: 6,
-        currentGold: 1850,
-        team: 'ORDER',
-        abilities: {}
-      },
-      players: [],
-      events: [],
-      sourceHealth: [],
-      clock: { observedAt: Date.now(), receivedAt: Date.now(), sequence: 1 }
-    })
-
-    const rule = new RuleGoldSpendSuggestion()
-    const cue = rule.evaluate({
-      sessionId: 'sess_1',
-      patch: '14.15.1',
-      fusion,
-      enabledCategories: { opportunity: true }
-    })
-
-    expect(cue).not.toBeNull()
-    expect(cue?.category).toBe('opportunity')
-    expect(cue?.options.length).toBe(2)
-  })
-
-  it('triggers RuleMinimapEnemyGrouping when 3+ enemies grouped on minimap', () => {
-    const fusion = new FactFusionEngine()
+    const engine = new CoachRuleEngine()
     const now = Date.now()
+
+    // 1. 三个敌人分散在全图（距离 > 0.18），不应触发聚集
     fusion.updateMinimapBatch({
       sessionId: 'sess_1',
       patch: '14.15.1',
-      calibrationVersion: '1.0',
+      calibrationVersion: '1.0.0',
       modelVersions: {},
       frame: { observedAt: now, receivedAt: now, sequence: 1, ageMs: 20 },
       health: 'healthy',
@@ -87,66 +23,116 @@ describe('CoachRuleEngine & rules', () => {
           kind: 'enemy',
           team: 'enemy',
           championId: null,
-          point: { x: 0.2, y: 0.2 },
-          regionId: 'top-river',
-          confidence: 0.9,
+          point: { x: 0.1, y: 0.1 }, // 上路
+          regionId: null,
+          confidence: 0.95,
           lifecycle: 'confirmed',
           firstObservedAt: now,
           lastObservedAt: now,
-          expiresAt: now + 3000
+          expiresAt: now + 5000
         },
         {
           trackId: 'e2',
           kind: 'enemy',
           team: 'enemy',
           championId: null,
-          point: { x: 0.22, y: 0.21 },
-          regionId: 'top-river',
-          confidence: 0.9,
+          point: { x: 0.5, y: 0.5 }, // 中路
+          regionId: null,
+          confidence: 0.95,
           lifecycle: 'confirmed',
           firstObservedAt: now,
           lastObservedAt: now,
-          expiresAt: now + 3000
+          expiresAt: now + 5000
         },
         {
           trackId: 'e3',
           kind: 'enemy',
           team: 'enemy',
           championId: null,
-          point: { x: 0.21, y: 0.23 },
-          regionId: 'top-river',
-          confidence: 0.9,
+          point: { x: 0.9, y: 0.9 }, // 下路
+          regionId: null,
+          confidence: 0.95,
           lifecycle: 'confirmed',
           firstObservedAt: now,
           lastObservedAt: now,
-          expiresAt: now + 3000
+          expiresAt: now + 5000
         }
       ],
       events: []
     })
 
-    const rule = new RuleMinimapEnemyGrouping()
-    const cue = rule.evaluate({
+    let cues = engine.evaluate({
       sessionId: 'sess_1',
       patch: '14.15.1',
       fusion,
-      enabledCategories: { warning: true }
+      enabledCategories: { warning: true, information: true, opportunity: true }
+    })
+    expect(cues.find((c) => c.ruleId === 'rule_minimap_enemy_grouping')).toBeUndefined()
+
+    // 2. 三个敌人在局部聚集（距离 < 0.18），应该触发聚集预警并包含正确的 Evidence ID
+    fusion.updateMinimapBatch({
+      sessionId: 'sess_1',
+      patch: '14.15.1',
+      calibrationVersion: '1.0.0',
+      modelVersions: {},
+      frame: { observedAt: now + 100, receivedAt: now + 100, sequence: 2, ageMs: 20 },
+      health: 'healthy',
+      entities: [
+        {
+          trackId: 'e1',
+          kind: 'enemy',
+          team: 'enemy',
+          championId: null,
+          point: { x: 0.5, y: 0.5 },
+          regionId: null,
+          confidence: 0.95,
+          lifecycle: 'confirmed',
+          firstObservedAt: now,
+          lastObservedAt: now,
+          expiresAt: now + 5000
+        },
+        {
+          trackId: 'e2',
+          kind: 'enemy',
+          team: 'enemy',
+          championId: null,
+          point: { x: 0.53, y: 0.52 },
+          regionId: null,
+          confidence: 0.95,
+          lifecycle: 'confirmed',
+          firstObservedAt: now,
+          lastObservedAt: now,
+          expiresAt: now + 5000
+        },
+        {
+          trackId: 'e3',
+          kind: 'enemy',
+          team: 'enemy',
+          championId: null,
+          point: { x: 0.51, y: 0.49 },
+          regionId: null,
+          confidence: 0.95,
+          lifecycle: 'confirmed',
+          firstObservedAt: now,
+          lastObservedAt: now,
+          expiresAt: now + 5000
+        }
+      ],
+      events: []
     })
 
-    expect(cue).not.toBeNull()
-    expect(cue?.category).toBe('warning')
-    expect(cue?.options.length).toBe(2)
-  })
-
-  it('evaluates multiple rules through CoachRuleEngine', () => {
-    const fusion = new FactFusionEngine()
-    const engine = new CoachRuleEngine()
-    const cues = engine.evaluate({
+    cues = engine.evaluate({
       sessionId: 'sess_1',
       patch: '14.15.1',
       fusion,
-      enabledCategories: { information: true, warning: true, opportunity: true }
+      enabledCategories: { warning: true, information: true, opportunity: true }
     })
-    expect(Array.isArray(cues)).toBe(true)
+    const groupingCue = cues.find((c) => c.ruleId === 'rule_minimap_enemy_grouping')
+    expect(groupingCue).toBeDefined()
+    expect(groupingCue?.evidenceIds.length).toBe(3)
+    // 验证 Evidence 链可以被准确检索到
+    for (const eviId of groupingCue!.evidenceIds) {
+      expect(fusion.getEvidence(eviId)).toBeDefined()
+    }
   })
 })

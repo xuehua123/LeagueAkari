@@ -1,13 +1,20 @@
-import { type LiveCoachMainContext } from './context'
+import { CoachReplaySession } from '@shared/types/live-coach'
+
+import type { LiveCoachMainContext } from './context'
 import type { LocalSpeechExecutor } from './local-speech-executor'
+import { CoachReplaySimulator } from './replay-simulator'
 import type { LiveCoachSessionController } from './session-controller'
 
 export class LiveCoachIpcHandlers {
+  private readonly _replaySimulator: CoachReplaySimulator
+
   constructor(
     private readonly _context: LiveCoachMainContext,
     private readonly _sessionController: LiveCoachSessionController,
     private readonly _speechExecutor: LocalSpeechExecutor
-  ) {}
+  ) {
+    this._replaySimulator = new CoachReplaySimulator()
+  }
 
   public register(): void {
     const { ipc, namespace } = this._context
@@ -43,6 +50,10 @@ export class LiveCoachIpcHandlers {
       return { success }
     })
 
+    ipc.onCall(namespace, 'listVoices', async () => {
+      return this._speechExecutor.listInstalledVoices()
+    })
+
     ipc.onCall(
       namespace,
       'submitCueFeedback',
@@ -60,9 +71,24 @@ export class LiveCoachIpcHandlers {
 
     ipc.onCall(namespace, 'listAudioDevices', async () => {
       return {
-        inputDevices: [{ id: 'default', name: '系统默认麦克风' }],
-        outputDevices: [{ id: 'default', name: '系统默认扬声器' }]
+        outputDevices: [{ id: 'default', name: '系统默认扬声器 (DirectSound)' }]
       }
+    })
+
+    // 离线录像与复盘仿真接口
+    ipc.onCall(namespace, 'getSampleReplay', async () => {
+      const session = this._replaySimulator.createSampleReplaySession()
+      const result = this._replaySimulator.simulateSynchronous(session)
+      const sidecar = this._replaySimulator.generateSidecar(session, result.cues)
+      const markdown = this._replaySimulator.generateMarkdownReport(sidecar)
+      return { session, sidecar, markdown, cues: result.cues }
+    })
+
+    ipc.onCall(namespace, 'simulateReplaySession', async (_e, session: CoachReplaySession) => {
+      const result = this._replaySimulator.simulateSynchronous(session)
+      const sidecar = this._replaySimulator.generateSidecar(session, result.cues)
+      const markdown = this._replaySimulator.generateMarkdownReport(sidecar)
+      return { sidecar, markdown, cues: result.cues }
     })
   }
 }

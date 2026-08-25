@@ -1,10 +1,12 @@
 <template>
   <div class="max-w-4xl space-y-4">
-    <NCard size="small" :title="t('liveCoach.settings.coachMode', '教练模式与提醒策略')">
+    <NCard size="small" :title="t('liveCoach.settings.title', '教练模式与提醒策略')">
       <div class="space-y-4">
         <div class="flex items-center justify-between">
           <div>
-            <div class="text-sm font-medium">指导强度</div>
+            <div class="text-sm font-medium">
+              {{ t('liveCoach.settings.coachModeTitle', '教练提醒模式') }}
+            </div>
             <div class="text-xs text-gray-400">控制局内提示的触发频率与详细程度</div>
           </div>
           <NRadioGroup
@@ -12,9 +14,15 @@
             @update:value="(val) => coachShard.setCoachMode(val)"
             size="small"
           >
-            <NRadioButton value="minimal">极简（仅危险）</NRadioButton>
-            <NRadioButton value="balanced">均衡（标准）</NRadioButton>
-            <NRadioButton value="training">训练（全量提示）</NRadioButton>
+            <NRadioButton value="minimal">{{
+              t('liveCoach.settings.modeMinimal', '极简（仅危险）')
+            }}</NRadioButton>
+            <NRadioButton value="balanced">{{
+              t('liveCoach.settings.modeBalanced', '均衡（推荐）')
+            }}</NRadioButton>
+            <NRadioButton value="training">{{
+              t('liveCoach.settings.modeTraining', '训练强化')
+            }}</NRadioButton>
           </NRadioGroup>
         </div>
 
@@ -28,7 +36,7 @@
               :key="cat"
               class="flex items-center justify-between rounded border border-gray-100 bg-gray-50 p-2.5 dark:border-gray-700 dark:bg-gray-800"
             >
-              <span class="text-xs font-medium uppercase">{{ cat }}</span>
+              <span class="font-mono text-xs font-medium uppercase">{{ cat }}</span>
               <NSwitch
                 size="small"
                 :value="enabled"
@@ -49,8 +57,17 @@
 
         <div class="flex items-center justify-between">
           <div>
-            <div class="text-sm font-medium">悬浮窗 Overlay</div>
-            <div class="text-xs text-gray-400">在游戏画面上方以轻量透明悬浮条显示字幕与状态</div>
+            <div class="text-sm font-medium">
+              {{ t('liveCoach.settings.overlaySwitchTitle', '启用独立透明置顶悬浮窗') }}
+            </div>
+            <div class="text-xs text-gray-400">
+              {{
+                t(
+                  'liveCoach.settings.overlaySwitchDesc',
+                  '在游戏画面上方展示半透明提示卡片，支持鼠标点击穿透'
+                )
+              }}
+            </div>
           </div>
           <NSwitch
             :value="coachStore.settings.overlayEnabled"
@@ -58,8 +75,13 @@
           />
         </div>
 
-        <div v-if="coachStore.settings.overlayEnabled" class="flex items-center justify-between">
-          <div class="text-xs text-gray-500">悬浮窗不透明度</div>
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="text-sm font-medium">
+              {{ t('liveCoach.settings.opacityTitle', '悬浮窗不透明度') }}
+            </div>
+            <div class="text-xs text-gray-400">调节悬浮窗在游戏顶层的可见透明度</div>
+          </div>
           <div class="w-48">
             <NSlider
               :value="coachStore.settings.overlayOpacity"

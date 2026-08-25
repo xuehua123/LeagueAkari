@@ -55,6 +55,10 @@ export class LiveCoachRenderer implements IAkariShardInitDispose {
     return this._context.settingUtils.set(LIVE_COACH_MAIN_NAMESPACE, 'speechRate', value)
   }
 
+  setSpeechVoiceId(value: string | null) {
+    return this._context.settingUtils.set(LIVE_COACH_MAIN_NAMESPACE, 'speechVoiceId', value)
+  }
+
   setOverlayEnabled(value: boolean) {
     return this._context.settingUtils.set(LIVE_COACH_MAIN_NAMESPACE, 'overlayEnabled', value)
   }
@@ -100,12 +104,30 @@ export class LiveCoachRenderer implements IAkariShardInitDispose {
     return this._ipc.call<{ success: boolean }>(LIVE_COACH_MAIN_NAMESPACE, 'testSpeech', options)
   }
 
-  submitCueFeedback(cueId: string, type: string, comment?: string) {
-    return this._ipc.call<{ feedbackId: string }>(LIVE_COACH_MAIN_NAMESPACE, 'submitCueFeedback', {
-      cueId,
-      type,
-      comment
-    })
+  listVoices() {
+    return this._ipc.call<Array<{ id: string; name: string; culture: string; gender: string }>>(
+      LIVE_COACH_MAIN_NAMESPACE,
+      'listVoices'
+    )
+  }
+
+  getEvidence(evidenceId: string) {
+    return this._ipc.call<any>(LIVE_COACH_MAIN_NAMESPACE, 'getEvidence', evidenceId)
+  }
+
+  getSampleReplay() {
+    return this._ipc.call<{ session: any; sidecar: any; markdown: string; cues: any[] }>(
+      LIVE_COACH_MAIN_NAMESPACE,
+      'getSampleReplay'
+    )
+  }
+
+  simulateReplaySession(session: any) {
+    return this._ipc.call<{ sidecar: any; markdown: string; cues: any[] }>(
+      LIVE_COACH_MAIN_NAMESPACE,
+      'simulateReplaySession',
+      session
+    )
   }
 
   onCueSpoken(listener: (payload: { cueId: string }) => void) {

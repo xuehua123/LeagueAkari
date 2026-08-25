@@ -1,5 +1,6 @@
 import type { GameClientMain } from '../game-client'
 import type { LeagueClientMain } from '../league-client'
+import type { LiveGameDataMain } from '../live-game-data'
 import type { AkariLogger } from '../logger-factory'
 import type { MobxUtilsMain } from '../mobx-utils'
 import type { SetterSettingService } from '../setting-factory/setter-setting-service'
@@ -12,6 +13,7 @@ export interface RespawnTimerMainContext {
   namespace: string
   gameClient: GameClientMain
   leagueClient: LeagueClientMain
+  liveGameData: LiveGameDataMain
   logger: AkariLogger
   mobxUtils: MobxUtilsMain
   settings: RespawnTimerSettings

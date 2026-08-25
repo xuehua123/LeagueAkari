@@ -4,8 +4,14 @@
       <div class="space-y-4">
         <div class="flex items-center justify-between">
           <div>
-            <div class="text-sm font-medium">启用本地语音播报</div>
-            <div class="text-xs text-gray-400">使用 Windows SAPI 5.4 离线语音引擎进行战术播报</div>
+            <div class="text-sm font-medium">
+              {{ t('liveCoach.voice.enableSwitch', '启用本地语音播报') }}
+            </div>
+            <div class="text-xs text-gray-400">
+              {{
+                t('liveCoach.voice.enableDesc', '使用 Windows SAPI 5.4 离线语音引擎进行战术播报')
+              }}
+            </div>
           </div>
           <NSwitch
             :value="coachStore.settings.speechEnabled"
@@ -17,15 +23,19 @@
 
         <div class="flex items-center justify-between">
           <div>
-            <div class="text-sm font-medium">系统 SAPI 语音包选择</div>
-            <div class="text-xs text-gray-400">选择用于播报的系统本地语音</div>
+            <div class="text-sm font-medium">
+              {{ t('liveCoach.voice.voiceSelectTitle', '系统 SAPI 语音包选择') }}
+            </div>
+            <div class="text-xs text-gray-400">
+              {{ t('liveCoach.voice.voiceSelectDesc', '选择用于播报的系统本地语音') }}
+            </div>
           </div>
           <NSelect
             style="width: 220px"
             size="small"
             :value="coachStore.settings.speechVoiceId"
             :options="voiceOptions"
-            placeholder="跟随系统默认语音"
+            :placeholder="t('liveCoach.voice.defaultVoice', '跟随系统默认语音')"
             clearable
             @update:value="(val) => handleSelectVoice(val)"
           />
@@ -33,8 +43,12 @@
 
         <div class="flex items-center justify-between">
           <div>
-            <div class="text-sm font-medium">播报音量</div>
-            <div class="text-xs text-gray-400">设置 TTS 语音输出音量</div>
+            <div class="text-sm font-medium">
+              {{ t('liveCoach.voice.volumeTitle', '播报音量') }}
+            </div>
+            <div class="text-xs text-gray-400">
+              {{ t('liveCoach.voice.volumeDesc', '设置 TTS 语音输出音量') }}
+            </div>
           </div>
           <div class="w-48">
             <NSlider
@@ -49,8 +63,10 @@
 
         <div class="flex items-center justify-between">
           <div>
-            <div class="text-sm font-medium">语速调节</div>
-            <div class="text-xs text-gray-400">0.5x ~ 1.5x 倍速</div>
+            <div class="text-sm font-medium">{{ t('liveCoach.voice.rateTitle', '语速调节') }}</div>
+            <div class="text-xs text-gray-400">
+              {{ t('liveCoach.voice.rateDesc', '0.5x ~ 1.5x 倍速') }}
+            </div>
           </div>
           <div class="w-48">
             <NSlider
@@ -64,7 +80,9 @@
         </div>
 
         <div class="pt-2">
-          <NButton size="small" secondary @click="handleTestVoice"> 测试当前语音输出 </NButton>
+          <NButton size="small" secondary @click="handleTestVoice">
+            {{ t('liveCoach.voice.testBtn', '测试当前语音输出') }}
+          </NButton>
         </div>
       </div>
     </NCard>

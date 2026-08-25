@@ -59,7 +59,7 @@ export default defineConfig({
       minify,
       rollupOptions: {
         input: {
-          index: resolve('src/main/index.ts'),
+          main: resolve('src/main/main.ts'),
           'minimap-observer-worker': resolve('src/main/utility-processes/minimap-observer/index.ts')
         },
         external: MAIN_EXTERNALS

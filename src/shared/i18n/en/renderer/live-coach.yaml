@@ -1,12 +1,12 @@
 liveCoach:
   title: Live AI Coach
   tabs:
-    overview: Overview & Session
-    calibration: Minimap Calibration
-    coach: Coaching Policy
-    voice: Speech & Voice
-    reviews: Tactical Reviews
-    privacy: Privacy & Consent
+    overview: Overview
+    calibration: Calibration
+    coach: Settings
+    voice: Voice
+    reviews: Reviews
+    privacy: Privacy
     diagnostics: Diagnostics
   overlay:
     activeTitle: AI Coach Active
@@ -17,61 +17,75 @@ liveCoach:
     mainSwitch: Live AI Coach
     mainSwitchDesc: Real-time deterministic tactical guidance based on minimap observations and Live Client Data during Summoner's Rift matches.
     sessionStatus: Session Status
-    latestCue: Active Tactical Cue
-    noCue: No active tactical cue currently speaking
+    latestCue: Live Cue Preview
+    noCue: No tactical cue currently active
     state:
       idle: Idle (Waiting for Summoner's Rift match)
-      active: Match Active
+      active: Active
       paused: Paused
-      unsupported: Unsupported map or platform
+      unsupported: Unsupported map or environment
       disabled: Disabled
   calibration:
-    title: Minimap Calibration & Environment Fingerprint
-    desc: Automatically detects game window resolution and HUD minimap position. Supports manual adjustment for left or right minimap layout.
-    sideTitle: Minimap HUD Position
-    sideDesc: Choose minimap position configured in your in-game HUD settings
-    autoSide: Auto Detect
+    title: Minimap Calibration & Environment
+    desc: To ensure visual observation accuracy, the system detects resolution and minimap ROI. You can adjust the layout below.
+    sideTitle: Minimap HUD Placement
+    sideDesc: Choose the minimap position configured in your in-game HUD
+    autoSide: Auto-detect
     rightSide: Bottom Right (Default)
     leftSide: Bottom Left
     backendTitle: Capture Backend
-    backendDesc: Windows 10/11 uses Windows Graphics Capture (WGC)
+    backendDesc: Windows 10/11 defaults to Windows Graphics Capture (WGC)
+    backendAuto: 'Auto'
+    backendWgc: 'WGC (Recommended)'
+    backendDda: 'DXGI DDA'
   settings:
-    title: Coaching Policy & Output
-    coachModeTitle: Coaching Mode
-    modeMinimal: Minimal (High-priority warnings only)
+    title: Coach Modes & Output Policy
+    coachModeTitle: Coach Feedback Mode
+    modeMinimal: Minimal (High risk warnings only)
     modeBalanced: Balanced (Recommended)
-    modeTraining: Training Mode
-    outputModeTitle: Output Mode
-    outputSpeech: Offline Voice (TTS)
-    outputSubtitle: Floating Subtitles
-    overlaySwitchTitle: Enable Floating Overlay Window
-    overlaySwitchDesc: Display transparent tactical overlay cards above game screen with mouse click-through
+    modeTraining: Training
+    outputModeTitle: Output Channel
+    outputSpeech: Local Speech (TTS)
+    outputSubtitle: Overlay Subtitle
+    overlaySwitchTitle: Enable Transparent Overlay Window
+    overlaySwitchDesc: Display floating tactical cards above the game with mouse passthrough
     opacityTitle: Overlay Opacity
   voice:
-    title: Speech & Voice Settings
-    enableSwitch: Enable Offline Speech (TTS)
-    enableDesc: Uses Windows SAPI 5.4 offline speech synthesis
+    title: Voice & TTS Settings
+    enableSwitch: Enable Local TTS Speech
+    enableDesc: Use Windows SAPI 5.4 offline speech engine for tactical cues
     voiceSelectTitle: SAPI Voice Selection
-    voiceSelectDesc: Select installed system voice for tactical audio
+    voiceSelectDesc: Select installed system voice
+    defaultVoice: Follow system default voice
     volumeTitle: Speech Volume
-    volumeDesc: Output volume for speech cues
+    volumeDesc: Adjust TTS speech output volume
     rateTitle: Speech Rate
     rateDesc: 0.5x ~ 1.5x speed
-    testBtn: Test Voice Output
+    testBtn: Test Current Voice Output
   reviews:
-    title: Tactical Reviews & Replay Analysis
-    desc: Offline analysis for game replays and match data with complete timeline and evidence tracking.
-    loadDemoBtn: Load Demo Session
+    title: Tactical Reviews & Offline Video Analysis
+    desc: Analyze replays and recordings offline to trace tactical moments and minimap evidence chains.
+    loadDemoBtn: Load Sample Match Replay
     exportSidecarBtn: Export Sidecar JSON
     exportMarkdownBtn: Export Markdown Report
-    emptyText: No review data available. Click "Load Demo Session" above to inspect replay timeline.
+    emptyText: No review data available. Click "Load Sample Match Replay" or import a file to inspect timeline events.
   privacy:
     title: Privacy & Data Policy
-    localComputeTitle: 100% Local Processing
-    localComputeDesc: All Live Client Data and minimap frame processing run in local isolated worker processes. No game frames uploaded to cloud.
+    localComputeTitle: 100% Local Computation
+    localComputeDesc: All Live Client Data and frame analysis execute entirely in isolated local child processes. No game frames are uploaded.
     noAntiCheatTitle: Anti-Cheat Compliance
-    noAntiCheatDesc: Strictly queries Riot official 2999 port and public minimap visuals. No memory read/write or game injection.
+    noAntiCheatDesc: Operates only on official Live Client Data (port 2999) and minimap visuals without memory injection or process manipulation.
   diagnostics:
-    title: Diagnostics & System Health
-    matrixTitle: System Support Matrix
-    metricsTitle: Real-Time Performance & Pipeline Health
+    title: System Diagnostics & Monitoring
+    matrixTitle: System Compatibility Matrix
+    metricsTitle: Pipeline Metrics & Health
+    platform: 'Platform:'
+    backend: 'Capture Backend:'
+    features: 'Enabled Features:'
+    unavailable: 'Unavailable Reasons:'
+    sampling: 'Visual Sampling:'
+    latency: 'Frame Latency:'
+    roi: 'ROI Health:'
+    session: 'Session State:'
+    speechState: 'Speech State:'
+    heartbeat: 'Source Heartbeat:'

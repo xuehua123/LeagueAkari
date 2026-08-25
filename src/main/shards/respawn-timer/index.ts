@@ -3,6 +3,7 @@ import { z } from 'zod'
 
 import { GameClientMain } from '../game-client'
 import { LeagueClientMain } from '../league-client'
+import { LiveGameDataMain } from '../live-game-data'
 import { AkariLogger, LoggerFactoryMain } from '../logger-factory'
 import { MobxUtilsMain } from '../mobx-utils'
 import { SettingFactoryMain } from '../setting-factory'
@@ -34,6 +35,7 @@ export class RespawnTimerMain implements IAkariShardInitDispose {
     _loggerFactory: LoggerFactoryMain,
     private readonly _leagueClient: LeagueClientMain,
     private readonly _mobxUtils: MobxUtilsMain,
+    private readonly _liveGameData: LiveGameDataMain,
     _settingFactory: SettingFactoryMain
   ) {
     this._logger = _loggerFactory.create(RespawnTimerMain.id)
@@ -54,25 +56,26 @@ export class RespawnTimerMain implements IAkariShardInitDispose {
       namespace: RespawnTimerMain.id,
       gameClient: this._gameClient,
       leagueClient: this._leagueClient,
+      liveGameData: this._liveGameData,
       logger: this._logger,
       mobxUtils: this._mobxUtils,
       settings: this.settings,
       settingService: this._settingService,
       state: this.state
     }
+
     this._controller = new RespawnTimerController(this._context)
   }
 
-  async onInit() {
-    await this._settingService.applyToState()
-
-    this._mobxUtils.propSync(RespawnTimerMain.id, 'state', this.state, ['info'])
+  async onInit(): Promise<void> {
+    this._logger.info('Initializing RespawnTimerMain')
     this._mobxUtils.propSync(RespawnTimerMain.id, 'settings', this.settings, ['enabled'])
-
-    this._controller.watch()
+    this._mobxUtils.propSync(RespawnTimerMain.id, 'state', this.state, ['info'])
+    this._controller.init()
   }
 
-  async onDispose() {
+  async onDispose(): Promise<void> {
+    this._logger.info('Disposing RespawnTimerMain')
     this._controller.dispose()
   }
 }

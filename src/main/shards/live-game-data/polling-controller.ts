@@ -38,7 +38,8 @@ export class LiveGameDataPollingController {
           const sessionId = session?.gameData?.gameId
             ? String(session.gameData.gameId)
             : `sess_${Date.now()}`
-          this.startPolling(sessionId)
+          const patch = (session?.gameData as any)?.patch || '14.15.1'
+          this.startPolling(sessionId, patch)
         } else {
           this.stopPolling()
         }

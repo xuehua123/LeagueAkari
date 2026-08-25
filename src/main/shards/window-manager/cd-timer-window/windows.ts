@@ -26,7 +26,7 @@ export class AkariCdTimerWindow extends BaseAkariWindow<CdTimerWindowState, CdTi
 
   public shortcutTargetId: string
 
-  private _gameStatsPollTimer: NodeJS.Timeout | null = null
+  private _gameStatsDisposer: (() => void) | null = null
 
   private _applyOverlayWindowBehavior() {
     if (!this._window || this._window.isDestroyed()) {
@@ -208,17 +208,20 @@ export class AkariCdTimerWindow extends BaseAkariWindow<CdTimerWindowState, CdTi
       () => shouldUseCdTimer.get(),
       (should) => {
         if (should) {
-          this._logger.info('Game stats polling started')
-          this._updateGameStats()
-          this._gameStatsPollTimer = setInterval(
-            () => this._updateGameStats(),
-            AkariCdTimerWindow.GAME_STATS_POLL_INTERVAL
-          )
+          this._logger.info('CdTimer subscribed to LiveGameData game-stats')
+          if (!this._gameStatsDisposer) {
+            this._gameStatsDisposer = this._context.liveGameData.subscribe(
+              'game-stats',
+              (snapshot) => {
+                this.state.setGameTime(snapshot.gameTimeSeconds)
+              }
+            )
+          }
         } else {
-          if (this._gameStatsPollTimer) {
-            this._logger.info('Game stats polling stopped')
-            clearInterval(this._gameStatsPollTimer)
-            this._gameStatsPollTimer = null
+          if (this._gameStatsDisposer) {
+            this._logger.info('CdTimer unsubscribed from LiveGameData game-stats')
+            this._gameStatsDisposer()
+            this._gameStatsDisposer = null
           }
 
           this.state.setGameTime(null)
@@ -264,16 +267,6 @@ export class AkariCdTimerWindow extends BaseAkariWindow<CdTimerWindowState, CdTi
         isSending = false
       }
     })
-  }
-
-  private async _updateGameStats() {
-    try {
-      const { data } = await this._gameClient.api.getGameStats()
-      this.state.setGameTime(data.gameTime)
-    } catch (error) {
-      this.state.setGameTime(null)
-      this._logger.warn('Failed to get game data', error)
-    }
   }
 
   override async onInit() {

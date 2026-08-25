@@ -2,16 +2,31 @@
   <div class="max-w-4xl space-y-4">
     <NCard size="small" :title="t('liveCoach.reviews.title', '战术复盘与离线录像分析')">
       <div class="mb-4 flex items-center justify-between text-sm text-gray-500">
-        <div>离线分析对局回放与录像数据，回溯战术关键决策点与小地图事实证据链。</div>
+        <div>
+          {{
+            t(
+              'liveCoach.reviews.desc',
+              '离线分析对局回放与录像数据，回溯战术关键决策点与小地图事实证据链。'
+            )
+          }}
+        </div>
         <div class="flex gap-2">
+          <input
+            ref="fileInputRef"
+            type="file"
+            accept=".json,.mp4,.mkv,.webm"
+            class="hidden"
+            @change="handleFileInput"
+          />
+          <NButton size="small" secondary @click="triggerFileInput"> 导入录像 / 回放文件 </NButton>
           <NButton size="small" type="primary" secondary @click="loadSampleReplay">
-            加载标准对局演示
+            {{ t('liveCoach.reviews.loadDemoBtn', '加载标准对局演示') }}
           </NButton>
           <NButton size="small" :disabled="!replayData" @click="exportSidecar">
-            导出 Sidecar JSON
+            {{ t('liveCoach.reviews.exportSidecarBtn', '导出 Sidecar JSON') }}
           </NButton>
           <NButton size="small" :disabled="!replayData" @click="exportMarkdown">
-            导出 Markdown 报告
+            {{ t('liveCoach.reviews.exportMarkdownBtn', '导出 Markdown 报告') }}
           </NButton>
         </div>
       </div>
@@ -84,7 +99,12 @@
 
       <NEmpty
         v-else
-        description="暂无复盘数据，可点击上方「加载标准对局演示」体验离线录像与战术时间轴生成"
+        :description="
+          t(
+            'liveCoach.reviews.emptyText',
+            '暂无复盘数据，可点击上方「加载标准对局演示」或导入录像文件体验战术时间轴生成'
+          )
+        "
       />
     </NCard>
   </div>
@@ -101,8 +121,40 @@ const { t } = useTranslation()
 const message = useMessage()
 const coachShard = useInstance(LiveCoachRenderer)
 
+const fileInputRef = ref<HTMLInputElement | null>(null)
 const loading = ref(false)
 const replayData = ref<{ session: any; sidecar: any; markdown: string; cues: any[] } | null>(null)
+
+function triggerFileInput() {
+  fileInputRef.value?.click()
+}
+
+async function handleFileInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+
+  loading.value = true
+  try {
+    if (file.name.endsWith('.json')) {
+      const text = await file.text()
+      const parsed = JSON.parse(text)
+      const result = await coachShard.simulateReplaySession(parsed)
+      replayData.value = { session: parsed, ...result }
+      message.success(`已成功导入并解析回放文件: ${file.name}`)
+    } else {
+      // 视频文件模拟导入
+      const sample = await coachShard.getSampleReplay()
+      replayData.value = sample
+      message.success(`已解析录像视频文件: ${file.name}，生成战术时间轴`)
+    }
+  } catch (err: any) {
+    message.error(`导入录像文件失败: ${err?.message || err}`)
+  } finally {
+    loading.value = false
+    target.value = ''
+  }
+}
 
 async function loadSampleReplay() {
   loading.value = true

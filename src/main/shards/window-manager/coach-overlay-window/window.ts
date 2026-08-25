@@ -97,35 +97,41 @@ export class AkariCoachOverlayWindow extends BaseAkariWindow<
       }
     )
 
-    // 2. 窗口 Ready 后显示并设置点击穿透
+    // 2. 窗口 Ready 后设置穿透，默认仅在对局中展示
     this._mobxUtils.reaction(
       () => this.state.ready,
       (ready) => {
         if (ready && this._window) {
           this._applyOverlayWindowBehavior()
-          this.show()
 
           this._window.on('show', () => {
             this._applyOverlayWindowBehavior()
           })
+
+          if (this._leagueClient.data.gameflow.phase === 'InProgress') {
+            this.show()
+          } else {
+            this.hide()
+          }
         }
       },
       { fireImmediately: true, equals: comparer.shallow }
     )
 
-    // 3. 对局内根据 Gameflow 联动显示与隐藏
+    // 3. 对局内根据 Gameflow 严格联动显示与隐藏
     this._mobxUtils.reaction(
       () => this._leagueClient.data.gameflow.phase,
       (phase) => {
         if (this._window && !this._window.isDestroyed()) {
-          if (phase === 'InProgress') {
+          if (phase === 'InProgress' && this.settings.enabled) {
             this.show()
             this._applyOverlayWindowBehavior()
-          } else if (phase === 'PreEndOfGame' || phase === 'EndOfGame') {
-            // 对局结束可保留悬浮窗展示或淡出
+          } else {
+            this.hide()
           }
         }
-      }
+      },
+      { fireImmediately: true }
     )
   }
 }

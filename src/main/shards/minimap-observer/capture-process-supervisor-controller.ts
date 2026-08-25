@@ -29,15 +29,16 @@ export class CaptureProcessSupervisorController {
   ) {}
 
   public init(): void {
-    // Watch gameflow phase
+    // 监听对局阶段与总开关，严格控制采集生命周期
     this._gameflowDisposer = this._context.mobxUtils.reaction(
       () => ({
+        enabled: this._context.liveCoach.settings.enabled,
         phase: this._context.leagueClient.data.gameflow.phase,
         session: this._context.leagueClient.data.gameflow.session
       }),
-      ({ phase, session }) => {
+      ({ enabled, phase, session }) => {
         const mapId = session?.map?.id ?? null
-        if (phase === 'InProgress' && mapId === 11) {
+        if (enabled && phase === 'InProgress' && mapId === 11) {
           const sessionId = session?.gameData?.gameId
             ? String(session.gameData.gameId)
             : `sess_${Date.now()}`

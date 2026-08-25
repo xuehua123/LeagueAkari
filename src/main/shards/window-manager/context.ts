@@ -7,6 +7,7 @@ import type { GameClientMain } from '../game-client'
 import type { AkariIpcMain } from '../ipc'
 import type { KeyboardShortcutsMain } from '../keyboard-shortcuts'
 import type { LeagueClientMain } from '../league-client'
+import type { LiveGameDataMain } from '../live-game-data'
 import type { AkariLogger, LoggerFactoryMain } from '../logger-factory'
 import type { MobxUtilsMain } from '../mobx-utils'
 import type { SelfUpdateMain } from '../self-update'
@@ -25,6 +26,7 @@ export interface WindowManagerMainContext {
   settingFactory: SettingFactoryMain
   loggerFactory: LoggerFactoryMain
   leagueClient: LeagueClientMain
+  liveGameData: LiveGameDataMain
   protocol: AkariProtocolMain
   mobxUtils: MobxUtilsMain
   logger: AkariLogger

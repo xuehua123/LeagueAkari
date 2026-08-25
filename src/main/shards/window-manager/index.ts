@@ -7,6 +7,7 @@ import { GameClientMain } from '../game-client'
 import { AkariIpcMain } from '../ipc'
 import { KeyboardShortcutsMain } from '../keyboard-shortcuts'
 import { LeagueClientMain } from '../league-client'
+import { LiveGameDataMain } from '../live-game-data'
 import { AkariLogger, LoggerFactoryMain } from '../logger-factory'
 import { MobxUtilsMain } from '../mobx-utils'
 import { SelfUpdateMain } from '../self-update'
@@ -53,7 +54,8 @@ export class WindowManagerMain implements IAkariShardInitDispose {
     private readonly _keyboardShortcuts: KeyboardShortcutsMain,
     private readonly _appCommon: AppCommonMain,
     private readonly _gameClient: GameClientMain,
-    private readonly _selfUpdate: SelfUpdateMain
+    private readonly _selfUpdate: SelfUpdateMain,
+    private readonly _liveGameData: LiveGameDataMain
   ) {
     this._logger = _loggerFactory.create(WindowManagerMain.id)
     this._settingService = _settingFactory.register(
@@ -96,6 +98,7 @@ export class WindowManagerMain implements IAkariShardInitDispose {
       settingFactory: this._settingFactory,
       loggerFactory: this._loggerFactory,
       leagueClient: this._leagueClient,
+      liveGameData: this._liveGameData,
       protocol: this._protocol,
       mobxUtils: this._mobxUtils,
       logger: this._logger,

@@ -14,16 +14,21 @@ export interface CoachRule {
   version: string
   category: 'information' | 'warning' | 'opportunity' | 'system' | 'review'
   evaluate(context: RuleEvaluationContext): CoachCue | null
+  reset(): void
 }
 
 /**
- * 规则 1：中立资源（巨龙 / 峡谷先锋 / 男爵）即将刷新提醒
+ * 规则 1：中立资源（巨龙 / 峡谷先锋 / 男爵）即将刷新提醒（第一期合规：纯客观事实与关注提示）
  */
 export class RuleObjectiveSpawn implements CoachRule {
   id = 'rule_objective_spawn'
-  version = '1.0.0'
+  version = '1.1.0'
   category = 'information' as const
   private _lastTriggeredMinute: number = -1
+
+  reset(): void {
+    this._lastTriggeredMinute = -1
+  }
 
   evaluate(ctx: RuleEvaluationContext): CoachCue | null {
     if (!ctx.enabledCategories[this.category]) return null
@@ -52,14 +57,14 @@ export class RuleObjectiveSpawn implements CoachRule {
 
       const options: CoachOption[] = [
         {
-          id: 'opt_dragon_ward',
-          label: '提前布置河道视野',
+          id: 'opt_obj_river',
+          label: '关注河道与龙坑动向',
           condition: null,
           evidenceIds: [evidenceId]
         },
         {
-          id: 'opt_dragon_lane',
-          label: '推线争夺中下线权',
+          id: 'opt_obj_lanes',
+          label: '留意中下路对线状态',
           condition: null,
           evidenceIds: [evidenceId]
         }
@@ -73,9 +78,9 @@ export class RuleObjectiveSpawn implements CoachRule {
         category: this.category,
         priority: 50,
         observationText: '中立资源即将刷新（约 30 秒内）',
-        impactText: '龙坑与河道区域可能爆发争夺',
+        impactText: '河道与龙坑区域可能存在敌方动向',
         options,
-        spokenText: '巨龙即将刷新，可以提前布置龙坑视野或抢占兵线线权。',
+        spokenText: '巨龙即将在 30 秒内刷新，注意河道动态。',
         evidenceIds: [evidenceId],
         createdAt: now,
         expiresAt: now + 6000,
@@ -89,13 +94,17 @@ export class RuleObjectiveSpawn implements CoachRule {
 }
 
 /**
- * 规则 2：防御塔镀层即将脱落（14:00 脱落节奏提醒）
+ * 规则 2：防御塔镀层即将脱落（14:00 脱落节奏感知）
  */
 export class RuleTurretPlatingFall implements CoachRule {
   id = 'rule_turret_plating_fall'
-  version = '1.0.0'
+  version = '1.1.0'
   category = 'information' as const
   private _hasTriggered = false
+
+  reset(): void {
+    this._hasTriggered = false
+  }
 
   evaluate(ctx: RuleEvaluationContext): CoachCue | null {
     if (!ctx.enabledCategories[this.category]) return null
@@ -124,14 +133,14 @@ export class RuleTurretPlatingFall implements CoachRule {
 
       const options: CoachOption[] = [
         {
-          id: 'opt_push_plating',
-          label: '尝试抢吃最后一层防御塔镀层',
+          id: 'opt_plate_timing',
+          label: '留意对线期结束时间节点',
           condition: null,
           evidenceIds: [evidenceId]
         },
         {
-          id: 'opt_prepare_mid',
-          label: '准备转线参与中期团战',
+          id: 'opt_plate_lanes',
+          label: '关注各路防御塔状态',
           condition: null,
           evidenceIds: [evidenceId]
         }
@@ -145,9 +154,9 @@ export class RuleTurretPlatingFall implements CoachRule {
         category: this.category,
         priority: 45,
         observationText: '防御塔镀层即将在 14 分钟脱落',
-        impactText: '对线期即将结束，防御塔经济奖励即将失效',
+        impactText: '对线期即将结束，防御塔额外护甲与经济脱落',
         options,
-        spokenText: '防御塔镀层即将脱落，注意抓紧最后的吃塔皮时机或准备转线。',
+        spokenText: '防御塔镀层即将在 14 分钟脱落，对线期即将结束。',
         evidenceIds: [evidenceId],
         createdAt: now,
         expiresAt: now + 8000,
@@ -161,14 +170,18 @@ export class RuleTurretPlatingFall implements CoachRule {
 }
 
 /**
- * 规则 3：小地图局部敌人聚集预警（基于 2D 空间聚类计算）
+ * 规则 3：小地图局部敌人聚集预警（基于 2D 空间聚类计算，第一期合规纯事实播报）
  */
 export class RuleMinimapEnemyGrouping implements CoachRule {
   id = 'rule_minimap_enemy_grouping'
-  version = '1.0.0'
+  version = '1.1.0'
   category = 'warning' as const
   private _lastTriggerTime: number = 0
   private readonly _clusterRadius = 0.18 // 归一化小地图距离阈值
+
+  reset(): void {
+    this._lastTriggerTime = 0
+  }
 
   evaluate(ctx: RuleEvaluationContext): CoachCue | null {
     if (!ctx.enabledCategories[this.category]) return null
@@ -220,10 +233,15 @@ export class RuleMinimapEnemyGrouping implements CoachRule {
       }
 
       const options: CoachOption[] = [
-        { id: 'opt_retreat', label: '向安全防御塔方向靠拢', condition: null, evidenceIds: eviIds },
         {
-          id: 'opt_counter_push',
-          label: '转向另一侧分推交换',
+          id: 'opt_group_watch',
+          label: '关注该区域视野动向',
+          condition: null,
+          evidenceIds: eviIds
+        },
+        {
+          id: 'opt_group_safe',
+          label: '保持安全防范距离',
           condition: null,
           evidenceIds: eviIds
         }
@@ -236,10 +254,10 @@ export class RuleMinimapEnemyGrouping implements CoachRule {
         ruleVersion: this.version,
         category: this.category,
         priority: 75,
-        observationText: `小地图局部聚集 ${targetCluster.length} 名敌方单位`,
-        impactText: '局部存在多打少或包夹风险',
+        observationText: `小地图局部检测到 ${targetCluster.length} 名敌方英雄聚集`,
+        impactText: '局部区域敌方人数占优',
         options,
-        spokenText: `注意小地图，局部聚集了 ${targetCluster.length} 名敌方英雄，注意防范包夹。`,
+        spokenText: `小地图局部检测到 ${targetCluster.length} 名敌方英雄聚集。`,
         evidenceIds: eviIds,
         createdAt: now,
         expiresAt: now + 8000,
@@ -259,6 +277,12 @@ export class CoachRuleEngine {
     this._rules.push(new RuleObjectiveSpawn())
     this._rules.push(new RuleTurretPlatingFall())
     this._rules.push(new RuleMinimapEnemyGrouping())
+  }
+
+  public reset(): void {
+    for (const rule of this._rules) {
+      rule.reset()
+    }
   }
 
   public evaluate(context: RuleEvaluationContext): CoachCue[] {

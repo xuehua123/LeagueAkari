@@ -35,6 +35,9 @@ liveCoach:
     leftSide: 左下角
     backendTitle: 采集后端选择
     backendDesc: Windows 10/11 优先使用 Windows Graphics Capture (WGC)
+    backendAuto: '自动 (Auto)'
+    backendWgc: 'WGC (推荐)'
+    backendDda: 'DXGI DDA'
   settings:
     title: 教练模式与提醒策略
     coachModeTitle: 教练提醒模式
@@ -53,6 +56,7 @@ liveCoach:
     enableDesc: 使用 Windows SAPI 5.4 离线语音引擎进行战术播报
     voiceSelectTitle: 系统 SAPI 语音包选择
     voiceSelectDesc: 选择用于播报的系统本地语音
+    defaultVoice: 跟随系统默认语音
     volumeTitle: 播报音量
     volumeDesc: 设置 TTS 语音输出音量
     rateTitle: 语速调节
@@ -75,3 +79,13 @@ liveCoach:
     title: 运行诊断与状态监控
     matrixTitle: 系统支持矩阵与能力检查
     metricsTitle: 实时性能指标与管道状态
+    platform: '运行平台:'
+    backend: '采集后端:'
+    features: '已启用能力特性:'
+    unavailable: '不可用原因:'
+    sampling: '视觉采样:'
+    latency: '帧延迟:'
+    roi: 'ROI 标定状态:'
+    session: '会话状态:'
+    speechState: '语音状态:'
+    heartbeat: '数据源心跳:'

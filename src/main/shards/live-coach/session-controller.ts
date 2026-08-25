@@ -124,6 +124,7 @@ export class LiveCoachSessionController {
       `Starting coach session: ${sessionId} (Map: ${mapId}, Queue: ${queueId}, Patch: ${patch})`
     )
     this._fusion.reset()
+    this._ruleEngine.reset()
     this._isPaused = false
 
     this._context.state.setSessionInfo({
@@ -149,6 +150,7 @@ export class LiveCoachSessionController {
     )
     this._scheduler.cancelAll(reason)
     this._fusion.reset()
+    this._ruleEngine.reset()
     this._context.state.reset()
   }
 

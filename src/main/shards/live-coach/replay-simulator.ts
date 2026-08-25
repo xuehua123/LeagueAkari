@@ -46,6 +46,7 @@ export class CoachReplaySimulator {
 
   public simulateSynchronous(session: CoachReplaySession): { totalCues: number; cues: CoachCue[] } {
     this._fusion.reset()
+    this._ruleEngine.reset()
     const allCues: CoachCue[] = []
 
     for (const frame of session.frames) {
@@ -70,7 +71,10 @@ export class CoachReplaySimulator {
       })
 
       if (cues.length > 0) {
-        allCues.push(...cues)
+        for (const cue of cues) {
+          cue.createdAt = frame.timestamp
+          allCues.push(cue)
+        }
         if (this._scheduler) {
           this._scheduler.submitCues(cues)
         }

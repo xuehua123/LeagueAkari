@@ -1,40 +1,40 @@
 import { riotId, summonerName } from '@shared/utils/name'
 import { comparer, runInAction } from 'mobx'
 
-import { RESPAWN_TIMER_POLL_INTERVAL, type RespawnTimerMainContext } from './context'
+import type { RespawnTimerMainContext } from './context'
 
 export class RespawnTimerController {
-  private _timerId: NodeJS.Timeout | null = null
-  private _isStarted = false
+  private _liveDataDisposer: (() => void) | null = null
 
-  constructor(private readonly context: RespawnTimerMainContext) {}
+  constructor(private context: RespawnTimerMainContext) {}
 
-  watch() {
-    this._watchGameflow()
+  init() {
+    this._watchGameflowPhase()
   }
 
   dispose() {
-    this._stopRespawnTimerPoll()
+    this._stopSubscription()
   }
 
   applyEnabledSettingSideEffect(enabled: boolean) {
-    if (enabled && this.context.leagueClient.data.gameflow.phase === 'InProgress') {
-      this._startRespawnTimerPoll()
-    } else if (enabled === false) {
-      this._stopRespawnTimerPoll()
+    if (!enabled) {
+      this._stopSubscription()
+    } else {
+      this._startSubscription()
     }
   }
 
-  private _watchGameflow() {
+  private _watchGameflowPhase() {
     const { leagueClient, mobxUtils, settings, state } = this.context
 
     mobxUtils.reaction(
-      () => [leagueClient.data.gameflow.phase, settings.enabled],
-      ([phase, enabled]) => {
-        if (phase === 'InProgress') {
-          if (enabled) {
-            this._startRespawnTimerPoll()
-          }
+      () => ({
+        phase: leagueClient.data.gameflow.phase,
+        enabled: settings.enabled
+      }),
+      ({ phase, enabled }) => {
+        if (phase === 'InProgress' && enabled) {
+          this._startSubscription()
         } else {
           runInAction(() => {
             state.info = {
@@ -43,33 +43,37 @@ export class RespawnTimerController {
               totalTime: 0
             }
           })
-          this._stopRespawnTimerPoll()
+          this._stopSubscription()
         }
       },
       { equals: comparer.shallow, fireImmediately: true }
     )
   }
 
-  private async _queryRespawnTime() {
-    const { gameClient, leagueClient, logger, state } = this.context
-
-    if (!leagueClient.data.summoner.me) {
-      logger.warn('Seems like summoner info is not loaded')
+  private _startSubscription() {
+    if (this._liveDataDisposer) {
       return
     }
 
-    try {
-      const playerList = (await gameClient.api.getLiveClientDataPlayerList()).data
-      const self = playerList.find((p) => {
+    const { leagueClient, logger, liveGameData, state } = this.context
+    logger.info('Respawn timer subscribed to unified LiveGameData')
+
+    this._liveDataDisposer = liveGameData.subscribe('players', (snapshot) => {
+      if (!leagueClient.data.summoner.me) {
+        return
+      }
+
+      const myRiotId = riotId(leagueClient.data.summoner.me)
+      const myInternalName = leagueClient.data.summoner.me.internalName
+
+      const self = snapshot.players.find((p) => {
         if (p.riotId) {
-          return p.riotId === riotId(leagueClient.data.summoner.me)
+          return p.riotId === myRiotId
         }
-
         if (p.summonerName) {
-          return summonerName(p.summonerName) === riotId(leagueClient.data.summoner.me)
+          return summonerName(p.summonerName) === myRiotId || p.summonerName === myInternalName
         }
-
-        return p.summonerName === leagueClient.data.summoner.me?.internalName
+        return false
       })
 
       if (self) {
@@ -85,40 +89,14 @@ export class RespawnTimerController {
           }
         })
       }
-    } catch {}
-  }
-
-  private _startRespawnTimerPoll() {
-    if (this._isStarted) {
-      return
-    }
-
-    this.context.logger.info('Respawn timer polling started')
-
-    this._isStarted = true
-    this._queryRespawnTime()
-    this._timerId = setInterval(() => this._queryRespawnTime(), RESPAWN_TIMER_POLL_INTERVAL)
-  }
-
-  private _stopRespawnTimerPoll() {
-    if (!this._isStarted) {
-      return
-    }
-
-    this.context.logger.info('Respawn timer polling stopped')
-
-    this._isStarted = false
-    if (this._timerId) {
-      clearInterval(this._timerId)
-      this._timerId = null
-    }
-
-    runInAction(() => {
-      this.context.state.info = {
-        isDead: false,
-        timeLeft: 0,
-        totalTime: 0
-      }
     })
+  }
+
+  private _stopSubscription() {
+    if (this._liveDataDisposer) {
+      this._liveDataDisposer()
+      this._liveDataDisposer = null
+      this.context.logger.info('Respawn timer unsubscribed from LiveGameData')
+    }
   }
 }

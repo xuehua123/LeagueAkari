@@ -60,6 +60,7 @@ export class LiveCoachRenderer implements IAkariShardInitDispose {
   }
 
   setOverlayEnabled(value: boolean) {
+    this._context.settingUtils.set('window-manager-main/coach-overlay-window', 'enabled', value)
     return this._context.settingUtils.set(LIVE_COACH_MAIN_NAMESPACE, 'overlayEnabled', value)
   }
 

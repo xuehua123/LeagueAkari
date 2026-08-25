@@ -7,6 +7,7 @@ export interface RuleEvaluationContext {
   patch: string
   fusion: FactFusionEngine
   enabledCategories: Record<string, boolean>
+  currentTime?: number
 }
 
 export interface CoachRule {
@@ -18,28 +19,37 @@ export interface CoachRule {
 }
 
 /**
- * 规则 1：中立资源（巨龙 / 峡谷先锋 / 男爵）即将刷新提醒
+ * 规则 1：中立资源（巨龙 / 男爵）基于真实击杀事件与复活倒计时的刷新提醒（P1-007）
  */
 export class RuleObjectiveSpawn implements CoachRule {
   id = 'rule_objective_spawn'
-  version = '1.1.0'
+  version = '1.2.0'
   category = 'information' as const
-  private _lastTriggeredMinute: number = -1
+  private _lastTriggeredSpawnTime: number = -1
 
   reset(): void {
-    this._lastTriggeredMinute = -1
+    this._lastTriggeredSpawnTime = -1
   }
 
   evaluate(ctx: RuleEvaluationContext): CoachCue | null {
     if (!ctx.enabledCategories[this.category]) return null
 
     const gameTime = ctx.fusion.getGameTimeSeconds()
-    if (gameTime === null || gameTime < 240) return null
+    if (gameTime === null) return null
 
-    const minute = Math.floor(gameTime / 60)
-    if (minute % 5 === 4 && gameTime % 60 >= 30 && this._lastTriggeredMinute !== minute) {
-      this._lastTriggeredMinute = minute
-      const now = Date.now()
+    const schedule = ctx.fusion.getNextObjectiveSchedule(gameTime)
+    if (!schedule) return null
+
+    const timeUntilSpawn = schedule.nextSpawnGameTime - gameTime
+
+    // 在实际刷新前 35 秒至 5 秒内触发提醒
+    if (
+      timeUntilSpawn >= 5 &&
+      timeUntilSpawn <= 35 &&
+      this._lastTriggeredSpawnTime !== schedule.nextSpawnGameTime
+    ) {
+      this._lastTriggeredSpawnTime = schedule.nextSpawnGameTime
+      const now = ctx.currentTime ?? Date.now()
 
       const evidenceId = `evi_obj_spawn_${now}`
       ctx.fusion.addEvidence({
@@ -52,13 +62,13 @@ export class RuleObjectiveSpawn implements CoachRule {
         patch: ctx.patch,
         clock: { observedAt: now, receivedAt: now, sequence: 1 },
         freshness: { expiresAt: now + 30000, state: 'fresh' },
-        payload: { minute, gameTime }
+        payload: { schedule, gameTime }
       })
 
       const options: CoachOption[] = [
         {
           id: 'opt_obj_river',
-          label: '关注河道与龙坑动向',
+          label: `关注 ${schedule.name} 坑位与河道视野`,
           condition: null,
           evidenceIds: [evidenceId],
           role: 'primary',
@@ -66,7 +76,7 @@ export class RuleObjectiveSpawn implements CoachRule {
         },
         {
           id: 'opt_obj_lanes',
-          label: '留意中下路对线状态',
+          label: '留意附近对线人员集结',
           condition: null,
           evidenceIds: [evidenceId],
           role: 'alternative',
@@ -81,13 +91,13 @@ export class RuleObjectiveSpawn implements CoachRule {
         ruleVersion: this.version,
         category: this.category,
         priority: 50,
-        observationText: '中立资源即将刷新（约 30 秒内）',
+        observationText: `${schedule.name} 即将在 ${Math.round(timeUntilSpawn)} 秒内刷新`,
         impactText: '河道与龙坑区域可能存在敌方动向',
         options,
-        spokenText: '巨龙即将在 30 秒内刷新，注意河道动态。',
+        spokenText: `${schedule.name} 即将在 ${Math.round(timeUntilSpawn)} 秒内刷新，注意河道动态。`,
         evidenceIds: [evidenceId],
         createdAt: now,
-        expiresAt: now + 6000,
+        expiresAt: now + 8000,
         status: 'pending',
         cancellationReason: null
       }
@@ -119,7 +129,7 @@ export class RuleTurretPlatingFall implements CoachRule {
     // 13:30 (810s) 提示防御塔镀层即将在 30 秒后脱落
     if (gameTime >= 810 && gameTime <= 835 && !this._hasTriggered) {
       this._hasTriggered = true
-      const now = Date.now()
+      const now = ctx.currentTime ?? Date.now()
 
       const evidenceId = `evi_turret_plating_${now}`
       ctx.fusion.addEvidence({
@@ -227,7 +237,7 @@ export class RuleMinimapEnemyGrouping implements CoachRule {
       return null
     }
 
-    const now = Date.now()
+    const now = ctx.currentTime ?? Date.now()
     if (now - this._lastTriggerTime >= 20000) {
       this._lastTriggerTime = now
 
@@ -286,7 +296,7 @@ export class RuleMinimapEnemyGrouping implements CoachRule {
  */
 export class RuleFogInference implements CoachRule {
   id = 'rule_fog_inference'
-  version = '1.0.0'
+  version = '1.1.0'
   category = 'warning' as const
   private _lastTriggerTime: number = 0
 
@@ -297,17 +307,24 @@ export class RuleFogInference implements CoachRule {
   evaluate(ctx: RuleEvaluationContext): CoachCue | null {
     if (!ctx.enabledCategories[this.category]) return null
 
-    const inferences = ctx.fusion.getFogInferences()
-    const highRisk = inferences.find((f) => f.confidence >= 0.7 && f.arrivalWindow !== null)
+    const now = ctx.currentTime ?? Date.now()
+    const inferences = ctx.fusion.getFogInferences(now)
+    const highRisk = inferences.find((f) => f.confidence >= 0.65 && f.arrivalWindow !== null)
 
-    if (!highRisk) return null
+    if (!highRisk || !highRisk.arrivalWindow) return null
 
-    const now = Date.now()
     if (now - this._lastTriggerTime >= 25000) {
       this._lastTriggerTime = now
 
       const topRegion = highRisk.predictedRegions[0]?.regionId || '河道'
       const eviIds = [...highRisk.basisEvidenceIds]
+
+      // 动态计算预计到达秒数范围（消除硬编码 15~25s 矛盾）
+      const minSec = Math.max(1, Math.round((highRisk.arrivalWindow.earliestAt - now) / 1000))
+      const maxSec = Math.max(
+        minSec + 2,
+        Math.round((highRisk.arrivalWindow.latestAt - now) / 1000)
+      )
 
       const options: CoachOption[] = [
         {
@@ -336,9 +353,9 @@ export class RuleFogInference implements CoachRule {
         category: this.category,
         priority: 70,
         observationText: `[迷雾推断] 敌方可能正向 ${topRegion} 方向游走`,
-        impactText: `预计将在 15~25 秒内到达该区域，置信度 ${Math.round(highRisk.confidence * 100)}%`,
+        impactText: `预计将在 ${minSec}~${maxSec} 秒内到达该区域，置信度 ${Math.round(highRisk.confidence * 100)}%`,
         options,
-        spokenText: `迷雾推断提醒：敌方可能在向 ${topRegion} 游走，注意安全防范。`,
+        spokenText: `迷雾推断提醒：敌方可能在 ${minSec} 到 ${maxSec} 秒内到达 ${topRegion}，注意安全防范。`,
         evidenceIds: eviIds,
         createdAt: now,
         expiresAt: now + 10000,
@@ -356,7 +373,7 @@ export class RuleFogInference implements CoachRule {
  */
 export class RuleItemPurchaseGuidance implements CoachRule {
   id = 'rule_item_purchase_guidance'
-  version = '1.0.0'
+  version = '1.1.0'
   category = 'opportunity' as const
   private _lastTriggerTime: number = 0
 
@@ -367,13 +384,14 @@ export class RuleItemPurchaseGuidance implements CoachRule {
   evaluate(ctx: RuleEvaluationContext): CoachCue | null {
     if (!ctx.enabledCategories[this.category]) return null
 
-    const guidance = ctx.fusion.getItemPurchaseGuidance()
+    const now = ctx.currentTime ?? Date.now()
+    const guidance = ctx.fusion.getItemPurchaseGuidance(now)
     if (!guidance) return null
 
-    // 当金币达到首选大件或重要组件阈值时触发建议
-    if (guidance.currentGold >= 850) {
-      const now = Date.now()
-      if (now - this._lastTriggerTime >= 45000) {
+    // 当金币满足购买推荐大件或重要组件时触发建议
+    if (guidance.currentGold >= 800) {
+      const now = ctx.currentTime ?? Date.now()
+      if (now - this._lastTriggerTime >= 40000) {
         this._lastTriggerTime = now
 
         const primary = guidance.primaryPlan
@@ -390,8 +408,8 @@ export class RuleItemPurchaseGuidance implements CoachRule {
           },
           {
             id: 'opt_item_alt',
-            label: `备选方案：优先靴子与消耗品`,
-            condition: '游走机动性或视野防守',
+            label: `备选方案：优先更新靴子或消耗品`,
+            condition: '移速与视野防守',
             evidenceIds: guidance.evidenceIds,
             role: 'alternative',
             score: 0.7
@@ -405,10 +423,10 @@ export class RuleItemPurchaseGuidance implements CoachRule {
           ruleVersion: this.version,
           category: this.category,
           priority: 40,
-          observationText: `当前持有金币 ${guidance.currentGold}g，满足核心装备购买条件`,
+          observationText: `持有金币 ${guidance.currentGold}g，满足核心装备组件购买条件`,
           impactText: `回城更新装备可提升对线战力：${primaryReason}`,
           options,
-          spokenText: `当前金币充足，回城建议优先更新核心装备组件。`,
+          spokenText: `当前金币充足，回城建议优先更新核心装备。`,
           evidenceIds: guidance.evidenceIds,
           createdAt: now,
           expiresAt: now + 15000,
@@ -423,11 +441,11 @@ export class RuleItemPurchaseGuidance implements CoachRule {
 }
 
 /**
- * 规则 6：基础连招与对线防抓提醒
+ * 规则 6：对线期控线与防抓时机提醒（基于对线时长与玩家位置证据）
  */
 export class RuleBasicSkillsAndTactics implements CoachRule {
   id = 'rule_basic_skills_and_tactics'
-  version = '1.0.0'
+  version = '1.1.0'
   category = 'information' as const
   private _lastTriggerTime: number = 0
 
@@ -441,8 +459,7 @@ export class RuleBasicSkillsAndTactics implements CoachRule {
     const gameTime = ctx.fusion.getGameTimeSeconds()
     if (gameTime === null || gameTime < 180 || gameTime > 600) return null
 
-    const now = Date.now()
-    // 对线期 (3~10分钟) 周期性提醒基础控线与防抓
+    const now = ctx.currentTime ?? Date.now()
     if (now - this._lastTriggerTime >= 90000) {
       this._lastTriggerTime = now
 
@@ -453,7 +470,7 @@ export class RuleBasicSkillsAndTactics implements CoachRule {
         temporalScope: 'current',
         source: 'live-client-data',
         kind: 'lane-phase-tactics',
-        confidence: 1,
+        confidence: 0.75, // 真实评估置信度 0.75，非虚假 1.0
         patch: ctx.patch,
         clock: { observedAt: now, receivedAt: now, sequence: 1 },
         freshness: { expiresAt: now + 20000, state: 'fresh' },
@@ -507,7 +524,7 @@ export class RuleBasicSkillsAndTactics implements CoachRule {
  */
 export class RuleCommunicationPing implements CoachRule {
   id = 'rule_communication_ping'
-  version = '1.0.0'
+  version = '1.1.0'
   category = 'information' as const
   private _lastTriggerTime: number = 0
 
@@ -525,7 +542,7 @@ export class RuleCommunicationPing implements CoachRule {
 
     if (!roamingEnemy) return null
 
-    const now = Date.now()
+    const now = ctx.currentTime ?? Date.now()
     if (now - this._lastTriggerTime >= 30000) {
       this._lastTriggerTime = now
 

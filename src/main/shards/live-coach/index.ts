@@ -169,6 +169,12 @@ export class LiveCoachMain implements IAkariShardInitDispose {
     this._sessionController.init()
   }
 
+  public feedMinimapObservationBatch(
+    batch: import('@shared/types/live-coach').MinimapObservationBatch
+  ): void {
+    this._sessionController.handleMinimapBatch(batch)
+  }
+
   public async onDispose(): Promise<void> {
     this._logger.info('Disposing LiveCoachMain')
     this._sessionController.dispose()

@@ -13,6 +13,8 @@ liveCoach:
     idleTitle: AI 教练空闲
     waiting: 等待战术时机触发...
     optionPrefix: '建议选项:'
+    rolePrimary: 首选
+    roleAlternative: 备选
   overview:
     mainSwitch: 实时语音 AI 教练
     mainSwitchDesc: 在召唤师峡谷对局中，基于小地图可见事实与 Live Client Data 提供实时确定性决策与语音辅助。

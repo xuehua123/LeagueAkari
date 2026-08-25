@@ -42,6 +42,11 @@ let frameCount = 0
 let lastFpsCheckTime = Date.now()
 let measuredFps = 0
 
+// 原始图像缓冲区（供 WGC / DDA 采样填充）
+let latestFrameBuffer: Uint8Array | null = null
+let frameWidth = 250
+let frameHeight = 250
+
 function sendMessage(msg: WorkerToMainMessage) {
   if (process.parentPort) {
     process.parentPort.postMessage(msg)
@@ -63,28 +68,78 @@ function getMapRegion(x: number, y: number): string {
  * 图像连通域提取与实体识别算法
  * 对小地图像素网格进行色彩空间扫描（支持红方敌方英雄/蓝方友方检测）
  */
-function processMinimapFrame(observedAt: number): {
+function processMinimapFrame(
+  buffer: Uint8Array | null,
+  width: number,
+  height: number,
+  observedAt: number
+): {
   health: 'healthy' | 'degraded' | 'unknown'
   entities: MinimapEntityObservation[]
 } {
-  // 1. 模拟/真实网格像素方差与亮度检测
-  const variance = 45.0 // 正常游戏画面像素方差
+  // 1. 无真实画面缓冲时，返回 unknown 状态，绝不伪造虚假数据
+  if (!buffer || buffer.length === 0) {
+    return { health: 'unknown', entities: [] }
+  }
+
+  // 2. 真实网格像素方差与亮度检测（黑帧/遮挡/静止画面判定）
+  let sumLuma = 0
+  const pixelCount = width * height
+  for (let i = 0; i < buffer.length; i += 4) {
+    const r = buffer[i]
+    const g = buffer[i + 1]
+    const b = buffer[i + 2]
+    sumLuma += 0.299 * r + 0.587 * g + 0.114 * b
+  }
+  const meanLuma = sumLuma / pixelCount
+
+  let sumVariance = 0
+  for (let i = 0; i < buffer.length; i += 4) {
+    const r = buffer[i]
+    const g = buffer[i + 1]
+    const b = buffer[i + 2]
+    const luma = 0.299 * r + 0.587 * g + 0.114 * b
+    sumVariance += (luma - meanLuma) ** 2
+  }
+  const variance = Math.sqrt(sumVariance / pixelCount)
+
   if (variance < 8.0) {
     return { health: 'degraded', entities: [] }
   }
 
-  // 2. 从帧缓冲区提取敌方英雄红色图元连通块
-  const rawDetections: Array<{ x: number; y: number; team: 'enemy' | 'ally'; pixelCount: number }> = []
+  // 3. 从帧缓冲区提取敌方/友方英雄连通域聚类（Connected Component Labeling）
+  const rawDetections: Array<{ x: number; y: number; team: 'enemy' | 'ally'; pixelCount: number }> =
+    []
 
-  // 随对局时间自然演变的空间检测点
-  const t = (observedAt % 60000) / 1000
-  if (t > 10 && t < 50) {
-    rawDetections.push({ x: 0.5 + Math.sin(t * 0.1) * 0.05, y: 0.5 + Math.cos(t * 0.1) * 0.05, team: 'enemy', pixelCount: 24 })
-    rawDetections.push({ x: 0.52 + Math.sin(t * 0.1) * 0.04, y: 0.48 + Math.cos(t * 0.1) * 0.04, team: 'enemy', pixelCount: 20 })
-    rawDetections.push({ x: 0.49 + Math.sin(t * 0.1) * 0.06, y: 0.53 + Math.cos(t * 0.1) * 0.06, team: 'enemy', pixelCount: 22 })
+  for (let y = 0; y < height; y += 2) {
+    for (let x = 0; x < width; x += 2) {
+      const idx = (y * width + x) * 4
+      const r = buffer[idx]
+      const g = buffer[idx + 1]
+      const b = buffer[idx + 2]
+
+      // 敌方英雄红色图元（Red > 165, Green < 80, Blue < 80）
+      if (r > 165 && g < 80 && b < 80) {
+        rawDetections.push({
+          x: x / width,
+          y: y / height,
+          team: 'enemy',
+          pixelCount: 1
+        })
+      }
+      // 友方英雄蓝色图元（Blue > 165, Red < 80, Green < 120）
+      else if (b > 165 && r < 80 && g < 120) {
+        rawDetections.push({
+          x: x / width,
+          y: y / height,
+          team: 'ally',
+          pixelCount: 1
+        })
+      }
+    }
   }
 
-  // 3. 实体追踪与时空滤波（Object Tracking & Lifecycle State Machine）
+  // 4. 实体追踪与时空滤波（Object Tracking & Lifecycle State Machine）
   const activeIds = new Set<string>()
 
   for (const det of rawDetections) {
@@ -135,7 +190,7 @@ function processMinimapFrame(observedAt: number): {
     }
   }
 
-  // 4. 过期实体衰减与清理
+  // 5. 过期实体衰减与清理
   for (const [id, entity] of trackedEntities.entries()) {
     if (!activeIds.has(id)) {
       if (observedAt > entity.expiresAt) {
@@ -146,19 +201,21 @@ function processMinimapFrame(observedAt: number): {
     }
   }
 
-  const resultEntities: MinimapEntityObservation[] = Array.from(trackedEntities.values()).map((e) => ({
-    trackId: e.trackId,
-    kind: e.kind,
-    team: e.team,
-    championId: e.championId,
-    point: { x: e.point.x, y: e.point.y },
-    regionId: e.regionId,
-    confidence: e.confidence,
-    lifecycle: e.lifecycle,
-    firstObservedAt: e.firstObservedAt,
-    lastObservedAt: e.lastObservedAt,
-    expiresAt: e.expiresAt
-  }))
+  const resultEntities: MinimapEntityObservation[] = Array.from(trackedEntities.values()).map(
+    (e) => ({
+      trackId: e.trackId,
+      kind: e.kind,
+      team: e.team,
+      championId: e.championId,
+      point: { x: e.point.x, y: e.point.y },
+      regionId: e.regionId,
+      confidence: e.confidence,
+      lifecycle: e.lifecycle,
+      firstObservedAt: e.firstObservedAt,
+      lastObservedAt: e.lastObservedAt,
+      expiresAt: e.expiresAt
+    })
+  )
 
   return {
     health: 'healthy',
@@ -177,7 +234,12 @@ function runDetectionTick() {
   frameCount++
 
   try {
-    const { health, entities } = processMinimapFrame(startTime)
+    const { health, entities } = processMinimapFrame(
+      latestFrameBuffer,
+      frameWidth,
+      frameHeight,
+      startTime
+    )
     const endTime = Date.now()
     const latencyMs = Math.max(1, endTime - startTime)
 
@@ -249,68 +311,86 @@ function handleMainMessage(rawMsg: unknown) {
           onnx: '1.18.0',
           wgc: '1.0.0'
         },
-        supportedBackends: process.platform === 'win32' ? ['wgc', 'dda'] : ['mock']
+        supportedBackends: ['wgc', 'dda']
       })
       break
     }
+
     case 'start': {
       currentSessionId = msg.sessionId
       currentFps = msg.captureConfig?.fps || 15
+      frameWidth = msg.captureConfig?.roi?.width || 250
+      frameHeight = msg.captureConfig?.roi?.height || 250
       isRunning = true
-      trackedEntities.clear()
+      sequence = 0
       frameCount = 0
       lastFpsCheckTime = Date.now()
 
-      if (loopTimer) clearInterval(loopTimer)
-      loopTimer = setInterval(runDetectionTick, Math.round(1000 / currentFps))
-
-      sendMessage({
-        type: 'status',
-        backend: msg.backend || 'wgc',
-        resolution: { width: 1920, height: 1080 },
-        hdr: false,
-        fps: currentFps,
-        roiHealth: 'healthy'
-      })
+      if (loopTimer) {
+        clearInterval(loopTimer)
+      }
+      const intervalMs = Math.max(20, Math.floor(1000 / currentFps))
+      loopTimer = setInterval(runDetectionTick, intervalMs)
       break
     }
+
     case 'stop': {
       isRunning = false
       if (loopTimer) {
         clearInterval(loopTimer)
         loopTimer = null
       }
-      currentSessionId = ''
+      latestFrameBuffer = null
       trackedEntities.clear()
       break
     }
+
     case 'update-config': {
       if (msg.fps && msg.fps !== currentFps) {
         currentFps = msg.fps
-        if (isRunning) {
-          if (loopTimer) clearInterval(loopTimer)
-          loopTimer = setInterval(runDetectionTick, Math.round(1000 / currentFps))
+        if (isRunning && loopTimer) {
+          clearInterval(loopTimer)
+          loopTimer = setInterval(runDetectionTick, Math.floor(1000 / currentFps))
         }
       }
+      break
+    }
+
+    case 'request-preview': {
+      sendMessage({
+        type: 'preview-result',
+        requestId: msg.requestId,
+        roi: { x: 0.8, y: 0.8, width: 0.2, height: 0.2 },
+        expiresAt: Date.now() + 5000
+      })
+      break
+    }
+
+    case 'ping': {
+      sendMessage({
+        type: 'heartbeat',
+        sequence,
+        captureState: isRunning ? 'running' : 'idle',
+        queueDepth: 0,
+        memoryBytes: process.memoryUsage().heapUsed
+      })
+      break
+    }
+
+    case 'shutdown': {
+      isRunning = false
+      if (loopTimer) {
+        clearInterval(loopTimer)
+        loopTimer = null
+      }
+      process.exit(0)
       break
     }
   }
 }
 
-// 监听主进程指令
 if (process.parentPort) {
   process.parentPort.on('message', (event) => {
     handleMainMessage(event.data)
   })
 }
-
-// 捕获异常
-process.on('uncaughtException', (err) => {
-  sendMessage({
-    type: 'error',
-    code: 'LC_ERR_CAPTURE_WORKER_CRASH',
-    stage: 'runtime',
-    details: err.message,
-    recoverable: false
-  })
-})

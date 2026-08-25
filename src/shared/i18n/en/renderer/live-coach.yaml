@@ -13,6 +13,8 @@ liveCoach:
     idleTitle: AI Coach Idle
     waiting: Waiting for tactical events...
     optionPrefix: 'Suggestion:'
+    rolePrimary: Primary
+    roleAlternative: Alternative
   overview:
     mainSwitch: Live AI Coach
     mainSwitchDesc: Real-time deterministic tactical guidance based on minimap observations and Live Client Data during Summoner's Rift matches.

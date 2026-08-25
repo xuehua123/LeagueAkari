@@ -1,4 +1,4 @@
-import { CoachSessionState } from '@shared/types/live-coach'
+import { CoachSessionState, MinimapObservationBatch } from '@shared/types/live-coach'
 import { LiveGameSnapshot } from '@shared/types/live-game-data'
 import { formatError } from '@shared/utils/errors'
 
@@ -23,6 +23,11 @@ export class LiveCoachSessionController {
   ) {
     this._fusion = new FactFusionEngine()
     this._ruleEngine = new CoachRuleEngine()
+
+    // 监听证据失效事件并通知调度器取消对应 Cue（P1-005）
+    this._fusion.onEvidenceInvalidated = (invalidatedIds) => {
+      this._scheduler.cancelCuesByEvidenceIds(invalidatedIds, 'evidence-invalidated')
+    }
   }
 
   public get fusion(): FactFusionEngine {
@@ -48,7 +53,7 @@ export class LiveCoachSessionController {
       ({ enabled, phase, session }) => {
         if (!enabled) {
           this.setSessionState('disabled')
-          this._scheduler.cancelAll('disabled')
+          this._scheduler.reset()
           return
         }
 
@@ -65,7 +70,7 @@ export class LiveCoachSessionController {
               `LiveCoach: mapId ${mapId} is not Summoner's Rift (11). Session blocked.`
             )
             this.setSessionState('degraded')
-            this._scheduler.cancelAll('unsupported-map')
+            this._scheduler.reset()
             return
           }
 
@@ -148,21 +153,47 @@ export class LiveCoachSessionController {
     this._context.logger.info(
       `Ending coach session: ${this._context.state.session.id}, reason: ${reason}`
     )
-    this._scheduler.cancelAll(reason)
+    this._scheduler.reset()
     this._fusion.reset()
     this._ruleEngine.reset()
     this._context.state.reset()
   }
 
-  public pause(reason: string): void {
+  public pause(_reason: string): void {
     this._isPaused = true
-    this._scheduler.cancelAll(reason)
+    this._scheduler.reset()
     this.setSessionState('paused')
   }
 
   public resume(): void {
     this._isPaused = false
     this.setSessionState('active')
+  }
+
+  public handleMinimapBatch(batch: MinimapObservationBatch): void {
+    if (this._isPaused || this._context.state.session.state !== 'active') {
+      return
+    }
+
+    try {
+      this._fusion.updateMinimapBatch(batch)
+
+      const sessionId = this._context.state.session.id || batch.sessionId
+      const patch = this._context.state.session.patch || batch.patch
+
+      const cues = this._ruleEngine.evaluate({
+        sessionId,
+        patch,
+        fusion: this._fusion,
+        enabledCategories: this._context.settings.cueCategories
+      })
+
+      if (cues.length > 0) {
+        this._scheduler.submitCues(cues)
+      }
+    } catch (err) {
+      this._context.logger.warn(`Error during minimap batch processing: ${formatError(err)}`)
+    }
   }
 
   private _onLiveGameSnapshot(snapshot: LiveGameSnapshot): void {

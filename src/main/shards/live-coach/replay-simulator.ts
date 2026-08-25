@@ -51,10 +51,10 @@ export class CoachReplaySimulator {
 
     for (const frame of session.frames) {
       if (frame.liveData) {
-        this._fusion.updateLiveGameSnapshot(frame.liveData)
+        this._fusion.updateLiveGameSnapshot(frame.liveData, frame.timestamp)
       }
       if (frame.minimap) {
-        this._fusion.updateMinimapBatch(frame.minimap)
+        this._fusion.updateMinimapBatch(frame.minimap, frame.timestamp)
       }
 
       const cues = this._ruleEngine.evaluate({
@@ -67,7 +67,8 @@ export class CoachReplaySimulator {
           opportunity: true,
           system: true,
           review: true
-        }
+        },
+        currentTime: frame.timestamp
       })
 
       if (cues.length > 0) {
@@ -166,13 +167,45 @@ export class CoachReplaySimulator {
               riotId: 'Test#CN',
               riotIdGameName: 'Test',
               riotIdTagLine: 'CN',
-              championName: 'Ahri',
+              championName: 'Garen', // 真实英雄：盖伦
               level: 6,
-              currentGold: 1250,
+              currentGold: 1300,
               team: 'ORDER',
               abilities: {}
             },
-            players: [],
+            players: [
+              {
+                summonerName: 'TestPlayer',
+                riotId: 'Test#CN',
+                riotIdGameName: 'Test',
+                riotIdTagLine: 'CN',
+                championName: 'Garen',
+                championId: 86,
+                team: 'ORDER',
+                position: 'TOP',
+                level: 6,
+                isDead: false,
+                respawnTimer: 0,
+                isBot: false,
+                kills: 1,
+                deaths: 0,
+                assists: 0,
+                creepScore: 42,
+                wardScore: 3,
+                items: [
+                  {
+                    canUse: true,
+                    consumable: false,
+                    count: 1,
+                    displayName: '多兰之盾',
+                    itemID: 1054,
+                    price: 450,
+                    slot: 0
+                  }
+                ],
+                summonerSpells: {}
+              }
+            ],
             events: [],
             sourceHealth: []
           }
@@ -227,7 +260,7 @@ export class CoachReplaySimulator {
               riotId: 'Test#CN',
               riotIdGameName: 'Test',
               riotIdTagLine: 'CN',
-              championName: 'Ahri',
+              championName: 'Garen',
               level: 7,
               currentGold: 300,
               team: 'ORDER',
@@ -270,7 +303,7 @@ export class CoachReplaySimulator {
               riotId: 'Test#CN',
               riotIdGameName: 'Test',
               riotIdTagLine: 'CN',
-              championName: 'Ahri',
+              championName: 'Garen',
               level: 10,
               currentGold: 450,
               team: 'ORDER',
@@ -298,7 +331,7 @@ export class CoachReplaySimulator {
               riotId: 'Test#CN',
               riotIdGameName: 'Test',
               riotIdTagLine: 'CN',
-              championName: 'Ahri',
+              championName: 'Garen',
               level: 11,
               currentGold: 400,
               team: 'ORDER',

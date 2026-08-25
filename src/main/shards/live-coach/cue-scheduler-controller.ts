@@ -4,108 +4,103 @@ import type { LiveCoachMainContext } from './context'
 import { LocalSpeechExecutor } from './local-speech-executor'
 
 export class CueSchedulerController {
+  private readonly _cues = new Map<string, CoachCue>()
   private _pendingCues: CoachCue[] = []
   private _currentSpeakingCue: CoachCue | null = null
   private _lastSpokenTime = 0
-  private readonly _minSpokenIntervalMs = 4000
-  private _schedulerTimer: NodeJS.Timeout | null = null
+  private readonly _minSpokenIntervalMs = 3000
 
   constructor(
     private readonly _context: LiveCoachMainContext,
     private readonly _speechExecutor: LocalSpeechExecutor
   ) {}
 
-  public init(): void {
-    this._startLoop()
-  }
+  public init(): void {}
 
   public dispose(): void {
-    if (this._schedulerTimer) {
-      clearInterval(this._schedulerTimer)
-      this._schedulerTimer = null
-    }
-    this.cancelAll('coach-disposed')
+    this.reset()
   }
 
   public submitCues(cues: CoachCue[]): void {
-    const now = Date.now()
-    const mode = this._context.settings.coachMode
-
     for (const cue of cues) {
-      // 1. 根据 coachMode 过滤
-      if (mode === 'minimal' && cue.category !== 'warning') {
-        continue
-      }
-
-      // 2. 检查分类开关
-      if (this._context.settings.cueCategories[cue.category] === false) {
-        continue
-      }
-
-      // 3. 检查是否已过期
-      if (cue.expiresAt <= now) {
-        continue
-      }
-
-      // 插入并按优先级降序排序
+      this._cues.set(cue.id, cue)
       this._pendingCues.push(cue)
     }
 
+    // 按优先级降序排序 (Priority 越高越先播放)
     this._pendingCues.sort((a, b) => b.priority - a.priority)
-
-    // 4. 高优先级提示即时打断低优先级播报机制
-    if (this._pendingCues.length > 0 && this._currentSpeakingCue) {
-      const topPending = this._pendingCues[0]
-      if (
-        topPending.priority >= 70 &&
-        topPending.priority > this._currentSpeakingCue.priority + 20
-      ) {
-        this._context.logger.info(
-          `Interrupting cue [${this._currentSpeakingCue.id}] for higher priority cue [${topPending.id}]`
-        )
-        this._speechExecutor.cancel()
-        this._notifyCueCancelled(this._currentSpeakingCue.id, 'interrupted-by-higher-priority')
-        this._currentSpeakingCue = null
-        this._lastSpokenTime = 0 // 允许立即播报
-      }
-    }
-
-    // 保持队列精简（最多 5 条）
-    if (this._pendingCues.length > 5) {
-      const removed = this._pendingCues.splice(5)
-      for (const cue of removed) {
-        this._notifyCueCancelled(cue.id, 'queue-overflow')
-      }
-    }
+    this._processNextCue()
   }
 
-  public cancelAll(reason: string): void {
-    for (const cue of this._pendingCues) {
-      this._notifyCueCancelled(cue.id, reason)
-    }
-    this._pendingCues = []
+  public cancelCue(cueId: string, reason: string = 'user-cancelled'): void {
+    const cue = this._cues.get(cueId)
+    if (!cue) return
 
-    if (this._currentSpeakingCue) {
+    cue.status = 'cancelled'
+    cue.cancellationReason = reason
+    this._pendingCues = this._pendingCues.filter((c) => c.id !== cueId)
+
+    if (this._currentSpeakingCue?.id === cueId) {
       this._speechExecutor.cancel()
-      this._notifyCueCancelled(this._currentSpeakingCue.id, reason)
       this._currentSpeakingCue = null
+      this._context.state.setSpeechState('idle')
       this._context.state.setCue(null)
     }
+
+    this._notifyCueCancelled(cueId, reason)
   }
 
-  private _startLoop(): void {
-    this._schedulerTimer = setInterval(() => {
-      this._processQueue()
-    }, 300)
+  /**
+   * 根据失效的证据 ID 批量撤销正在排队或正在播报的 Cue（P1-005）
+   */
+  public cancelCuesByEvidenceIds(
+    invalidatedEvidenceIds: string[],
+    reason: string = 'evidence-invalidated'
+  ): void {
+    const idSet = new Set(invalidatedEvidenceIds)
+    const cancelledIds: string[] = []
+
+    for (const cue of this._cues.values()) {
+      if (cue.status === 'pending' || cue.status === 'speaking') {
+        if (cue.evidenceIds.some((id) => idSet.has(id))) {
+          cue.status = 'cancelled'
+          cue.cancellationReason = reason
+          cancelledIds.push(cue.id)
+        }
+      }
+    }
+
+    this._pendingCues = this._pendingCues.filter((c) => !cancelledIds.includes(c.id))
+
+    if (this._currentSpeakingCue && cancelledIds.includes(this._currentSpeakingCue.id)) {
+      this._speechExecutor.cancel()
+      this._currentSpeakingCue = null
+      this._context.state.setSpeechState('idle')
+      this._context.state.setCue(null)
+    }
+
+    for (const id of cancelledIds) {
+      this._notifyCueCancelled(id, reason)
+    }
   }
 
-  private async _processQueue(): Promise<void> {
+  public reset(): void {
+    this._speechExecutor.cancel()
+    this._pendingCues = []
+    this._currentSpeakingCue = null
+    this._cues.clear()
+    this._context.state.setCue(null)
+    this._context.state.setSpeechState('idle')
+  }
+
+  private async _processNextCue(): Promise<void> {
     const now = Date.now()
 
-    // 1. 清理过期提示
+    // 1. 清理过期 Cue
     const unexpired: CoachCue[] = []
     for (const cue of this._pendingCues) {
       if (cue.expiresAt <= now) {
+        cue.status = 'expired'
         this._notifyCueCancelled(cue.id, 'expired')
       } else {
         unexpired.push(cue)
@@ -137,7 +132,11 @@ export class CueSchedulerController {
       priority: nextCue.priority,
       observationText: nextCue.observationText,
       impactText: nextCue.impactText,
-      options: nextCue.options.map((o) => ({ id: o.id, label: o.label })),
+      options: nextCue.options.map((o) => ({
+        id: o.id,
+        label: o.label,
+        role: o.role
+      })),
       spokenText: nextCue.spokenText,
       createdAt: nextCue.createdAt,
       expiresAt: nextCue.expiresAt,

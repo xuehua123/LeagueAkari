@@ -60,13 +60,30 @@
             {{ coachStore.cue.spokenText }}
           </div>
 
-          <div class="flex gap-1 pt-0.5">
+          <div class="flex flex-col gap-1 pt-0.5">
             <span
               v-for="opt of coachStore.cue.options"
               :key="opt.id"
-              class="rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-white/80"
+              class="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px]"
+              :class="[
+                opt.role === 'primary'
+                  ? 'border border-blue-400/40 bg-blue-500/20 font-medium text-blue-200'
+                  : 'bg-white/10 text-white/80'
+              ]"
             >
-              {{ t('liveCoach.overlay.optionPrefix', '选项:') }} {{ opt.label }}
+              <span
+                v-if="opt.role === 'primary'"
+                class="rounded bg-blue-500/80 px-1 text-[9px] text-white"
+              >
+                {{ t('liveCoach.overlay.rolePrimary', '首选') }}
+              </span>
+              <span
+                v-else-if="opt.role === 'alternative'"
+                class="rounded bg-white/20 px-1 text-[9px] text-white/80"
+              >
+                {{ t('liveCoach.overlay.roleAlternative', '备选') }}
+              </span>
+              <span>{{ opt.label }}</span>
             </span>
           </div>
         </div>

@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  coachCuePublicDtoSchema,
   coachCueSchema,
   coachEvidenceSchema,
+  fogInferenceSchema,
+  itemPurchaseGuidanceSchema,
   liveCoachCapabilityPayloadSchema,
   liveCoachPublicStateSchema,
   workerToMainMessageSchema
@@ -149,5 +152,81 @@ describe('live-coach schemas', () => {
       lastError: null
     }
     expect(liveCoachPublicStateSchema.safeParse(validState).success).toBe(true)
+  })
+
+  it('validates fogInferenceSchema and itemPurchaseGuidanceSchema with strict constraints', () => {
+    const validFog = {
+      id: 'fog_001',
+      sessionId: 'sess_1',
+      enemyTrackId: 'enemy_1',
+      basisEvidenceIds: ['evi_1'],
+      lastSeenAt: 1700000000000,
+      predictedRegions: [{ regionId: 'bot_river', probability: 0.8 }],
+      candidateRoutes: [{ regionIds: ['mid', 'bot_river'], probability: 0.8 }],
+      arrivalWindow: {
+        earliestAt: 1700000005000,
+        latestAt: 1700000015000
+      },
+      intents: [{ kind: 'roam' as const, probability: 0.85 }],
+      confidence: 0.9,
+      createdAt: 1700000000000,
+      expiresAt: 1700000020000,
+      modelVersion: '1.2.0'
+    }
+    expect(fogInferenceSchema.safeParse(validFog).success).toBe(true)
+
+    // Verify arrivalWindow earliestAt > latestAt fails validation
+    const invalidWindowFog = {
+      ...validFog,
+      arrivalWindow: {
+        earliestAt: 1700000020000,
+        latestAt: 1700000010000
+      }
+    }
+    expect(fogInferenceSchema.safeParse(invalidWindowFog).success).toBe(false)
+
+    // Verify negative gold fails validation
+    const invalidGuidance = {
+      id: 'item_1',
+      sessionId: 'sess_1',
+      patch: '14.15.1',
+      championId: 86,
+      currentGold: -50,
+      inventoryItemIds: [],
+      primaryPlan: {
+        itemIds: [3071],
+        totalCost: 3000,
+        remainingGold: 0,
+        missingGold: 3000,
+        reasonCodes: [],
+        conditions: []
+      },
+      alternativePlans: [],
+      evidenceIds: ['evi_gold'],
+      createdAt: 1700000000000,
+      expiresAt: 1700000020000,
+      ruleVersion: '1.0.0'
+    }
+    expect(itemPurchaseGuidanceSchema.safeParse(invalidGuidance).success).toBe(false)
+
+    // Verify CoachCuePublicDto enforces max 2 options
+    const invalidPublicDto = {
+      id: 'cue_p_1',
+      sessionId: 'sess_1',
+      category: 'warning',
+      priority: 50,
+      observationText: 'obs',
+      impactText: null,
+      options: [
+        { id: '1', label: '1', role: 'primary' },
+        { id: '2', label: '2', role: 'alternative' },
+        { id: '3', label: '3' }
+      ],
+      spokenText: 'text',
+      createdAt: 1700000000000,
+      expiresAt: 1700000005000,
+      status: 'speaking'
+    }
+    expect(coachCuePublicDtoSchema.safeParse(invalidPublicDto).success).toBe(false)
   })
 })

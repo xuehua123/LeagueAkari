@@ -19,10 +19,7 @@ export class MinimapObservationController {
       roiState: batch.health
     })
 
-    // Forward to LiveCoach Fact Fusion Engine
-    const fusion = (this._context.liveCoach as any)._sessionController?.fusion
-    if (fusion) {
-      fusion.updateMinimapBatch(batch)
-    }
+    // Forward to LiveCoach Fact Fusion Engine via typed public API
+    this._context.liveCoach.feedMinimapObservationBatch(batch)
   }
 }

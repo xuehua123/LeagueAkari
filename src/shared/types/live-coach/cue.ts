@@ -97,13 +97,15 @@ export const coachCuePublicDtoSchema = z.object({
   priority: z.number().min(0).max(100),
   observationText: z.string(),
   impactText: z.string().nullable(),
-  options: z.array(
-    z.object({
-      id: z.string(),
-      label: z.string(),
-      role: z.enum(['primary', 'alternative']).optional()
-    })
-  ),
+  options: z
+    .array(
+      z.object({
+        id: z.string(),
+        label: z.string(),
+        role: z.enum(['primary', 'alternative']).optional()
+      })
+    )
+    .max(2),
   spokenText: z.string(),
   createdAt: z.number(),
   expiresAt: z.number(),

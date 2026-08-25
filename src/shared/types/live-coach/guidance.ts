@@ -48,42 +48,45 @@ export const fogInferenceSchema = z.object({
   sessionId: z.string(),
   enemyTrackId: z.string(),
   basisEvidenceIds: z.array(z.string()),
-  lastSeenAt: z.number(),
+  lastSeenAt: z.number().min(0),
   predictedRegions: z.array(
     z.object({
       regionId: z.string(),
-      probability: z.number()
+      probability: z.number().min(0).max(1)
     })
   ),
   candidateRoutes: z.array(
     z.object({
       regionIds: z.array(z.string()),
-      probability: z.number()
+      probability: z.number().min(0).max(1)
     })
   ),
   arrivalWindow: z
     .object({
-      earliestAt: z.number(),
-      latestAt: z.number()
+      earliestAt: z.number().min(0),
+      latestAt: z.number().min(0)
+    })
+    .refine((w) => w.latestAt >= w.earliestAt, {
+      message: 'latestAt must be greater than or equal to earliestAt'
     })
     .nullable(),
   intents: z.array(
     z.object({
       kind: z.enum(['roam', 'recall', 'ambush', 'flank', 'objective', 'lane-swap', 'unknown']),
-      probability: z.number()
+      probability: z.number().min(0).max(1)
     })
   ),
-  confidence: z.number(),
-  createdAt: z.number(),
-  expiresAt: z.number(),
+  confidence: z.number().min(0).max(1),
+  createdAt: z.number().min(0),
+  expiresAt: z.number().min(0),
   modelVersion: z.string()
 })
 
 export const itemPurchasePlanSchema = z.object({
   itemIds: z.array(z.number()),
-  totalCost: z.number(),
-  remainingGold: z.number(),
-  missingGold: z.number(),
+  totalCost: z.number().min(0),
+  remainingGold: z.number().min(0),
+  missingGold: z.number().min(0),
   reasonCodes: z.array(z.string()),
   conditions: z.array(z.string())
 })
@@ -93,12 +96,12 @@ export const itemPurchaseGuidanceSchema = z.object({
   sessionId: z.string(),
   patch: z.string(),
   championId: z.number(),
-  currentGold: z.number(),
+  currentGold: z.number().min(0),
   inventoryItemIds: z.array(z.number()),
   primaryPlan: itemPurchasePlanSchema,
   alternativePlans: z.array(itemPurchasePlanSchema),
   evidenceIds: z.array(z.string()),
-  createdAt: z.number(),
-  expiresAt: z.number(),
+  createdAt: z.number().min(0),
+  expiresAt: z.number().min(0),
   ruleVersion: z.string()
 })

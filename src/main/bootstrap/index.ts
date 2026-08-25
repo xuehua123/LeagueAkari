@@ -19,8 +19,10 @@ import { AkariIpcMain } from '@main/shards/ipc'
 import { KeyboardShortcutsMain } from '@main/shards/keyboard-shortcuts'
 import { LeagueClientMain } from '@main/shards/league-client'
 import { LeagueClientUxMain } from '@main/shards/league-client-ux'
+import { LiveCoachMain } from '@main/shards/live-coach'
 import { LiveGameDataMain } from '@main/shards/live-game-data'
 import { LoggerFactoryMain } from '@main/shards/logger-factory'
+import { MinimapObserverMain } from '@main/shards/minimap-observer'
 import { MobxUtilsMain } from '@main/shards/mobx-utils'
 import { OngoingGameMain } from '@main/shards/ongoing-game'
 import { RendererDebugMain } from '@main/shards/renderer-debug'
@@ -337,6 +339,8 @@ export function bootstrap() {
     manager.use(AutoMiscMain)
     manager.use(AutoSelectMain)
     manager.use(InGameSendMain)
+    manager.use(LiveCoachMain)
+    manager.use(MinimapObserverMain)
     manager.use(OngoingGameMain)
     manager.use(RespawnTimerMain)
     manager.use(SavedPlayerMain)

@@ -15,6 +15,7 @@ import { AkariIpcRenderer } from '@renderer-shared/shards/ipc'
 import { KeyboardShortcutsRenderer } from '@renderer-shared/shards/keyboard-shortcut'
 import { LeagueClientRenderer } from '@renderer-shared/shards/league-client'
 import { LeagueClientUxRenderer } from '@renderer-shared/shards/league-client-ux'
+import { LiveCoachRenderer } from '@renderer-shared/shards/live-coach'
 import { LoggerRenderer } from '@renderer-shared/shards/logger'
 import { OngoingGameRenderer } from '@renderer-shared/shards/ongoing-game'
 import { PiniaMobxUtilsRenderer } from '@renderer-shared/shards/pinia-mobx-utils'
@@ -54,6 +55,7 @@ manager.use(KeyboardShortcutsRenderer)
 manager.use(LeagueClientPeekRenderer)
 manager.use(LeagueClientRenderer)
 manager.use(LeagueClientUxRenderer)
+manager.use(LiveCoachRenderer)
 manager.use(LoggerRenderer)
 manager.use(MainWindowUiRenderer)
 manager.use(PlayerTabsRenderer)

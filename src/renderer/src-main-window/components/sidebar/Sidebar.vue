@@ -58,6 +58,7 @@ import { ToolFilled as ToolFilledIcon } from '@vicons/antd'
 import { AiStatus as AiStatusIcon } from '@vicons/carbon'
 import {
   AnimalRabbit28Filled as AnimalRabbit28FilledIcon,
+  Bot24Filled as Bot24FilledIcon,
   Games24Filled as Games24FilledIcon
 } from '@vicons/fluent'
 import { AnalyticsRound as AnalyticsRoundIcon } from '@vicons/material'
@@ -182,6 +183,11 @@ const menu = computed(() => {
       name: t('navigation.sidebar.menu.ongoing-game'),
       inProgress: shouldShowOngoingGameBadge.value,
       isDisabled: !lcs.isConnected
+    },
+    {
+      key: 'live-coach',
+      icon: renderIcon(Bot24FilledIcon),
+      name: t('navigation.sidebar.menu.live-coach', 'AI 教练')
     },
     {
       key: 'automation',

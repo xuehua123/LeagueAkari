@@ -1,6 +1,7 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 
 import Automation from '@main-window/views/automation/Automation.vue'
+import LiveCoach from '@main-window/views/live-coach/LiveCoach.vue'
 import OngoingGame from '@main-window/views/ongoing-game/OngoingGame.vue'
 import PlayerTabs from '@main-window/views/player-tabs/PlayerTabs.vue'
 import Test from '@main-window/views/test/Test.vue'
@@ -24,6 +25,11 @@ const router = createRouter({
       name: 'ongoing-game',
       path: '/ongoing-game',
       component: OngoingGame
+    },
+    {
+      name: 'live-coach',
+      path: '/live-coach/:section?',
+      component: LiveCoach
     },
     {
       name: 'toolkit',

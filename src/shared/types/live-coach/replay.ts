@@ -1,5 +1,26 @@
 import { z } from 'zod'
 
+import type { LiveGameSnapshot } from '../live-game-data'
+import type { MinimapObservationBatch } from './observation'
+
+export interface CoachReplayFrame {
+  timestamp: number
+  liveData?: LiveGameSnapshot
+  minimap?: MinimapObservationBatch
+}
+
+export interface CoachReplaySession {
+  metadata: {
+    sessionId: string
+    patch: string
+    recordedAt: number
+    durationSeconds: number
+    mapId: number
+    queueId: number
+  }
+  frames: CoachReplayFrame[]
+}
+
 export interface CoachReplaySidecarV1 {
   schemaVersion: 1
   artifactSha256: string

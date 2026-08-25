@@ -81,7 +81,7 @@ export class CaptureProcessSupervisorController {
       `Starting MinimapObserver capture supervisor for session: ${sessionId}`
     )
     this._context.state.setIsCapturing(true)
-    this._context.state.setBackend('wgc')
+    this._context.state.setBackend('desktopCapturer')
     this._context.state.setFps(15)
 
     // 查找英雄联盟游戏客户端进程 PID
@@ -202,7 +202,7 @@ export class CaptureProcessSupervisorController {
       sessionId,
       targetHwnd: null,
       targetPid: this._targetPid,
-      backend: 'wgc',
+      backend: 'desktopCapturer',
       detectors: ['enemy-champions', 'neutral-objectives'],
       captureConfig: {
         fps: 15,
@@ -215,6 +215,8 @@ export class CaptureProcessSupervisorController {
       }
     })
   }
+
+  private _captureSequence = 0
 
   private _startCaptureLoop(): void {
     if (this._captureTimer) {
@@ -233,13 +235,18 @@ export class CaptureProcessSupervisorController {
           thumbnailSize: { width: 3840, height: 2160 }
         })
 
-        // 优先匹配英雄联盟游戏客户端窗口
-        const gameSource = sources.find((s) => s.name.includes('League of Legends')) || sources[0]
+        // 精准匹配英雄联盟游戏客户端窗口，严禁回退到随机桌面或无关窗口
+        const gameSource = sources.find(
+          (s) =>
+            s.name === 'League of Legends (TM) Client' ||
+            s.name.includes('League of Legends (TM) Client') ||
+            (s.name.includes('League of Legends') && !s.name.includes('LeagueClient'))
+        )
 
         if (gameSource && gameSource.thumbnail) {
           const size = gameSource.thumbnail.getSize()
           if (size.width > 100 && size.height > 100) {
-            const cal = this._currentCalibration
+            const cal = this._currentCalibration!
             const pixelRoi = {
               x: Math.max(0, Math.round(cal.roi.x * size.width)),
               y: Math.max(0, Math.round(cal.roi.y * size.height)),
@@ -250,13 +257,16 @@ export class CaptureProcessSupervisorController {
             if (pixelRoi.width > 20 && pixelRoi.height > 20) {
               const minimapCrop = gameSource.thumbnail.crop(pixelRoi)
               const rawBitmap = minimapCrop.toBitmap()
+              this._captureSequence++
 
               this._worker.postMessage({
                 type: 'frame-buffer',
                 buffer: rawBitmap,
+                pixelFormat: process.platform === 'win32' ? 'bgra' : 'rgba',
                 width: pixelRoi.width,
                 height: pixelRoi.height,
-                observedAt: Date.now()
+                observedAt: Date.now(),
+                sequence: this._captureSequence
               })
             }
           }

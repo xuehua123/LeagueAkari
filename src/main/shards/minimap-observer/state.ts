@@ -3,7 +3,7 @@ import { makeAutoObservable, observable } from 'mobx'
 
 export class MinimapObserverState {
   public isCapturing: boolean = false
-  public backend: 'wgc' | 'dda' | 'mock' = 'wgc'
+  public backend: 'wgc' | 'dda' | 'desktopCapturer' | 'mock' = 'wgc'
   public fps: number = 0
   public frameAgeMs: number | null = null
   public roiHealth: 'healthy' | 'degraded' | 'occluded' | 'unknown' = 'unknown'
@@ -19,7 +19,7 @@ export class MinimapObserverState {
     this.isCapturing = capturing
   }
 
-  setBackend(backend: 'wgc' | 'dda' | 'mock') {
+  setBackend(backend: 'wgc' | 'dda' | 'desktopCapturer' | 'mock') {
     this.backend = backend
   }
 

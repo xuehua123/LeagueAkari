@@ -59,9 +59,11 @@ export interface MainToWorkerShutdownMessage {
 export interface MainToWorkerFrameBufferMessage {
   type: 'frame-buffer'
   buffer: Uint8Array | Buffer | ArrayBuffer
+  pixelFormat: 'bgra' | 'rgba'
   width: number
   height: number
   observedAt: number
+  sequence: number
 }
 
 export type MainToWorkerMessage =

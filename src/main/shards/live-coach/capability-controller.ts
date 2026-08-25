@@ -57,13 +57,16 @@ export class LiveCoachCapabilityController {
       return
     }
 
-    // 4. 补丁检查
-    if (patch && !patch.startsWith('14.') && !patch.startsWith('15.')) {
-      unavailable['patch'] = 'unsupported-patch'
-      unavailable['coach.analyze.fog-inference'] = 'unsupported-patch'
-      unavailable['coach.guidance.item-purchase'] = 'unsupported-patch'
-      unavailable['coach.analyze.minimap-basic'] = 'unsupported-patch'
-      unavailable['coach.analyze.minimap-advanced'] = 'unsupported-patch'
+    // 4. 补丁检查（支持 Season 14+ 现代版本，如 16.16.1、15.x、14.x）
+    if (patch) {
+      const major = parseInt(patch.split('.')[0], 10)
+      if (Number.isFinite(major) && major < 14) {
+        unavailable['patch'] = 'unsupported-patch'
+        unavailable['coach.analyze.fog-inference'] = 'unsupported-patch'
+        unavailable['coach.guidance.item-purchase'] = 'unsupported-patch'
+        unavailable['coach.analyze.minimap-basic'] = 'unsupported-patch'
+        unavailable['coach.analyze.minimap-advanced'] = 'unsupported-patch'
+      }
     }
 
     // 5. 采集状态与 ROI 健康检查

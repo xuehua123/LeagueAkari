@@ -718,12 +718,160 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     // 2. 当包含 'coach.guidance.item-purchase' 时，装备规则正常产出
     const cuesWithCap = engine.evaluate({
       sessionId: 'sess_gate',
-      patch: '14.15.1',
+      patch: '16.16.1',
       fusion,
       enabledCategories: { warning: true, information: true, opportunity: true },
       enabledCapabilities: new Set(['coach.guidance.item-purchase']),
       currentTime: now
     })
     expect(cuesWithCap.find((c) => c.ruleId === 'rule_item_purchase_guidance')).toBeDefined()
+  })
+
+  it('correctly suppresses false jungler alarm when an enemy is visible in jungle/river or all enemies are visible', () => {
+    const fusion = new FactFusionEngine()
+    const engine = new CoachRuleEngine()
+    const now = 1700000000000
+
+    fusion.updateLiveGameSnapshot(
+      {
+        sessionId: 'sess_jg_seen',
+        patch: '16.16.1',
+        gameTimeSeconds: 300,
+        clock: { observedAt: now, receivedAt: now, sequence: 1 },
+        activePlayer: {
+          summonerName: 'MidPlayer',
+          riotId: 'Mid#CN',
+          riotIdGameName: 'Mid',
+          riotIdTagLine: 'CN',
+          championName: 'Ahri',
+          level: 6,
+          currentGold: 1000,
+          team: 'ORDER',
+          abilities: {}
+        },
+        players: [
+          {
+            summonerName: 'MidPlayer',
+            riotId: 'Mid#CN',
+            riotIdGameName: 'Mid',
+            riotIdTagLine: 'CN',
+            championName: 'Ahri',
+            championId: 103,
+            team: 'ORDER',
+            position: 'MIDDLE',
+            isDead: false,
+            respawnTimer: 0,
+            items: []
+          } as any,
+          {
+            summonerName: 'EnemyJungler',
+            riotId: 'Lee#CN',
+            riotIdGameName: 'Lee',
+            riotIdTagLine: 'CN',
+            championName: 'LeeSin',
+            championId: 64,
+            team: 'CHAOS',
+            position: 'JUNGLE',
+            isDead: false,
+            respawnTimer: 0,
+            items: []
+          } as any
+        ],
+        events: [],
+        sourceHealth: []
+      },
+      now
+    )
+
+    // 1. CV 视觉识别仅输出 track_enemy_1（championId 为 null），但在 top_jungle_river 区域
+    fusion.updateMinimapBatch(
+      {
+        sessionId: 'sess_jg_seen',
+        patch: '16.16.1',
+        calibrationVersion: '1.0.0',
+        modelVersions: {},
+        frame: { observedAt: now, receivedAt: now, sequence: 1, ageMs: 15 },
+        health: 'healthy',
+        entities: [
+          {
+            trackId: 'track_enemy_1',
+            kind: 'enemy',
+            team: 'enemy',
+            championId: null,
+            point: { x: 0.25, y: 0.45 },
+            regionId: 'top_jungle_river',
+            confidence: 0.92,
+            lifecycle: 'confirmed',
+            firstObservedAt: now,
+            lastObservedAt: now,
+            expiresAt: now + 5000
+          }
+        ],
+        events: []
+      },
+      now
+    )
+
+    // 既然野区/河道已经有敌方实体，敌方打野不属于“位置完全未知”，防抓规则不应误报
+    const cues = engine.evaluate({
+      sessionId: 'sess_jg_seen',
+      patch: '16.16.1',
+      fusion,
+      enabledCategories: { warning: true, information: true, opportunity: true },
+      enabledCapabilities: new Set(['coach.analyze.minimap-basic']),
+      currentTime: now
+    })
+
+    expect(cues.find((c) => c.ruleId === 'rule_basic_skills_and_tactics')).toBeUndefined()
+  })
+
+  it('validates canonical Data Dragon 16.x item catalog definitions', () => {
+    const fusion = new FactFusionEngine()
+    const now = 1700000000000
+
+    // 法师阿狸（3000g）-> 验证推荐 6655 卢登的伙伴，其组件为 3802 遗失的章节 (1200g)
+    fusion.updateLiveGameSnapshot(
+      {
+        sessionId: 'sess_dd_ahri',
+        patch: '16.16.1',
+        gameTimeSeconds: 400,
+        clock: { observedAt: now, receivedAt: now, sequence: 1 },
+        activePlayer: {
+          summonerName: 'AhriPlayer',
+          riotId: 'Ahri#CN',
+          riotIdGameName: 'Ahri',
+          riotIdTagLine: 'CN',
+          championName: 'Ahri',
+          level: 6,
+          currentGold: 3000,
+          team: 'ORDER',
+          abilities: {}
+        },
+        players: [
+          {
+            summonerName: 'AhriPlayer',
+            riotId: 'Ahri#CN',
+            riotIdGameName: 'Ahri',
+            riotIdTagLine: 'CN',
+            championName: 'Ahri',
+            championId: 103,
+            team: 'ORDER',
+            position: 'MIDDLE',
+            isDead: false,
+            respawnTimer: 0,
+            items: []
+          } as any
+        ],
+        events: [],
+        sourceHealth: []
+      },
+      now
+    )
+
+    const guidance = fusion.getItemPurchaseGuidance(now)
+    expect(guidance).toBeDefined()
+    expect(guidance?.championId).toBe(103)
+    expect(guidance?.primaryPlan.itemIds).toContain(6655)
+    expect(guidance?.primaryPlan.totalCost).toBe(2900)
   })
 })

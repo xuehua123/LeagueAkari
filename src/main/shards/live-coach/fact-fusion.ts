@@ -38,7 +38,7 @@ const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
         components: [
           { id: 3051, name: '提亚马特', cost: 1200 },
           { id: 3044, name: '净蚀', cost: 1100 },
-          { id: 1028, name: '红水晶', cost: 400 }
+          { id: 1042, name: '短剑', cost: 250 }
         ],
         reason: '核心减速留人与清线战力'
       },
@@ -60,11 +60,11 @@ const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
     archetype: 'mage',
     coreItems: [
       {
-        id: 3802, // 卢登的伙伴
+        id: 6655, // 卢登的伙伴 (Riot Data Dragon 6655)
         name: '卢登的伙伴',
-        cost: 3000,
+        cost: 2900,
         components: [
-          { id: 3803, name: '遗失的章节', cost: 1200 }, // 修正 ID 为 3803，消除 3802 自引用冲突
+          { id: 3802, name: '遗失的章节', cost: 1200 }, // 遗失的章节标准 ID: 3802
           { id: 3145, name: '海克斯科技发电机', cost: 1100 },
           { id: 1052, name: '增幅典籍', cost: 400 }
         ],
@@ -76,7 +76,8 @@ const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
         cost: 3200,
         components: [
           { id: 3108, name: '恶魔法典', cost: 900 },
-          { id: 1026, name: '爆裂魔杖', cost: 850 }
+          { id: 1026, name: '爆裂魔杖', cost: 850 },
+          { id: 1052, name: '增幅典籍', cost: 400 }
         ],
         reason: '高额法强与暴击斩杀'
       }
@@ -92,8 +93,8 @@ const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
         cost: 3400,
         components: [
           { id: 1038, name: '暴风之剑', cost: 1300 },
-          { id: 875, name: '十字镐', cost: 875 },
-          { id: 3123, name: '灵巧披风', cost: 600 }
+          { id: 1037, name: '十字镐', cost: 875 },
+          { id: 1018, name: '灵巧披风', cost: 600 } // 灵巧披风标准 ID: 1018
         ],
         reason: '核心高额暴击伤害提升'
       },
@@ -102,8 +103,8 @@ const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
         name: '海妖杀手',
         cost: 3100,
         components: [
-          { id: 1037, name: '正午箭袋', cost: 1300 },
-          { id: 3123, name: '灵巧披风', cost: 600 },
+          { id: 1037, name: '十字镐', cost: 875 },
+          { id: 3086, name: '狂热', cost: 1100 },
           { id: 1042, name: '短剑', cost: 250 }
         ],
         reason: '持续攻速与击中特效输出'
@@ -132,7 +133,7 @@ const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
         components: [
           { id: 3801, name: '晶体护臂', cost: 800 },
           { id: 3067, name: '燃烧宝石', cost: 800 },
-          { id: 3134, name: '巨人腰带', cost: 900 }
+          { id: 1011, name: '巨人腰带', cost: 900 } // 巨人腰带标准 ID: 1011
         ],
         reason: '脱战高额生命恢复'
       }
@@ -158,7 +159,8 @@ const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
         cost: 2800,
         components: [
           { id: 3134, name: '锯齿短匕', cost: 1000 },
-          { id: 3134, name: '巨人腰带', cost: 900 }
+          { id: 1011, name: '巨人腰带', cost: 900 }, // 巨人腰带标准 ID: 1011
+          { id: 1036, name: '长剑', cost: 350 }
         ],
         reason: '法术护盾防先手'
       }
@@ -174,7 +176,8 @@ const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
         cost: 2300,
         components: [
           { id: 3113, name: '以太精魂', cost: 850 },
-          { id: 3114, name: '禁忌雕像', cost: 800 }
+          { id: 3114, name: '禁忌雕像', cost: 800 },
+          { id: 1052, name: '增幅典籍', cost: 400 }
         ],
         reason: '护盾强度与友方攻速增益'
       },

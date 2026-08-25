@@ -13,6 +13,7 @@ export class LiveCoachSessionController {
   private readonly _ruleEngine: CoachRuleEngine
   private _gameflowDisposer: (() => void) | null = null
   private _liveDataDisposer: (() => void) | null = null
+  private _roiHealthDisposer: (() => void) | null = null
   private _isPaused = false
   private _latestPatch: string | null = null
 
@@ -98,12 +99,33 @@ export class LiveCoachSessionController {
       },
       { fireImmediately: true }
     )
+
+    // 3. 动态响应 ROI 采集状态与 Patch 变化，实时重新评估并解禁/更新 Capabilities
+    this._roiHealthDisposer = this._context.mobxUtils.reaction(
+      () => ({
+        roiState: this._context.state.capture.roiState,
+        enabled: this._context.settings.enabled,
+        patch: this._latestPatch
+      }),
+      ({ roiState, patch }) => {
+        const session = this._context.leagueClient.data.gameflow.session
+        const mapId = session?.map?.id ?? null
+        const queueId = session?.gameData?.queue?.id ?? null
+        this._capabilityController.evaluateCapabilities(mapId, queueId, patch || '14.15.1', {
+          roiHealth: roiState
+        })
+      }
+    )
   }
 
   public dispose(): void {
     if (this._gameflowDisposer) {
       this._gameflowDisposer()
       this._gameflowDisposer = null
+    }
+    if (this._roiHealthDisposer) {
+      this._roiHealthDisposer()
+      this._roiHealthDisposer = null
     }
     if (this._liveDataDisposer) {
       this._liveDataDisposer()
@@ -178,6 +200,16 @@ export class LiveCoachSessionController {
     }
 
     try {
+      if (batch.health && batch.health !== this._context.state.capture.roiState) {
+        this._context.state.setCaptureState({ roiState: batch.health })
+        const session = this._context.leagueClient.data.gameflow.session
+        const mapId = session?.map?.id ?? null
+        const queueId = session?.gameData?.queue?.id ?? null
+        this._capabilityController.evaluateCapabilities(mapId, queueId, batch.patch || '16.16.1', {
+          roiHealth: batch.health
+        })
+      }
+
       this._fusion.updateMinimapBatch(batch)
 
       const sessionId = this._context.state.session.id || batch.sessionId

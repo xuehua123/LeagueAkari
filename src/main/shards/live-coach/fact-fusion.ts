@@ -36,7 +36,7 @@ const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
         name: '挺进破坏者',
         cost: 3300,
         components: [
-          { id: 3077, name: '提亚马特', cost: 1200 }, // 提亚马特标准 ID: 3077
+          { id: 3077, name: '提亚马特', cost: 1200 }, // 提亚马特 3077
           { id: 3044, name: '净蚀', cost: 1100 },
           { id: 1042, name: '短剑', cost: 250 }
         ],
@@ -54,7 +54,7 @@ const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
         reason: '破甲与移速提升'
       }
     ],
-    boots: { id: 3047, name: '铁板靴', cost: 1100, reason: '物理抗性与减伤' }
+    boots: { id: 3047, name: '铁板靴', cost: 1200, reason: '物理抗性与减伤' } // 铁板靴 1200g
   },
   mage: {
     archetype: 'mage',
@@ -75,7 +75,7 @@ const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
         cost: 3200,
         components: [
           { id: 3145, name: '海克斯科技发电机', cost: 1100 },
-          { id: 1058, name: '无用大棒', cost: 1250 } // 无用大棒 1058
+          { id: 1058, name: '无用大棒', cost: 1200 } // 无用大棒 1200g
         ],
         reason: '高额法强与暴击斩杀'
       }
@@ -97,12 +97,12 @@ const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
         reason: '核心高额暴击伤害提升'
       },
       {
-        id: 6672, // 海妖杀手 (Riot 16.16.1: 3100g)
+        id: 6672, // 海妖杀手 (Riot 16.16.1: 3000g)
         name: '海妖杀手',
-        cost: 3100,
+        cost: 3000,
         components: [
-          { id: 6690, name: '正午箭袋', cost: 1300 }, // 正午箭袋 6690
-          { id: 3051, name: '炉盾', cost: 1200 }, // 炉盾 3051
+          { id: 6690, name: '剑翎', cost: 775 }, // 剑翎 6690
+          { id: 3051, name: '缚炉之斧', cost: 1200 }, // 缚炉之斧 3051
           { id: 1043, name: '反曲之弓', cost: 700 } // 反曲之弓 1043
         ],
         reason: '持续攻速与击中特效输出'
@@ -129,37 +129,36 @@ const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
         name: '狂徒铠甲',
         cost: 3100,
         components: [
-          { id: 3801, name: '晶体护臂', cost: 800 },
+          { id: 3801, name: '晶体护腕', cost: 800 }, // 晶体护腕 3801
           { id: 1011, name: '巨人腰带', cost: 900 }, // 巨人腰带 1011
           { id: 1011, name: '巨人腰带', cost: 900 } // 巨人腰带 1011 (第2件)
         ],
         reason: '脱战高额生命恢复'
       }
     ],
-    boots: { id: 3111, name: '水银之靴', cost: 1100, reason: '韧性与魔抗' }
+    boots: { id: 3111, name: '水银之靴', cost: 1250, reason: '韧性与魔抗' } // 水银之靴 1250g
   },
   assassin: {
     archetype: 'assassin',
     coreItems: [
       {
-        id: 3142, // 幽梦之灵 (Riot 16.16.1: 2700g)
+        id: 3142, // 幽梦之灵 (Riot 16.16.1: 2800g)
         name: '幽梦之灵',
-        cost: 2700,
+        cost: 2800,
         components: [
           { id: 3134, name: '锯齿短匕', cost: 1000 },
-          { id: 3113, name: '以太精魂', cost: 850 }, // 以太精魂 3113
+          { id: 6690, name: '剑翎', cost: 775 }, // 剑翎 6690
           { id: 1036, name: '长剑', cost: 350 }
         ],
         reason: '爆发穿甲与高额游走移速'
       },
       {
-        id: 3814, // 夜之锋刃 (Riot 16.16.1: 2800g)
+        id: 3814, // 夜之锋刃 (Riot 16.16.1: 3000g)
         name: '夜之锋刃',
-        cost: 2800,
+        cost: 3000,
         components: [
           { id: 3134, name: '锯齿短匕', cost: 1000 },
-          { id: 1011, name: '巨人腰带', cost: 900 }, // 巨人腰带 1011
-          { id: 1036, name: '长剑', cost: 350 }
+          { id: 2021, name: '掘道钻头', cost: 1150 } // 掘道钻头 2021
         ],
         reason: '法术护盾防先手'
       }
@@ -170,13 +169,12 @@ const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
     archetype: 'support',
     coreItems: [
       {
-        id: 3504, // 炽热香炉 (Riot 16.16.1: 2300g)
+        id: 3504, // 炽热香炉 (Riot 16.16.1: 2200g)
         name: '炽热香炉',
-        cost: 2300,
+        cost: 2200,
         components: [
-          { id: 3113, name: '以太精魂', cost: 850 },
-          { id: 3114, name: '禁忌雕像', cost: 800 },
-          { id: 1052, name: '增幅典籍', cost: 400 }
+          { id: 3113, name: '以太精魂', cost: 900 }, // 以太精魂 900g
+          { id: 3114, name: '禁忌雕像', cost: 600 } // 禁忌雕像 600g
         ],
         reason: '护盾强度与友方攻速增益'
       },
@@ -185,8 +183,8 @@ const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
         name: '月石再生器',
         cost: 2200,
         components: [
-          { id: 3108, name: '恶魔法典', cost: 900 },
-          { id: 3067, name: '燃烧宝石', cost: 800 }
+          { id: 3067, name: '燃烧宝石', cost: 800 },
+          { id: 4642, name: '班德尔玻璃镜', cost: 900 } // 班德尔玻璃镜 900g
         ],
         reason: '连锁治疗与护盾扩散'
       }
@@ -652,6 +650,13 @@ export class FactFusionEngine {
       return
     }
 
+    // 补丁有效性校验：若对局补丁无法识别或为不兼容版本，停用推荐以保证绝对准确
+    const patch = snapshot.patch || '16.16.1'
+    if (!patch.startsWith('16.') && !patch.startsWith('15.') && !patch.startsWith('14.')) {
+      this._latestItemGuidance = null
+      return
+    }
+
     // 确定英雄流派
     let role = CHAMPION_ROLES_MAP[championNameClean]
     if (!role && matchingPlayer?.position) {
@@ -668,6 +673,15 @@ export class FactFusionEngine {
     const buildDef = CHAMPION_BUILDS[role] || CHAMPION_BUILDS.fighter
     const inventoryItemIds = (matchingPlayer?.items ?? []).map((i) => i.itemID)
 
+    // 装备栏容量校验：计算非饰品/守卫道具数量（召唤师峡谷主装备栏最大 6 格）
+    const TRINKET_IDS = new Set([3340, 3363, 3364, 2055])
+    const normalItems = (matchingPlayer?.items ?? []).filter((i) => !TRINKET_IDS.has(i.itemID))
+    const isInventoryFull = normalItems.length >= 6
+
+    // 2级鞋唯一性校验：若已拥有任意 2 级鞋，则不重复推荐鞋子
+    const TIER2_BOOTS = new Set([3047, 3111, 3006, 3020, 3158, 3009, 3117])
+    const hasTier2Boots = inventoryItemIds.some((id) => TIER2_BOOTS.has(id))
+
     // 1. 创建并持久化金币与装备 Evidence
     const goldEvidenceId = `evi_gold_inv_${now}`
     this.addEvidence({
@@ -677,7 +691,7 @@ export class FactFusionEngine {
       source: 'live-client-data',
       kind: 'player-economy-inventory',
       confidence: 1,
-      patch: snapshot.patch || '14.15.1',
+      patch,
       clock: { observedAt: now, receivedAt: now, sequence: 1 },
       freshness: { expiresAt: now + 35000, state: 'fresh' },
       payload: {
@@ -723,10 +737,10 @@ export class FactFusionEngine {
         conditions: [`完成核心装备：${uncompletedCore.name}（${uncompletedCore.reason}）`]
       }
     } else {
-      // 检查是否有玩家买得起的未拥有组件（从缺失组件列表查找）
+      // 检查是否有玩家买得起的未拥有组件（从缺失组件列表查找，且背包未满或已持有组件可升级）
       const affordableUnownedComp = missingComponents.find((comp) => currentGold >= comp.cost)
 
-      if (affordableUnownedComp) {
+      if (affordableUnownedComp && (!isInventoryFull || ownedComponents.length > 0)) {
         primaryPlan = {
           itemIds: [affordableUnownedComp.id],
           totalCost: affordableUnownedComp.cost,
@@ -736,36 +750,48 @@ export class FactFusionEngine {
           conditions: [`合成 ${uncompletedCore.name} 组件：${affordableUnownedComp.name}`]
         }
       } else {
-        const nextComp = missingComponents[0] || uncompletedCore.components[0]
+        const nextComp =
+          isInventoryFull && ownedComponents.length === 0
+            ? uncompletedCore
+            : missingComponents[0] || uncompletedCore.components[0]
         primaryPlan = {
           itemIds: [nextComp.id],
           totalCost: nextComp.cost,
           remainingGold: 0,
           missingGold: Math.max(0, nextComp.cost - currentGold),
-          reasonCodes: ['CORE_COMPONENT_PROGRESSION'],
-          conditions: [`合成 ${uncompletedCore.name} 组件：${nextComp.name}`]
+          reasonCodes:
+            isInventoryFull && ownedComponents.length === 0
+              ? ['CORE_ITEM_PROGRESSION']
+              : ['CORE_COMPONENT_PROGRESSION'],
+          conditions: [
+            isInventoryFull && ownedComponents.length === 0
+              ? `装备栏已满，建议攒金币直接购买：${uncompletedCore.name}`
+              : `合成 ${uncompletedCore.name} 组件：${nextComp.name}`
+          ]
         }
       }
     }
 
-    const alternativePlans: ItemPurchasePlan[] = [
-      {
+    const alternativePlans: ItemPurchasePlan[] = []
+    if (!hasTier2Boots && !inventoryItemIds.includes(buildDef.boots.id)) {
+      alternativePlans.push({
         itemIds: [buildDef.boots.id],
         totalCost: buildDef.boots.cost,
         remainingGold: Math.max(0, currentGold - buildDef.boots.cost),
         missingGold: Math.max(0, buildDef.boots.cost - currentGold),
         reasonCodes: ['BOOTS_MOBILITY'],
         conditions: [`备选：${buildDef.boots.name}（${buildDef.boots.reason}）`]
-      },
-      {
-        itemIds: [2055], // 控制守卫
-        totalCost: 75,
-        remainingGold: Math.max(0, currentGold - 75),
-        missingGold: Math.max(0, 75 - currentGold),
-        reasonCodes: ['VISION_CONTROL'],
-        conditions: ['备选：控制守卫（防御草丛视野）']
-      }
-    ]
+      })
+    }
+
+    alternativePlans.push({
+      itemIds: [2055], // 控制守卫
+      totalCost: 75,
+      remainingGold: Math.max(0, currentGold - 75),
+      missingGold: Math.max(0, 75 - currentGold),
+      reasonCodes: ['VISION_CONTROL'],
+      conditions: ['备选：控制守卫（防御草丛视野）']
+    })
 
     const guidance: ItemPurchaseGuidance = {
       id: `item_guidance_${now}`,

@@ -1,4 +1,5 @@
 import { IAkariShardInitDispose, Shard } from '@shared/akari-shard'
+import { app } from 'electron'
 import { z } from 'zod'
 
 import { GameClientMain } from '../game-client'
@@ -163,6 +164,10 @@ export class LiveCoachMain implements IAkariShardInitDispose {
       'conversation',
       'lastError'
     ])
+
+    const buildChannel = app.isPackaged ? 'public' : 'internal'
+    this._capabilityController.setBuildChannel(buildChannel)
+    this._capabilityController.setGates(true, true)
 
     this._ipcHandlers.register()
     this._cueScheduler.init()

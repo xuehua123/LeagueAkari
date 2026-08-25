@@ -958,9 +958,180 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     const guidance = fusion.getItemPurchaseGuidance(now)
     expect(guidance).toBeDefined()
     expect(guidance?.championId).toBe(516)
-    // 验证推荐买得起的未拥有组件（3801 晶体护臂），花费 800g
+    // 验证推荐买得起的未拥有组件（3801 晶体护腕），花费 800g
     expect(guidance?.primaryPlan.itemIds).toEqual([3801])
     expect(guidance?.primaryPlan.totalCost).toBe(800)
     expect(guidance?.primaryPlan.missingGold).toBe(0)
+  })
+
+  it('correctly suppresses jungler fog alarm when an anonymous enemy is spotted in jungle or river', () => {
+    const fusion = new FactFusionEngine()
+    const engine = new CoachRuleEngine()
+    const now = 1700000000000
+
+    fusion.updateLiveGameSnapshot(
+      {
+        sessionId: 'sess_jg_spatial',
+        patch: '16.16.1',
+        gameTimeSeconds: 300,
+        clock: { observedAt: now, receivedAt: now, sequence: 1 },
+        activePlayer: {
+          summonerName: 'MidPlayer',
+          riotId: 'Mid#CN',
+          riotIdGameName: 'Mid',
+          riotIdTagLine: 'CN',
+          championName: 'Ahri',
+          level: 6,
+          currentGold: 1000,
+          team: 'ORDER',
+          abilities: {}
+        },
+        players: [
+          {
+            summonerName: 'MidPlayer',
+            riotId: 'Mid#CN',
+            riotIdGameName: 'Mid',
+            riotIdTagLine: 'CN',
+            championName: 'Ahri',
+            championId: 103,
+            team: 'ORDER',
+            position: 'MIDDLE',
+            isDead: false,
+            respawnTimer: 0,
+            items: []
+          } as any,
+          {
+            summonerName: 'EnemyMid',
+            riotId: 'Zed#CN',
+            riotIdGameName: 'Zed',
+            riotIdTagLine: 'CN',
+            championName: 'Zed',
+            championId: 238,
+            team: 'CHAOS',
+            position: 'MIDDLE',
+            isDead: false,
+            respawnTimer: 0,
+            items: []
+          } as any,
+          {
+            summonerName: 'EnemyJungler',
+            riotId: 'Lee#CN',
+            riotIdGameName: 'Lee',
+            riotIdTagLine: 'CN',
+            championName: 'LeeSin',
+            championId: 64,
+            team: 'CHAOS',
+            position: 'JUNGLE',
+            isDead: false,
+            respawnTimer: 0,
+            items: []
+          } as any
+        ],
+        events: [],
+        sourceHealth: []
+      },
+      now
+    )
+
+    // 小地图在河道区域 (top_river) 探测到匿名敌方图元（打野游走已现身），即使线上英雄消失，也应抑制打野未知警报
+    fusion.updateMinimapBatch(
+      {
+        sessionId: 'sess_jg_spatial',
+        patch: '16.16.1',
+        calibrationVersion: '1.0.0',
+        modelVersions: {},
+        frame: { observedAt: now, receivedAt: now, sequence: 1, ageMs: 15 },
+        health: 'healthy',
+        entities: [
+          {
+            trackId: 'track_enemy_1',
+            kind: 'enemy',
+            team: 'enemy',
+            championId: null, // 无显式 championId
+            point: { x: 0.3, y: 0.3 },
+            regionId: 'top_river',
+            confidence: 0.9,
+            lifecycle: 'confirmed',
+            firstObservedAt: now,
+            lastObservedAt: now,
+            expiresAt: now + 5000
+          }
+        ],
+        events: []
+      },
+      now
+    )
+
+    const cues = engine.evaluate({
+      sessionId: 'sess_jg_spatial',
+      patch: '16.16.1',
+      fusion,
+      enabledCategories: { warning: true, information: true, opportunity: true },
+      enabledCapabilities: new Set(['coach.analyze.minimap-basic']),
+      currentTime: now
+    })
+    expect(cues.find((c) => c.ruleId === 'rule_basic_skills_and_tactics')).toBeUndefined()
+  })
+
+  it('handles full inventory (6 slots) and tier 2 boots uniqueness properly in item purchase guidance', () => {
+    const fusion = new FactFusionEngine()
+    const now = 1700000000000
+
+    // 玩家背包已满 6 格（包含 2 级水银之靴 3111），且持有 1000g，目标大件 6631 挺进破坏者 (3300g)
+    // 玩家未拥有 6631 的任何组件，且背包无空位，无法购买 250g 短剑等基础散件，方案应指导攒钱购买整件 6631
+    // 且备选方案中不再推荐 2 级鞋子（因为已拥有 3111）
+    fusion.updateLiveGameSnapshot(
+      {
+        sessionId: 'sess_full_inv',
+        patch: '16.16.1',
+        gameTimeSeconds: 800,
+        clock: { observedAt: now, receivedAt: now, sequence: 1 },
+        activePlayer: {
+          summonerName: 'FighterPlayer',
+          riotId: 'Fighter#CN',
+          riotIdGameName: 'Fighter',
+          riotIdTagLine: 'CN',
+          championName: 'Garen',
+          level: 9,
+          currentGold: 1000,
+          team: 'ORDER',
+          abilities: {}
+        },
+        players: [
+          {
+            summonerName: 'FighterPlayer',
+            riotId: 'Fighter#CN',
+            riotIdGameName: 'Fighter',
+            riotIdTagLine: 'CN',
+            championName: 'Garen',
+            championId: 86,
+            team: 'ORDER',
+            position: 'TOP',
+            isDead: false,
+            respawnTimer: 0,
+            items: [
+              { itemID: 3111, count: 1 }, // 2 级水银之靴
+              { itemID: 1054, count: 1 }, // 多兰盾
+              { itemID: 2003, count: 1 }, // 生命药水
+              { itemID: 1082, count: 1 }, // 黑暗封印
+              { itemID: 1055, count: 1 }, // 多兰之刃
+              { itemID: 1056, count: 1 } // 多兰之戒 (满 6 格)
+            ]
+          } as any
+        ],
+        events: [],
+        sourceHealth: []
+      },
+      now
+    )
+
+    const guidance = fusion.getItemPurchaseGuidance(now)
+    expect(guidance).toBeDefined()
+    expect(guidance?.championId).toBe(86)
+    // 验证背包满载时推荐目标为整件 6631，且备选方案不含鞋子
+    expect(guidance?.primaryPlan.itemIds).toEqual([6631])
+    expect(guidance?.alternativePlans.some((p) => p.reasonCodes.includes('BOOTS_MOBILITY'))).toBe(
+      false
+    )
   })
 })

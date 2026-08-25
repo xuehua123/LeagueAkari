@@ -498,12 +498,26 @@ export class RuleBasicSkillsAndTactics implements CoachRule {
           e.trackId === enemyJungler.summonerName
       )
 
-      // 2. 全局对线完全覆盖：若场上存活的所有敌方英雄（全量敌方）均已在小地图上可见，则打野必然已被捕获
+      // 2. 野区/河道空间图元直接观测判定：对线期若在野区或河道区域探测到敌方图元，代表打野/游走目标已被捕获
+      const isSeenInJungleOrRiver = visibleEnemyEntities.some((e) => {
+        const region = e.regionId || ''
+        return (
+          region === 'top_jungle' ||
+          region === 'bot_jungle' ||
+          region === 'top_river' ||
+          region === 'bot_river' ||
+          region.includes('jungle') ||
+          region.includes('river')
+        )
+      })
+
+      // 3. 全局对线完全覆盖：若场上存活的所有敌方英雄均已在小地图上可见，则打野必然已被捕获
       const livingEnemies = players.filter((p) => p.team === enemyTeam && !p.isDead)
       const areAllLivingEnemiesVisible =
         livingEnemies.length > 0 && visibleEnemyEntities.length >= livingEnemies.length
 
-      const isEnemyJunglerSeen = isExplicitlySeen || areAllLivingEnemiesVisible
+      const isEnemyJunglerSeen =
+        isExplicitlySeen || isSeenInJungleOrRiver || areAllLivingEnemiesVisible
 
       // 当敌方打野处于迷雾中时，触发控线与防抓提醒
       if (!isEnemyJunglerSeen) {

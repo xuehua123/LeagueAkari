@@ -75,11 +75,25 @@ export class CaptureProcessSupervisorController {
 
   private _currentPatch: string = '16.16.1'
 
+  private _targetHwnd: number | null = null
+
+  private _getEffectiveBackend(): 'wgc' | 'dda' | 'desktopCapturer' {
+    const configured = this._context.liveCoach.settings.captureBackend
+    if (process.platform === 'win32') {
+      if (configured === 'wgc') return 'wgc'
+      if (configured === 'dda') return 'dda'
+      return 'wgc' // 'auto' 模式在 Windows 下优先使用 WGC
+    }
+    return 'desktopCapturer'
+  }
+
   public async startSupervising(
     sessionId: string,
     calibration: MinimapCalibration,
     patch: string = '16.16.1'
   ): Promise<void> {
+    const backend = this._getEffectiveBackend()
+
     if (this._isSupervising && this._currentSessionId === sessionId) {
       if (patch && patch !== this._currentPatch) {
         this._currentPatch = patch
@@ -88,9 +102,9 @@ export class CaptureProcessSupervisorController {
             type: 'start',
             sessionId,
             patch,
-            targetHwnd: null,
+            targetHwnd: this._targetHwnd,
             targetPid: this._targetPid,
-            backend: 'desktopCapturer',
+            backend,
             detectors: ['enemy-champions', 'neutral-objectives'],
             captureConfig: {
               fps: 15,
@@ -114,18 +128,33 @@ export class CaptureProcessSupervisorController {
     this._currentCalibration = calibration
 
     this._context.logger.info(
-      `Starting MinimapObserver capture supervisor for session: ${sessionId}`
+      `Starting MinimapObserver capture supervisor for session: ${sessionId}, backend: ${backend}`
     )
     this._context.state.setIsCapturing(true)
-    this._context.state.setBackend('desktopCapturer')
+    this._context.state.setBackend(backend)
     this._context.state.setFps(15)
 
-    // 查找英雄联盟游戏客户端进程 PID
+    // 查找英雄联盟游戏客户端进程 PID 与 HWND
     try {
       if (process.platform === 'win32') {
         const pids = await getPidsByName('League of Legends.exe')
         if (pids && pids.length > 0) {
           this._targetPid = pids[0]
+        }
+        const sources = await desktopCapturer.getSources({
+          types: ['window'],
+          thumbnailSize: { width: 1, height: 1 }
+        })
+        const gameSource = sources.find(
+          (s) =>
+            s.name === 'League of Legends (TM) Client' ||
+            (s.name.includes('League of Legends') && !s.name.includes('LeagueClient'))
+        )
+        if (gameSource) {
+          const hwndMatch = gameSource.id.match(/^window:(\d+):/)
+          if (hwndMatch) {
+            this._targetHwnd = parseInt(hwndMatch[1], 10)
+          }
         }
       }
     } catch {
@@ -152,6 +181,7 @@ export class CaptureProcessSupervisorController {
     this._currentSessionId = ''
     this._currentCalibration = null
     this._targetPid = null
+    this._targetHwnd = null
     this._context.state.reset()
 
     if (this._captureTimer) {
@@ -237,9 +267,9 @@ export class CaptureProcessSupervisorController {
       type: 'start',
       sessionId,
       patch: this._currentPatch,
-      targetHwnd: null,
+      targetHwnd: this._targetHwnd,
       targetPid: this._targetPid,
-      backend: 'desktopCapturer',
+      backend: this._getEffectiveBackend(),
       detectors: ['enemy-champions', 'neutral-objectives'],
       captureConfig: {
         fps: 15,

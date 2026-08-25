@@ -28,13 +28,37 @@ export interface ComponentDetection {
 
 /**
  * 区域判定辅助函数（召唤师峡谷小地图归一化区域划分）
+ * 坐标系约定：(0,0) 为左上角，(1,1) 为右下角，(0,1) 为左下角（蓝方基地），(1,0) 为右上角（红方基地）
  */
 export function getMapRegion(x: number, y: number): string {
-  if (x < 0.35 && y < 0.35) return 'top_lane'
-  if (x > 0.65 && y > 0.65) return 'bot_lane'
-  if (Math.abs(x - y) < 0.15 && x >= 0.35 && x <= 0.65) return 'mid_lane'
-  if (x > y) return 'bot_jungle_river'
-  return 'top_jungle_river'
+  // 1. 中路判定：连接左下蓝方基地与右上红方基地，几何主轴方程为 x + y = 1
+  if (Math.abs(x + y - 1) < 0.12 && x >= 0.18 && x <= 0.82 && y >= 0.18 && y <= 0.82) {
+    return 'mid_lane'
+  }
+
+  // 2. 上路判定：沿左边缘与上边缘走向的外侧边路走廊 (x + y < 0.75 且 (x < 0.18 || y < 0.18))
+  if ((x < 0.18 || y < 0.18) && x + y < 0.75) {
+    return 'top_lane'
+  }
+
+  // 3. 下路判定：沿下边缘与右边缘走向的外侧边路走廊 (x + y > 1.25 且 (x > 0.82 || y > 0.82))
+  if ((x > 0.82 || y > 0.82) && x + y > 1.25) {
+    return 'bot_lane'
+  }
+
+  // 4. 河道判定：垂直于中路，连接左上河道/大龙坑与右下河道/小龙坑，几何主轴为 x = y
+  if (Math.abs(x - y) < 0.12) {
+    return x + y < 1.0 ? 'top_river' : 'bot_river'
+  }
+
+  // 5. 上下半区野区判定
+  // x + y < 1.0 为上半区野区 (top_jungle)
+  // x + y >= 1.0 为下半区野区 (bot_jungle)
+  if (x + y < 1.0) {
+    return 'top_jungle'
+  } else {
+    return 'bot_jungle'
+  }
 }
 
 /**
@@ -181,7 +205,8 @@ export function processMinimapFrameWithState(
   }
   const variance = Math.sqrt(sumVariance / pixelCount)
 
-  if (meanLuma < 2.0 && variance < 1.0) {
+  // 纯黑、纯白、纯灰遮挡或低方差空白/静止死帧一律判定为 degraded
+  if (variance < 2.5 || meanLuma < 3.0 || meanLuma > 252.0) {
     return { health: 'degraded', entities: [] }
   }
 

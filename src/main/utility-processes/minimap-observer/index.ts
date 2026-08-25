@@ -1,31 +1,15 @@
 import {
   MainToWorkerMessage,
-  MinimapEntityKind,
   MinimapEntityObservation,
   MinimapObservationBatch,
-  ObservationLifecycle,
   WorkerToMainMessage
 } from '../../../shared/types/live-coach'
+import { TrackedEntity, processMinimapFrameWithState } from './minimap-cv'
 
 /**
  * Minimap Observer Utility Process Worker
  * 独立运行在 Electron utilityProcess 进程中，负责小地图画面采样、真实连通域分析 (CCL)、质心提取与实体追踪
  */
-
-interface TrackedEntity {
-  trackId: string
-  kind: MinimapEntityKind
-  team: 'enemy' | 'ally' | 'neutral' | 'unknown'
-  championId: number | null
-  point: { x: number; y: number }
-  regionId: string | null
-  confidence: number
-  lifecycle: ObservationLifecycle
-  firstObservedAt: number
-  lastObservedAt: number
-  expiresAt: number
-  hitCount: number
-}
 
 let isRunning = false
 let currentSessionId = ''
@@ -36,6 +20,11 @@ let sequence = 0
 // 实体追踪集合
 const trackedEntities = new Map<string, TrackedEntity>()
 let entityCounter = 0
+
+function getNewEntityId(team: string): string {
+  entityCounter++
+  return `track_${team}_${entityCounter}`
+}
 
 // 性能与新鲜度测量
 let frameCount = 0
@@ -57,260 +46,6 @@ let currentPatch = '16.16.1'
 function sendMessage(msg: WorkerToMainMessage) {
   if (process.parentPort) {
     process.parentPort.postMessage(msg)
-  }
-}
-
-/**
- * 区域判定辅助函数（召唤师峡谷小地图归一化区域划分）
- */
-function getMapRegion(x: number, y: number): string {
-  if (x < 0.35 && y < 0.35) return 'top_lane'
-  if (x > 0.65 && y > 0.65) return 'bot_lane'
-  if (Math.abs(x - y) < 0.15 && x >= 0.35 && x <= 0.65) return 'mid_lane'
-  if (x > y) return 'bot_jungle_river'
-  return 'top_jungle_river'
-}
-
-interface ComponentDetection {
-  x: number
-  y: number
-  team: 'enemy' | 'ally'
-  pixelCount: number
-}
-
-/**
- * 真实连通域提取与聚类分析 (Connected Component Labeling)
- * 对小地图像素网格执行 8-邻域泛洪连通域提取，计算质心并过滤噪点与背景边框
- */
-function extractConnectedComponents(
-  buffer: Uint8Array,
-  width: number,
-  height: number,
-  pixelFormat: 'bgra' | 'rgba'
-): ComponentDetection[] {
-  const isBgra = pixelFormat === 'bgra'
-  const binaryGrid = new Int8Array(width * height) // 0: none, 1: enemy (red), 2: ally (blue)
-
-  // 1. 色彩空间阈值判定，生成二值分类网格
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const idx = (y * width + x) * 4
-      const b = buffer[idx]
-      const g = buffer[idx + 1]
-      const r = buffer[idx + 2]
-
-      const red = isBgra ? r : b
-      const blue = isBgra ? b : r
-      const green = g
-
-      // 敌方英雄红色图元 (Red > 155, Red比绿蓝高 40% 以上)
-      if (red > 155 && red > green * 1.4 && red > blue * 1.4) {
-        binaryGrid[y * width + x] = 1
-      }
-      // 友方英雄蓝色图元 (Blue > 155, Blue比红绿高 30% 以上)
-      else if (blue > 155 && blue > red * 1.35 && blue > green * 1.1) {
-        binaryGrid[y * width + x] = 2
-      }
-    }
-  }
-
-  // 2. 8-邻域 BFS 连通域标记与质心聚合
-  const visited = new Uint8Array(width * height)
-  const detections: ComponentDetection[] = []
-
-  const dx = [-1, 0, 1, -1, 1, -1, 0, 1]
-  const dy = [-1, -1, -1, 0, 0, 1, 1, 1]
-
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const startIdx = y * width + x
-      const targetType = binaryGrid[startIdx]
-      if (targetType === 0 || visited[startIdx]) {
-        continue
-      }
-
-      // BFS 搜索连通分量
-      const queue = [startIdx]
-      visited[startIdx] = 1
-      let sumX = 0
-      let sumY = 0
-      let count = 0
-
-      while (queue.length > 0) {
-        const curr = queue.pop()!
-        const cy = Math.floor(curr / width)
-        const cx = curr % width
-
-        sumX += cx
-        sumY += cy
-        count++
-
-        for (let i = 0; i < 8; i++) {
-          const nx = cx + dx[i]
-          const ny = cy + dy[i]
-          if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-            const nIdx = ny * width + nx
-            if (!visited[nIdx] && binaryGrid[nIdx] === targetType) {
-              visited[nIdx] = 1
-              queue.push(nIdx)
-            }
-          }
-        }
-      }
-
-      // 面积过滤：有效英雄图标面积通常在 6 ~ 350 像素之间（过滤单点噪点与巨大 UI 边框）
-      if (count >= 6 && count <= 350) {
-        const centroidX = sumX / count / width
-        const centroidY = sumY / count / height
-        detections.push({
-          x: centroidX,
-          y: centroidY,
-          team: targetType === 1 ? 'enemy' : 'ally',
-          pixelCount: count
-        })
-      }
-    }
-  }
-
-  return detections
-}
-
-/**
- * 图像连通域提取与实体追踪
- */
-function processMinimapFrame(
-  buffer: Uint8Array | null,
-  width: number,
-  height: number,
-  observedAt: number,
-  pixelFormat: 'bgra' | 'rgba'
-): {
-  health: 'healthy' | 'degraded' | 'unknown'
-  entities: MinimapEntityObservation[]
-} {
-  // 1. 无真实画面缓冲时，返回 unknown 状态，绝不伪造虚假数据
-  if (!buffer || buffer.length === 0) {
-    return { health: 'unknown', entities: [] }
-  }
-
-  // 2. 真实网格像素方差与亮度检测（黑帧/遮挡/静止画面判定）
-  let sumLuma = 0
-  const pixelCount = width * height
-  const isBgra = pixelFormat === 'bgra'
-
-  for (let i = 0; i < buffer.length; i += 4) {
-    const b = buffer[i]
-    const g = buffer[i + 1]
-    const r = buffer[i + 2]
-    const red = isBgra ? r : b
-    const blue = isBgra ? b : r
-    sumLuma += 0.299 * red + 0.587 * g + 0.114 * blue
-  }
-  const meanLuma = sumLuma / pixelCount
-
-  let sumVariance = 0
-  for (let i = 0; i < buffer.length; i += 4) {
-    const b = buffer[i]
-    const g = buffer[i + 1]
-    const r = buffer[i + 2]
-    const red = isBgra ? r : b
-    const blue = isBgra ? b : r
-    const luma = 0.299 * red + 0.587 * g + 0.114 * blue
-    sumVariance += (luma - meanLuma) ** 2
-  }
-  const variance = Math.sqrt(sumVariance / pixelCount)
-
-  if (variance < 6.0) {
-    return { health: 'degraded', entities: [] }
-  }
-
-  // 3. 运行连通域聚类算法 (CCL)
-  const detections = extractConnectedComponents(buffer, width, height, pixelFormat)
-
-  // 4. 实体追踪与生命周期状态机 (Object Tracking)
-  const activeIds = new Set<string>()
-  const matchedIdsInCurrentFrame = new Set<string>()
-
-  for (const det of detections) {
-    let matchedId: string | null = null
-    let minDist = 0.08 // 匹配距离阈值
-
-    for (const [id, entity] of trackedEntities.entries()) {
-      if (entity.team === det.team && !matchedIdsInCurrentFrame.has(id)) {
-        const dist = Math.sqrt((entity.point.x - det.x) ** 2 + (entity.point.y - det.y) ** 2)
-        if (dist < minDist) {
-          minDist = dist
-          matchedId = id
-        }
-      }
-    }
-
-    if (matchedId) {
-      matchedIdsInCurrentFrame.add(matchedId)
-      const entity = trackedEntities.get(matchedId)!
-      entity.point = { x: det.x, y: det.y }
-      entity.regionId = getMapRegion(det.x, det.y)
-      entity.lastObservedAt = observedAt
-      entity.expiresAt = observedAt + 5000
-      entity.hitCount++
-      if (entity.hitCount >= 2) {
-        entity.lifecycle = 'confirmed'
-        entity.confidence = Math.min(0.98, 0.85 + entity.hitCount * 0.03)
-      }
-      activeIds.add(matchedId)
-    } else {
-      entityCounter++
-      const newId = `track_${det.team}_${entityCounter}`
-      const newEntity: TrackedEntity = {
-        trackId: newId,
-        kind: det.team === 'enemy' ? 'enemy' : 'ally',
-        team: det.team,
-        championId: null,
-        point: { x: det.x, y: det.y },
-        regionId: getMapRegion(det.x, det.y),
-        confidence: 0.85,
-        lifecycle: 'candidate',
-        firstObservedAt: observedAt,
-        lastObservedAt: observedAt,
-        expiresAt: observedAt + 5000,
-        hitCount: 1
-      }
-      trackedEntities.set(newId, newEntity)
-      activeIds.add(newId)
-      matchedIdsInCurrentFrame.add(newId)
-    }
-  }
-
-  // 5. 实体生命周期转换与失效衰减
-  for (const [id, entity] of trackedEntities.entries()) {
-    if (!activeIds.has(id)) {
-      if (observedAt > entity.expiresAt) {
-        trackedEntities.delete(id)
-      } else if (observedAt - entity.lastObservedAt > 1500) {
-        entity.lifecycle = 'invalidated'
-      }
-    }
-  }
-
-  const resultEntities: MinimapEntityObservation[] = Array.from(trackedEntities.values()).map(
-    (e) => ({
-      trackId: e.trackId,
-      kind: e.kind,
-      team: e.team,
-      championId: e.championId,
-      point: { x: e.point.x, y: e.point.y },
-      regionId: e.regionId,
-      confidence: e.confidence,
-      lifecycle: e.lifecycle,
-      firstObservedAt: e.firstObservedAt,
-      lastObservedAt: e.lastObservedAt,
-      expiresAt: e.expiresAt
-    })
-  )
-
-  return {
-    health: 'healthy',
-    entities: resultEntities
   }
 }
 
@@ -358,12 +93,14 @@ function runDetectionTick() {
       }))
     } else {
       lastProcessedSequence = latestFrameSequence
-      const result = processMinimapFrame(
+      const result = processMinimapFrameWithState(
         latestFrameBuffer,
         frameWidth,
         frameHeight,
         latestFrameObservedAt,
-        latestPixelFormat
+        latestPixelFormat,
+        trackedEntities,
+        getNewEntityId
       )
       health = result.health
       lastProcessedHealth = result.health

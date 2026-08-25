@@ -32,7 +32,7 @@ const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
     archetype: 'fighter',
     coreItems: [
       {
-        id: 6631, // 挺进破坏者
+        id: 6631, // 挺进破坏者 (Riot 16.16.1: 3300g)
         name: '挺进破坏者',
         cost: 3300,
         components: [
@@ -43,13 +43,13 @@ const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
         reason: '核心减速留人与清线战力'
       },
       {
-        id: 3071, // 黑色切割者
+        id: 3071, // 黑色切割者 (Riot 16.16.1: 3000g)
         name: '黑色切割者',
         cost: 3000,
         components: [
           { id: 3044, name: '净蚀', cost: 1100 },
-          { id: 3133, name: '考尔菲德的战锤', cost: 1100 },
-          { id: 1028, name: '红水晶', cost: 400 }
+          { id: 3067, name: '燃烧宝石', cost: 800 }, // 燃烧宝石 3067
+          { id: 1037, name: '十字镐', cost: 875 } // 十字镐 1037
         ],
         reason: '破甲与移速提升'
       }
@@ -60,23 +60,22 @@ const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
     archetype: 'mage',
     coreItems: [
       {
-        id: 6655, // 卢登的伙伴 (Riot Data Dragon 16.16.1 标准总价 2750g)
+        id: 6655, // 卢登的伙伴 (Riot 16.16.1: 2750g)
         name: '卢登的伙伴',
         cost: 2750,
         components: [
-          { id: 3802, name: '遗失的章节', cost: 1200 }, // 遗失的章节标准 ID: 3802
+          { id: 3802, name: '遗失的章节', cost: 1200 }, // 遗失的章节 3802
           { id: 3145, name: '海克斯科技发电机', cost: 1100 }
         ],
         reason: '法力续航与爆发伤害支点'
       },
       {
-        id: 4645, // 影焰
+        id: 4645, // 影焰 (Riot 16.16.1: 3200g)
         name: '影焰',
         cost: 3200,
         components: [
-          { id: 3108, name: '恶魔法典', cost: 900 },
-          { id: 1026, name: '爆裂魔杖', cost: 850 },
-          { id: 1052, name: '增幅典籍', cost: 400 }
+          { id: 3145, name: '海克斯科技发电机', cost: 1100 },
+          { id: 1058, name: '无用大棒', cost: 1250 } // 无用大棒 1058
         ],
         reason: '高额法强与暴击斩杀'
       }
@@ -87,24 +86,24 @@ const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
     archetype: 'marksman',
     coreItems: [
       {
-        id: 3031, // 无尽之刃 (Riot Data Dragon 16.16.1 标准总价 3500g)
+        id: 3031, // 无尽之刃 (Riot 16.16.1: 3500g)
         name: '无尽之刃',
         cost: 3500,
         components: [
           { id: 1038, name: '暴风之剑', cost: 1300 },
           { id: 1037, name: '十字镐', cost: 875 },
-          { id: 1018, name: '灵巧披风', cost: 600 } // 灵巧披风标准 ID: 1018
+          { id: 1018, name: '灵巧披风', cost: 600 } // 灵巧披风 1018
         ],
         reason: '核心高额暴击伤害提升'
       },
       {
-        id: 6672, // 海妖杀手 (Riot Data Dragon 16.16.1 标准总价 3000g)
+        id: 6672, // 海妖杀手 (Riot 16.16.1: 3100g)
         name: '海妖杀手',
-        cost: 3000,
+        cost: 3100,
         components: [
-          { id: 1037, name: '十字镐', cost: 875 },
-          { id: 3086, name: '狂热', cost: 1100 },
-          { id: 1042, name: '短剑', cost: 250 }
+          { id: 6690, name: '正午箭袋', cost: 1300 }, // 正午箭袋 6690
+          { id: 3051, name: '炉盾', cost: 1200 }, // 炉盾 3051
+          { id: 1043, name: '反曲之弓', cost: 700 } // 反曲之弓 1043
         ],
         reason: '持续攻速与击中特效输出'
       }
@@ -115,24 +114,24 @@ const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
     archetype: 'tank',
     coreItems: [
       {
-        id: 3068, // 日炎圣盾
+        id: 3068, // 日炎圣盾 (Riot 16.16.1: 2800g)
         name: '日炎圣盾',
-        cost: 2700,
+        cost: 2800,
         components: [
-          { id: 3751, name: '斑比的熔渣', cost: 900 },
+          { id: 6660, name: '斑比的熔渣', cost: 900 }, // 斑比的熔渣 6660
           { id: 1031, name: '锁子甲', cost: 800 },
           { id: 1028, name: '红水晶', cost: 400 }
         ],
         reason: '持续魔法伤害与坦度'
       },
       {
-        id: 3083, // 狂徒铠甲
+        id: 3083, // 狂徒铠甲 (Riot 16.16.1: 3100g)
         name: '狂徒铠甲',
         cost: 3100,
         components: [
           { id: 3801, name: '晶体护臂', cost: 800 },
-          { id: 3067, name: '燃烧宝石', cost: 800 },
-          { id: 1011, name: '巨人腰带', cost: 900 } // 巨人腰带标准 ID: 1011
+          { id: 1011, name: '巨人腰带', cost: 900 }, // 巨人腰带 1011
+          { id: 1011, name: '巨人腰带', cost: 900 } // 巨人腰带 1011 (第2件)
         ],
         reason: '脱战高额生命恢复'
       }
@@ -143,22 +142,23 @@ const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
     archetype: 'assassin',
     coreItems: [
       {
-        id: 3142, // 幽梦之灵
+        id: 3142, // 幽梦之灵 (Riot 16.16.1: 2700g)
         name: '幽梦之灵',
         cost: 2700,
         components: [
           { id: 3134, name: '锯齿短匕', cost: 1000 },
-          { id: 3133, name: '考尔菲德的战锤', cost: 1100 }
+          { id: 3113, name: '以太精魂', cost: 850 }, // 以太精魂 3113
+          { id: 1036, name: '长剑', cost: 350 }
         ],
         reason: '爆发穿甲与高额游走移速'
       },
       {
-        id: 3814, // 夜之锋刃
+        id: 3814, // 夜之锋刃 (Riot 16.16.1: 2800g)
         name: '夜之锋刃',
         cost: 2800,
         components: [
           { id: 3134, name: '锯齿短匕', cost: 1000 },
-          { id: 1011, name: '巨人腰带', cost: 900 }, // 巨人腰带标准 ID: 1011
+          { id: 1011, name: '巨人腰带', cost: 900 }, // 巨人腰带 1011
           { id: 1036, name: '长剑', cost: 350 }
         ],
         reason: '法术护盾防先手'
@@ -170,7 +170,7 @@ const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
     archetype: 'support',
     coreItems: [
       {
-        id: 3504, // 炽热香炉
+        id: 3504, // 炽热香炉 (Riot 16.16.1: 2300g)
         name: '炽热香炉',
         cost: 2300,
         components: [
@@ -181,7 +181,7 @@ const CHAMPION_BUILDS: Record<string, ChampionBuildDefinition> = {
         reason: '护盾强度与友方攻速增益'
       },
       {
-        id: 6617, // 月石再生器
+        id: 6617, // 月石再生器 (Riot 16.16.1: 2200g)
         name: '月石再生器',
         cost: 2200,
         components: [
@@ -693,13 +693,21 @@ export class FactFusionEngine {
       buildDef.coreItems.find((item) => !inventoryItemIds.includes(item.id)) ||
       buildDef.coreItems[0]
 
-    // 检查已拥有的组件并抵扣总花费
+    // 检查已拥有的组件并抵扣总花费（支持重复组件如狂徒铠甲的 2 个巨人腰带 1011）
     let netCost = uncompletedCore.cost
-    const ownedComponents = uncompletedCore.components.filter((comp) =>
-      inventoryItemIds.includes(comp.id)
-    )
-    for (const comp of ownedComponents) {
-      netCost -= comp.cost
+    const remainingInventoryItemIds = [...inventoryItemIds]
+    const ownedComponents: Array<{ id: number; name: string; cost: number }> = []
+    const missingComponents: Array<{ id: number; name: string; cost: number }> = []
+
+    for (const comp of uncompletedCore.components) {
+      const idx = remainingInventoryItemIds.indexOf(comp.id)
+      if (idx !== -1) {
+        remainingInventoryItemIds.splice(idx, 1)
+        ownedComponents.push(comp)
+        netCost -= comp.cost
+      } else {
+        missingComponents.push(comp)
+      }
     }
     netCost = Math.max(0, netCost)
 
@@ -715,10 +723,8 @@ export class FactFusionEngine {
         conditions: [`完成核心装备：${uncompletedCore.name}（${uncompletedCore.reason}）`]
       }
     } else {
-      // 检查是否有玩家买得起的未拥有组件
-      const affordableUnownedComp = uncompletedCore.components.find(
-        (comp) => !inventoryItemIds.includes(comp.id) && currentGold >= comp.cost
-      )
+      // 检查是否有玩家买得起的未拥有组件（从缺失组件列表查找）
+      const affordableUnownedComp = missingComponents.find((comp) => currentGold >= comp.cost)
 
       if (affordableUnownedComp) {
         primaryPlan = {
@@ -730,9 +736,7 @@ export class FactFusionEngine {
           conditions: [`合成 ${uncompletedCore.name} 组件：${affordableUnownedComp.name}`]
         }
       } else {
-        const nextComp =
-          uncompletedCore.components.find((comp) => !inventoryItemIds.includes(comp.id)) ||
-          uncompletedCore.components[0]
+        const nextComp = missingComponents[0] || uncompletedCore.components[0]
         primaryPlan = {
           itemIds: [nextComp.id],
           totalCost: nextComp.cost,

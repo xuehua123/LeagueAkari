@@ -727,66 +727,83 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     expect(cuesWithCap.find((c) => c.ruleId === 'rule_item_purchase_guidance')).toBeDefined()
   })
 
-  it('correctly suppresses false jungler alarm when an enemy is visible in jungle/river or all enemies are visible', () => {
+  it('correctly handles jungler visibility without artificial championId: suppresses when all living enemies are visible or jungler is dead, and triggers when jungler is in fog', () => {
     const fusion = new FactFusionEngine()
     const engine = new CoachRuleEngine()
     const now = 1700000000000
 
-    fusion.updateLiveGameSnapshot(
-      {
-        sessionId: 'sess_jg_seen',
-        patch: '16.16.1',
-        gameTimeSeconds: 300,
-        clock: { observedAt: now, receivedAt: now, sequence: 1 },
-        activePlayer: {
-          summonerName: 'MidPlayer',
-          riotId: 'Mid#CN',
-          riotIdGameName: 'Mid',
-          riotIdTagLine: 'CN',
-          championName: 'Ahri',
-          level: 6,
-          currentGold: 1000,
-          team: 'ORDER',
-          abilities: {}
-        },
-        players: [
-          {
+    // 2 名敌方存活英雄：LeeSin (Jungle) 和 Zed (Mid)
+    const setupGame = (isJunglerDead = false) => {
+      fusion.updateLiveGameSnapshot(
+        {
+          sessionId: 'sess_jg_real',
+          patch: '16.16.1',
+          gameTimeSeconds: 300,
+          clock: { observedAt: now, receivedAt: now, sequence: 1 },
+          activePlayer: {
             summonerName: 'MidPlayer',
             riotId: 'Mid#CN',
             riotIdGameName: 'Mid',
             riotIdTagLine: 'CN',
             championName: 'Ahri',
-            championId: 103,
+            level: 6,
+            currentGold: 1000,
             team: 'ORDER',
-            position: 'MIDDLE',
-            isDead: false,
-            respawnTimer: 0,
-            items: []
-          } as any,
-          {
-            summonerName: 'EnemyJungler',
-            riotId: 'Lee#CN',
-            riotIdGameName: 'Lee',
-            riotIdTagLine: 'CN',
-            championName: 'LeeSin',
-            championId: 64,
-            team: 'CHAOS',
-            position: 'JUNGLE',
-            isDead: false,
-            respawnTimer: 0,
-            items: []
-          } as any
-        ],
-        events: [],
-        sourceHealth: []
-      },
-      now
-    )
+            abilities: {}
+          },
+          players: [
+            {
+              summonerName: 'MidPlayer',
+              riotId: 'Mid#CN',
+              riotIdGameName: 'Mid',
+              riotIdTagLine: 'CN',
+              championName: 'Ahri',
+              championId: 103,
+              team: 'ORDER',
+              position: 'MIDDLE',
+              isDead: false,
+              respawnTimer: 0,
+              items: []
+            } as any,
+            {
+              summonerName: 'EnemyMid',
+              riotId: 'Zed#CN',
+              riotIdGameName: 'Zed',
+              riotIdTagLine: 'CN',
+              championName: 'Zed',
+              championId: 238,
+              team: 'CHAOS',
+              position: 'MIDDLE',
+              isDead: false,
+              respawnTimer: 0,
+              items: []
+            } as any,
+            {
+              summonerName: 'EnemyJungler',
+              riotId: 'Lee#CN',
+              riotIdGameName: 'Lee',
+              riotIdTagLine: 'CN',
+              championName: 'LeeSin',
+              championId: 64,
+              team: 'CHAOS',
+              position: 'JUNGLE',
+              isDead: isJunglerDead,
+              respawnTimer: isJunglerDead ? 20 : 0,
+              items: []
+            } as any
+          ],
+          events: [],
+          sourceHealth: []
+        },
+        now
+      )
+    }
 
-    // 1. CV 视觉识别仅输出 track_enemy_1（championId 为 null），但在 top_jungle_river 区域
+    // 1. 当打野存活且小地图只看到 1 个敌人（另 1 个处于迷雾中）且 championId: null 时，必须准确触发防抓提醒
+    setupGame(false)
     fusion.updateMinimapBatch(
       {
-        sessionId: 'sess_jg_seen',
+        sessionId: 'sess_jg_real',
         patch: '16.16.1',
         calibrationVersion: '1.0.0',
         modelVersions: {},
@@ -797,9 +814,9 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
             trackId: 'track_enemy_1',
             kind: 'enemy',
             team: 'enemy',
-            championId: 64, // 显式匹配打野李青 ID
-            point: { x: 0.25, y: 0.45 },
-            regionId: 'top_jungle_river',
+            championId: null, // 真实生产 CV 输出无 championId
+            point: { x: 0.5, y: 0.5 },
+            regionId: 'mid_lane',
             confidence: 0.92,
             lifecycle: 'confirmed',
             firstObservedAt: now,
@@ -812,54 +829,124 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
       now
     )
 
-    // 敌方打野已显式捕获，防抓规则不应误报
-    const cues = engine.evaluate({
-      sessionId: 'sess_jg_seen',
+    const fogCues = engine.evaluate({
+      sessionId: 'sess_jg_real',
       patch: '16.16.1',
       fusion,
       enabledCategories: { warning: true, information: true, opportunity: true },
       enabledCapabilities: new Set(['coach.analyze.minimap-basic']),
       currentTime: now
     })
+    expect(fogCues.find((c) => c.ruleId === 'rule_basic_skills_and_tactics')).toBeDefined()
 
-    expect(cues.find((c) => c.ruleId === 'rule_basic_skills_and_tactics')).toBeUndefined()
+    // 2. 当小地图同时观测到 2 个敌人（覆盖全部 2 名存活敌人）时，所有敌方均在视野中，抑制防抓提醒
+    fusion.updateMinimapBatch(
+      {
+        sessionId: 'sess_jg_real',
+        patch: '16.16.1',
+        calibrationVersion: '1.0.0',
+        modelVersions: {},
+        frame: { observedAt: now + 100, receivedAt: now + 100, sequence: 2, ageMs: 15 },
+        health: 'healthy',
+        entities: [
+          {
+            trackId: 'track_enemy_1',
+            kind: 'enemy',
+            team: 'enemy',
+            championId: null,
+            point: { x: 0.5, y: 0.5 },
+            regionId: 'mid_lane',
+            confidence: 0.92,
+            lifecycle: 'confirmed',
+            firstObservedAt: now,
+            lastObservedAt: now + 100,
+            expiresAt: now + 5000
+          },
+          {
+            trackId: 'track_enemy_2',
+            kind: 'enemy',
+            team: 'enemy',
+            championId: null,
+            point: { x: 0.2, y: 0.2 },
+            regionId: 'top_lane',
+            confidence: 0.9,
+            lifecycle: 'confirmed',
+            firstObservedAt: now,
+            lastObservedAt: now + 100,
+            expiresAt: now + 5000
+          }
+        ],
+        events: []
+      },
+      now + 100
+    )
+
+    const allSeenCues = engine.evaluate({
+      sessionId: 'sess_jg_real',
+      patch: '16.16.1',
+      fusion,
+      enabledCategories: { warning: true, information: true, opportunity: true },
+      enabledCapabilities: new Set(['coach.analyze.minimap-basic']),
+      currentTime: now + 100
+    })
+    expect(allSeenCues.find((c) => c.ruleId === 'rule_basic_skills_and_tactics')).toBeUndefined()
+
+    // 3. 当敌方打野阵亡时，同样自然抑制防抓提醒
+    setupGame(true)
+    const deadJunglerCues = engine.evaluate({
+      sessionId: 'sess_jg_real',
+      patch: '16.16.1',
+      fusion,
+      enabledCategories: { warning: true, information: true, opportunity: true },
+      enabledCapabilities: new Set(['coach.analyze.minimap-basic']),
+      currentTime: now + 200
+    })
+    expect(
+      deadJunglerCues.find((c) => c.ruleId === 'rule_basic_skills_and_tactics')
+    ).toBeUndefined()
   })
 
-  it('validates canonical Data Dragon 16.16.1 item catalog definitions', () => {
+  it('validates canonical Data Dragon 16.16.1 item catalog and multiset duplicate component deduction (Warmogs)', () => {
     const fusion = new FactFusionEngine()
     const now = 1700000000000
 
-    // 法师阿狸（3000g）-> 验证推荐 6655 卢登的伙伴 (2750g)，其组件为 3802 遗失的章节 (1200g) 与 3145 (1100g)
+    // 坦克奥恩（已完成第一件日炎圣盾 3068，且拥有 1 个巨人腰带 1011，持有 1000g）
+    // 目标第二大件为狂徒铠甲 3083 (3100g)，配方包含 [3801 晶体护臂 800g, 1011 巨人腰带 900g, 1011 巨人腰带 900g]
+    // 扣除 1 个 1011 后，剩余未拥有组件为 [3801 晶体护臂 800g, 1011 巨人腰带 900g]，剩余合成花费为 3100 - 900 = 2200g
+    // 玩家持有 1000g，买得起第 1 个未拥有组件 3801 晶体护臂 (800g)
     fusion.updateLiveGameSnapshot(
       {
-        sessionId: 'sess_dd_ahri',
+        sessionId: 'sess_dd_tank',
         patch: '16.16.1',
-        gameTimeSeconds: 400,
+        gameTimeSeconds: 500,
         clock: { observedAt: now, receivedAt: now, sequence: 1 },
         activePlayer: {
-          summonerName: 'AhriPlayer',
-          riotId: 'Ahri#CN',
-          riotIdGameName: 'Ahri',
+          summonerName: 'TankPlayer',
+          riotId: 'Tank#CN',
+          riotIdGameName: 'Tank',
           riotIdTagLine: 'CN',
-          championName: 'Ahri',
-          level: 6,
-          currentGold: 3000,
+          championName: 'Ornn',
+          level: 7,
+          currentGold: 1000,
           team: 'ORDER',
           abilities: {}
         },
         players: [
           {
-            summonerName: 'AhriPlayer',
-            riotId: 'Ahri#CN',
-            riotIdGameName: 'Ahri',
+            summonerName: 'TankPlayer',
+            riotId: 'Tank#CN',
+            riotIdGameName: 'Tank',
             riotIdTagLine: 'CN',
-            championName: 'Ahri',
-            championId: 103,
+            championName: 'Ornn',
+            championId: 516,
             team: 'ORDER',
-            position: 'MIDDLE',
+            position: 'TOP',
             isDead: false,
             respawnTimer: 0,
-            items: []
+            items: [
+              { itemID: 3068, count: 1 }, // 已完成第 1 核心大件日炎圣盾
+              { itemID: 1011, count: 1 } // 持有狂徒铠甲的第 1 个巨人腰带
+            ]
           } as any
         ],
         events: [],
@@ -870,8 +957,10 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
 
     const guidance = fusion.getItemPurchaseGuidance(now)
     expect(guidance).toBeDefined()
-    expect(guidance?.championId).toBe(103)
-    expect(guidance?.primaryPlan.itemIds).toContain(6655)
-    expect(guidance?.primaryPlan.totalCost).toBe(2750)
+    expect(guidance?.championId).toBe(516)
+    // 验证推荐买得起的未拥有组件（3801 晶体护臂），花费 800g
+    expect(guidance?.primaryPlan.itemIds).toEqual([3801])
+    expect(guidance?.primaryPlan.totalCost).toBe(800)
+    expect(guidance?.primaryPlan.missingGold).toBe(0)
   })
 })

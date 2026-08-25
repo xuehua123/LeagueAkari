@@ -38,15 +38,21 @@ export class CaptureProcessSupervisorController {
       () => ({
         enabled: this._context.liveCoach.settings.enabled,
         phase: this._context.leagueClient.data.gameflow.phase,
-        session: this._context.leagueClient.data.gameflow.session
+        session: this._context.leagueClient.data.gameflow.session,
+        patch: this._context.liveCoach.state.session.patch
       }),
-      ({ enabled, phase, session }) => {
+      ({ enabled, phase, session, patch }) => {
         const mapId = session?.map?.id ?? null
         if (enabled && phase === 'InProgress' && mapId === 11) {
           const sessionId = session?.gameData?.gameId
             ? String(session.gameData.gameId)
             : `sess_${Date.now()}`
-          this.startSupervising(sessionId, this._calibrationController.getOrCreateCalibration())
+          const effectivePatch = patch || '16.16.1'
+          this.startSupervising(
+            sessionId,
+            this._calibrationController.getOrCreateCalibration(),
+            effectivePatch
+          )
         } else {
           this.stopSupervising()
         }
@@ -75,6 +81,29 @@ export class CaptureProcessSupervisorController {
     patch: string = '16.16.1'
   ): Promise<void> {
     if (this._isSupervising && this._currentSessionId === sessionId) {
+      if (patch && patch !== this._currentPatch) {
+        this._currentPatch = patch
+        if (this._worker) {
+          this._worker.postMessage({
+            type: 'start',
+            sessionId,
+            patch,
+            targetHwnd: null,
+            targetPid: this._targetPid,
+            backend: 'desktopCapturer',
+            detectors: ['enemy-champions', 'neutral-objectives'],
+            captureConfig: {
+              fps: 15,
+              roi: {
+                x: Math.round(calibration.roi.x * 1920),
+                y: Math.round(calibration.roi.y * 1080),
+                width: Math.round(calibration.roi.width * 1920),
+                height: Math.round(calibration.roi.height * 1080)
+              }
+            }
+          })
+        }
+      }
       return
     }
 
@@ -329,7 +358,7 @@ export class CaptureProcessSupervisorController {
       // 无传感器数据时，报告 health: 'unknown'，entities: []
       const batch: MinimapObservationBatch = {
         sessionId,
-        patch: '14.15.1',
+        patch: this._currentPatch || '16.16.1',
         calibrationVersion: '1.0.0',
         modelVersions: { cnn: '1.0.0' },
         frame: {

@@ -4,6 +4,7 @@ import auxWindowEn from '@shared/i18n/en/renderer/aux-window.yaml'
 import cdTimerEn from '@shared/i18n/en/renderer/cd-timer.yaml'
 import gameAssetsEn from '@shared/i18n/en/renderer/game-assets.yaml'
 import leagueClientEn from '@shared/i18n/en/renderer/league-client.yaml'
+import liveCoachEn from '@shared/i18n/en/renderer/live-coach.yaml'
 import matchCardEn from '@shared/i18n/en/renderer/match-card.yaml'
 import notificationsEn from '@shared/i18n/en/renderer/notifications.yaml'
 import ongoingGameEn from '@shared/i18n/en/renderer/ongoing-game.yaml'
@@ -19,6 +20,7 @@ import auxWindowZhCN from '@shared/i18n/zh-CN/renderer/aux-window.yaml'
 import cdTimerZhCN from '@shared/i18n/zh-CN/renderer/cd-timer.yaml'
 import gameAssetsZhCN from '@shared/i18n/zh-CN/renderer/game-assets.yaml'
 import leagueClientZhCN from '@shared/i18n/zh-CN/renderer/league-client.yaml'
+import liveCoachZhCN from '@shared/i18n/zh-CN/renderer/live-coach.yaml'
 import matchCardZhCN from '@shared/i18n/zh-CN/renderer/match-card.yaml'
 import notificationsZhCN from '@shared/i18n/zh-CN/renderer/notifications.yaml'
 import ongoingGameZhCN from '@shared/i18n/zh-CN/renderer/ongoing-game.yaml'
@@ -60,6 +62,7 @@ const rendererEn = mergeRendererResources(
   auxWindowEn,
   opggEn,
   cdTimerEn,
+  liveCoachEn,
   notificationsEn
 )
 
@@ -77,6 +80,7 @@ const rendererZhCN = mergeRendererResources(
   auxWindowZhCN,
   opggZhCN,
   cdTimerZhCN,
+  liveCoachZhCN,
   notificationsZhCN
 )
 

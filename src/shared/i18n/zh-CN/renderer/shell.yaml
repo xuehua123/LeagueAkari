@@ -149,6 +149,7 @@ navigation:
     menu:
       match-history: 战绩
       ongoing-game: 对局
+      live-coach: AI 教练
       automation: 自动操作
       toolkit: 工具集
       test: 测试

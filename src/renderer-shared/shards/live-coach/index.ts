@@ -63,6 +63,14 @@ export class LiveCoachRenderer implements IAkariShardInitDispose {
     return this._context.settingUtils.set(LIVE_COACH_MAIN_NAMESPACE, 'overlayOpacity', value)
   }
 
+  setMinimapSide(value: 'auto' | 'left' | 'right') {
+    return this._context.settingUtils.set(LIVE_COACH_MAIN_NAMESPACE, 'minimapSide', value)
+  }
+
+  setCaptureBackend(value: 'auto' | 'wgc' | 'dda') {
+    return this._context.settingUtils.set(LIVE_COACH_MAIN_NAMESPACE, 'captureBackend', value)
+  }
+
   setCueCategoryEnabled(
     category: string,
     enabled: boolean,

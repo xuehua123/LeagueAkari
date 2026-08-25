@@ -1,0 +1,27 @@
+liveCoach:
+  title: Live AI Coach
+  tabs:
+    overview: Overview & Session
+    calibration: Minimap Calibration
+    coach: Coaching Policy
+    voice: Speech & Voice
+    reviews: Reviews & History
+    privacy: Privacy & Consent
+    diagnostics: Diagnostics
+  overview:
+    mainSwitch: Live AI Coach
+    mainSwitchDesc: Real-time deterministic tactical guidance based on minimap observations and Live Client Data during Summoner's Rift matches.
+    sessionStatus: Session Status
+    latestCue: Active Tactical Cue
+  calibration:
+    title: Minimap Calibration & Environment Fingerprint
+  settings:
+    coachMode: Coaching Mode & Triggers
+  voice:
+    title: Speech & Offline TTS
+  reviews:
+    title: Tactical Reviews
+  privacy:
+    title: Privacy & Consent
+  diagnostics:
+    title: Diagnostics & Health

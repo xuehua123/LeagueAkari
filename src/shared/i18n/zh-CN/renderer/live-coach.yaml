@@ -1,0 +1,27 @@
+liveCoach:
+  title: 实时语音 AI 教练
+  tabs:
+    overview: 概览与会话
+    calibration: 小地图标定
+    coach: 提醒策略
+    voice: 语音设置
+    reviews: 战术复盘
+    privacy: 隐私与授权
+    diagnostics: 运行诊断
+  overview:
+    mainSwitch: 实时语音 AI 教练
+    mainSwitchDesc: 在召唤师峡谷对局中，基于小地图可见事实与 Live Client Data 提供实时确定性决策与语音辅助。
+    sessionStatus: 当前会话状态
+    latestCue: 实时提示预览
+  calibration:
+    title: 小地图 ROI 标定与环境指纹
+  settings:
+    coachMode: 教练模式与提醒策略
+  voice:
+    title: 语音播报与 TTS 设置
+  reviews:
+    title: 战术复盘与会话记录
+  privacy:
+    title: 隐私保护与数据授权
+  diagnostics:
+    title: 运行诊断与状态监控

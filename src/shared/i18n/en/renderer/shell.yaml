@@ -149,6 +149,7 @@ navigation:
     menu:
       match-history: Match History
       ongoing-game: Ongoing Game
+      live-coach: AI Coach
       automation: Automation
       toolkit: Toolkit
       test: Test

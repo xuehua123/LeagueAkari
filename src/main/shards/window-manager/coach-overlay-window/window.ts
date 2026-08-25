@@ -77,6 +77,26 @@ export class AkariCoachOverlayWindow extends BaseAkariWindow<
     await super.onInit()
 
     this._mobxUtils.reaction(
+      () => [this.settings.enabled, this._windowManager.state.isManagerFinishedInit],
+      ([enabled, finishedInit]) => {
+        if (!finishedInit) {
+          return
+        }
+
+        if (enabled) {
+          this.createWindow()
+        } else {
+          this.close(true)
+        }
+      },
+      {
+        fireImmediately: true,
+        equals: comparer.shallow,
+        delay: 500
+      }
+    )
+
+    this._mobxUtils.reaction(
       () => this.state.ready,
       (ready) => {
         if (ready) {

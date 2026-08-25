@@ -15,7 +15,7 @@
           </div>
           <NRadioGroup
             :value="coachStore.settings.minimapSide"
-            @update:value="(val) => (coachStore.settings.minimapSide = val)"
+            @update:value="(val) => coachShard.setMinimapSide(val)"
             size="small"
           >
             <NRadioButton value="auto">自动检测</NRadioButton>
@@ -42,7 +42,7 @@
               { label: 'WGC (推荐)', value: 'wgc' },
               { label: 'DXGI DDA', value: 'dda' }
             ]"
-            @update:value="(val) => (coachStore.settings.captureBackend = val)"
+            @update:value="(val) => coachShard.setCaptureBackend(val)"
           />
         </div>
       </div>
@@ -51,10 +51,13 @@
 </template>
 
 <script setup lang="ts">
+import { useInstance } from '@renderer-shared/shards'
+import { LiveCoachRenderer } from '@renderer-shared/shards/live-coach'
 import { useLiveCoachStore } from '@renderer-shared/shards/live-coach/store'
 import { useTranslation } from 'i18next-vue'
 import { NCard, NRadioButton, NRadioGroup, NSelect } from 'naive-ui'
 
 const { t } = useTranslation()
 const coachStore = useLiveCoachStore()
+const coachShard = useInstance(LiveCoachRenderer)
 </script>

@@ -71,6 +71,9 @@ export class FactFusionEngine {
 
   public addEvidence(evidence: CoachEvidence): void {
     this._evidences.set(evidence.id, evidence)
+    if (this._evidences.size > 80) {
+      this.cleanupExpiredEvidence(Date.now())
+    }
   }
 
   public cleanupExpiredEvidence(now: number = Date.now()): void {

@@ -35,16 +35,15 @@ export class LocalSpeechExecutor {
     const rawRate = options.rate ?? this._context.settings.speechRate
     const sapiRate = Math.round((rawRate - 1) * 5)
 
-    // Sanitize text for powershell string literal
-    const sanitizedText = text.replace(/['"`$]/g, '')
-
     const psScript = `
-      Add-Type -AssemblyName System.Speech;
-      $synth = New-Object System.Speech.Synthesis.SpeechSynthesizer;
-      $synth.Volume = ${volume};
-      $synth.Rate = ${sapiRate};
-      $synth.Speak('${sanitizedText}');
-    `
+Add-Type -AssemblyName System.Speech
+$synth = New-Object System.Speech.Synthesis.SpeechSynthesizer
+$synth.Volume = ${volume}
+$synth.Rate = ${sapiRate}
+$synth.Speak(${JSON.stringify(text)})
+`
+    // Convert to UTF-16LE Base64 for PowerShell -EncodedCommand to prevent code page issues with Chinese characters
+    const encodedCommand = Buffer.from(psScript, 'utf16le').toString('base64')
 
     this._isSpeaking = true
     this._context.state.setSpeechState('speaking')
@@ -53,7 +52,7 @@ export class LocalSpeechExecutor {
       try {
         const proc = spawn(
           'powershell.exe',
-          ['-NoProfile', '-NonInteractive', '-Command', psScript],
+          ['-NoProfile', '-NonInteractive', '-EncodedCommand', encodedCommand],
           {
             windowsHide: true
           }

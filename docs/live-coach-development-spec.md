@@ -71,6 +71,12 @@ src/main/shards/
     session-controller.ts
     capability-controller.ts
     fact-fusion.ts
+    fog-inference-controller.ts
+    item-guidance-controller.ts
+    cooldown-tracker-controller.ts
+    communication-controller.ts
+    combat-guidance-controller.ts
+    shot-calling-controller.ts
     rule-engine.ts
     cue-scheduler-controller.ts
     speech-port.ts
@@ -92,6 +98,8 @@ src/main/shards/
     push-to-talk-controller.ts
     audio-device-controller.ts
     local-asr-executor.ts
+    wake-word-controller.ts
+    authorized-audio-analysis-controller.ts
     provider-controller.ts
     cloud-asr-executor.ts
     cloud-tts-executor.ts
@@ -104,6 +112,11 @@ src/main/utility-processes/
     capture-controller.ts
     inference-controller.ts
     metrics-controller.ts
+  combat-observer/             # 第三期完整画面多模态分析
+    index.ts
+    protocol.ts
+    privacy-crop-controller.ts
+    multimodal-inference-controller.ts
   coach-audio/                 # 第三期
     index.ts
     protocol.ts
@@ -135,6 +148,8 @@ src/shared/types/live-coach/
   index.ts
   evidence.ts
   observation.ts
+  inference.ts
+  item-guidance.ts
   cue.ts
   review.ts
   voice.ts
@@ -223,27 +238,31 @@ resources/live-coach/
 ### 3.1 时间和来源
 
 ```ts
-type CoachTemporalScope = "current" | "recorded" | "historical";
+type CoachTemporalScope = 'current' | 'recorded' | 'historical'
 
 type CoachEvidenceSource =
-  | "minimap"
-  | "live-client-data"
-  | "lcu-gameflow"
-  | "lcu-history"
-  | "sgp-history"
-  | "minimap-replay"
-  | "replay-sidecar"
-  | "user-input";
+  | 'minimap'
+  | 'live-client-data'
+  | 'lcu-gameflow'
+  | 'lcu-history'
+  | 'sgp-history'
+  | 'minimap-replay'
+  | 'replay-sidecar'
+  | 'fog-inference'
+  | 'item-guidance'
+  | 'combat-observer'
+  | 'authorized-audio'
+  | 'user-input'
 
 interface CoachClock {
-  observedAt: number;
-  receivedAt: number;
-  sequence: number;
+  observedAt: number
+  receivedAt: number
+  sequence: number
 }
 
 interface CoachFreshness {
-  expiresAt: number;
-  state: "fresh" | "stale" | "expired" | "unknown";
+  expiresAt: number
+  state: 'fresh' | 'stale' | 'expired' | 'unknown'
 }
 ```
 
@@ -257,16 +276,16 @@ interface CoachFreshness {
 
 ```ts
 interface CoachEvidence<TPayload> {
-  id: string;
-  sessionId: string;
-  temporalScope: CoachTemporalScope;
-  source: CoachEvidenceSource;
-  kind: string;
-  confidence: number;
-  patch: string;
-  clock: CoachClock;
-  freshness: CoachFreshness;
-  payload: TPayload;
+  id: string
+  sessionId: string
+  temporalScope: CoachTemporalScope
+  source: CoachEvidenceSource
+  kind: string
+  confidence: number
+  patch: string
+  clock: CoachClock
+  freshness: CoachFreshness
+  payload: TPayload
 }
 ```
 
@@ -282,25 +301,25 @@ interface CoachEvidence<TPayload> {
 ### 3.3 LiveGameSnapshot
 
 ```ts
-type LiveGameDomain = "game-stats" | "players" | "events" | "active-player";
+type LiveGameDomain = 'game-stats' | 'players' | 'events' | 'active-player'
 
 interface LiveGameSourceHealth {
-  domain: LiveGameDomain;
-  state: "idle" | "healthy" | "degraded" | "unavailable";
-  lastSuccessAt: number | null;
-  lastErrorCode: string | null;
-  consecutiveFailures: number;
+  domain: LiveGameDomain
+  state: 'idle' | 'healthy' | 'degraded' | 'unavailable'
+  lastSuccessAt: number | null
+  lastErrorCode: string | null
+  consecutiveFailures: number
 }
 
 interface LiveGameSnapshot {
-  sessionId: string;
-  patch: string;
-  gameTimeSeconds: number | null;
-  activePlayer: NormalizedActivePlayer | null;
-  players: NormalizedPlayer[];
-  events: NormalizedGameEvent[];
-  sourceHealth: LiveGameSourceHealth[];
-  clock: CoachClock;
+  sessionId: string
+  patch: string
+  gameTimeSeconds: number | null
+  activePlayer: NormalizedActivePlayer | null
+  players: NormalizedPlayer[]
+  events: NormalizedGameEvent[]
+  sourceHealth: LiveGameSourceHealth[]
+  clock: CoachClock
 }
 ```
 
@@ -315,197 +334,262 @@ interface LiveGameSnapshot {
 ### 3.4 MinimapObservation
 
 ```ts
-type ObservationLifecycle =
-  "candidate" | "confirmed" | "invalidated" | "expired" | "unknown";
+type ObservationLifecycle = 'candidate' | 'confirmed' | 'invalidated' | 'expired' | 'unknown'
 
 type MinimapEntityKind =
-  | "self"
-  | "ally"
-  | "enemy"
-  | "ping"
-  | "ward"
-  | "minion-wave"
-  | "objective-marker";
+  'self' | 'ally' | 'enemy' | 'ping' | 'ward' | 'minion-wave' | 'objective-marker'
 
 interface NormalizedMapPoint {
-  x: number;
-  y: number;
+  x: number
+  y: number
 }
 
 interface MinimapEntityObservation {
-  trackId: string;
-  kind: MinimapEntityKind;
-  team: "ally" | "enemy" | "neutral" | "unknown";
-  championId: number | null;
-  point: NormalizedMapPoint;
-  regionId: string | null;
-  confidence: number;
-  lifecycle: ObservationLifecycle;
-  firstObservedAt: number;
-  lastObservedAt: number;
-  expiresAt: number;
+  trackId: string
+  kind: MinimapEntityKind
+  team: 'ally' | 'enemy' | 'neutral' | 'unknown'
+  championId: number | null
+  point: NormalizedMapPoint
+  regionId: string | null
+  confidence: number
+  lifecycle: ObservationLifecycle
+  firstObservedAt: number
+  lastObservedAt: number
+  expiresAt: number
 }
 
 interface MinimapObservationBatch {
-  sessionId: string;
-  patch: string;
-  calibrationVersion: string;
-  modelVersions: Record<string, string>;
-  frame: CoachClock & { ageMs: number };
-  health: "healthy" | "degraded" | "unknown";
-  entities: MinimapEntityObservation[];
-  events: MinimapDerivedEvent[];
+  sessionId: string
+  patch: string
+  calibrationVersion: string
+  modelVersions: Record<string, string>
+  frame: CoachClock & { ageMs: number }
+  health: 'healthy' | 'degraded' | 'unknown'
+  entities: MinimapEntityObservation[]
+  events: MinimapDerivedEvent[]
 }
 ```
 
 坐标归一化到左上 `(0,0)`、右下 `(1,1)`。地图方向、红蓝方和左右侧由 calibration transform 处理，业务规则不得重复翻转坐标。
 
-### 3.5 Cue
+### 3.5 FogInference 与 ItemPurchaseGuidance
 
 ```ts
-type CoachCueCategory =
-  "information" | "warning" | "opportunity" | "system" | "review";
-
-type CoachCueStatus =
-  "pending" | "speaking" | "spoken" | "cancelled" | "expired" | "suppressed";
-
-interface CoachOption {
-  id: string;
-  label: string;
-  condition: string | null;
-  evidenceIds: string[];
+interface FogInference {
+  id: string
+  sessionId: string
+  enemyTrackId: string
+  basisEvidenceIds: string[]
+  lastSeenAt: number
+  predictedRegions: Array<{ regionId: string; probability: number }>
+  candidateRoutes: Array<{ regionIds: string[]; probability: number }>
+  arrivalWindow: { earliestAt: number; latestAt: number } | null
+  intents: Array<{
+    kind: 'roam' | 'recall' | 'ambush' | 'flank' | 'objective' | 'lane-swap' | 'unknown'
+    probability: number
+  }>
+  confidence: number
+  createdAt: number
+  expiresAt: number
+  modelVersion: string
 }
 
-interface CoachCue {
-  id: string;
-  sessionId: string;
-  ruleId: string;
-  ruleVersion: string;
-  category: CoachCueCategory;
-  priority: number;
-  observationText: string;
-  impactText: string | null;
-  options: CoachOption[];
-  spokenText: string;
-  evidenceIds: string[];
-  createdAt: number;
-  expiresAt: number;
-  status: CoachCueStatus;
-  cancellationReason: string | null;
+interface ItemPurchaseGuidance {
+  id: string
+  sessionId: string
+  patch: string
+  championId: number
+  currentGold: number
+  inventoryItemIds: number[]
+  primaryPlan: ItemPurchasePlan
+  alternativePlans: ItemPurchasePlan[]
+  evidenceIds: string[]
+  createdAt: number
+  expiresAt: number
+  ruleVersion: string
+}
+
+interface ItemPurchasePlan {
+  itemIds: number[]
+  totalCost: number
+  remainingGold: number
+  missingGold: number
+  reasonCodes: string[]
+  conditions: string[]
 }
 ```
 
-`options` 最多两个。`spokenText` 由本地安全模板或通过验证的模型结果生成。没有有效 evidence 的 cue 不得进入 pending。
+`FogInference` 是预测，不是直接观测。它必须引用仍有效的小地图/对局 evidence；新观测、确认死亡/回城、跨局或 TTL 到期时立即撤销。renderer、TTS、导出和对话必须明确显示预测标识、置信度和有效期。
 
-### 3.6 Renderer State
+`ItemPurchaseGuidance` 必须通过当前补丁装备 schema 校验价格、合成路径、模式可用性、唯一限制和装备栏容量。指导只能形成文字、字幕和语音选项，禁止调用键鼠、商店或自动购买路径。
+
+### 3.6 CombatAssessment
+
+```ts
+interface CombatAssessment {
+  id: string
+  sessionId: string
+  evidenceIds: string[]
+  scenario: 'trade' | 'skirmish' | 'teamfight' | 'dive' | 'escape'
+  winProbability: { low: number; expected: number; high: number }
+  missingInformation: string[]
+  primaryOption: CoachOption
+  alternativeOption: CoachOption | null
+  confidence: number
+  createdAt: number
+  expiresAt: number
+  modelVersion: string
+}
+```
+
+战斗胜算是区间预测而不是事实。它必须引用等级、装备、血量/资源、位置、技能与召唤师状态、可见敌人、迷雾风险和完整画面行为中实际可用的证据，并列出缺失信息；任一关键证据失效时立即撤销。
+
+### 3.7 Cue
+
+```ts
+type CoachCueCategory = 'information' | 'warning' | 'opportunity' | 'system' | 'review'
+
+type CoachCueStatus = 'pending' | 'speaking' | 'spoken' | 'cancelled' | 'expired' | 'suppressed'
+
+interface CoachOption {
+  id: string
+  label: string
+  condition: string | null
+  evidenceIds: string[]
+  role: 'primary' | 'alternative'
+  score: number
+}
+
+interface CoachCue {
+  id: string
+  sessionId: string
+  ruleId: string
+  ruleVersion: string
+  category: CoachCueCategory
+  priority: number
+  observationText: string
+  impactText: string | null
+  options: CoachOption[]
+  spokenText: string
+  evidenceIds: string[]
+  createdAt: number
+  expiresAt: number
+  status: CoachCueStatus
+  cancellationReason: string | null
+}
+```
+
+`options` 最多两个，存在建议时第一个必须是 `primary`，第二个只能是 `alternative`。`spokenText` 由本地安全模板或通过验证的模型结果生成。没有有效 evidence 的 cue 不得进入 pending。
+
+### 3.8 Renderer State
 
 ```ts
 interface LiveCoachPublicState {
   session: {
-    id: string | null;
-    state: CoachSessionState;
-    mapId: number | null;
-    queueId: number | null;
-    patch: string | null;
-    startedAt: number | null;
-  };
+    id: string | null
+    state: CoachSessionState
+    mapId: number | null
+    queueId: number | null
+    patch: string | null
+    startedAt: number | null
+  }
   capability: {
-    enabledFeatureIds: string[];
-    unavailable: Record<string, CoachUnavailableReason>;
-  };
+    enabledFeatureIds: string[]
+    unavailable: Record<string, CoachUnavailableReason>
+  }
   capture: {
-    state: string;
-    backend: string | null;
-    fps: number;
-    frameAgeMs: number | null;
-    roiState: string;
-  };
+    state: string
+    backend: string | null
+    fps: number
+    frameAgeMs: number | null
+    roiState: string
+  }
   liveData: {
-    state: string;
-    lastSuccessAt: number | null;
-  };
-  cue: CoachCuePublicDto | null;
+    state: string
+    lastSuccessAt: number | null
+  }
+  cue: CoachCuePublicDto | null
   speech: {
-    state: "idle" | "speaking" | "muted" | "unavailable";
-    cueId: string | null;
-  };
-  conversation: CoachConversationPublicDto;
-  lastError: CoachPublicError | null;
+    state: 'idle' | 'speaking' | 'muted' | 'unavailable'
+    cueId: string | null
+  }
+  conversation: CoachConversationPublicDto
+  lastError: CoachPublicError | null
 }
 ```
 
 propSync 只同步 `settings` 与 `state` 两个固定键。高频帧、完整 evidence、录像时间线、云端密钥和音频不进入 propSync。
 
-### 3.7 标定与环境指纹
+### 3.9 标定与环境指纹
 
 ```ts
 interface CaptureEnvironmentFingerprint {
-  displayId: string;
-  width: number;
-  height: number;
-  dpiScale: number;
-  hdr: boolean;
-  windowMode: "windowed" | "borderless" | "exclusive-fullscreen" | "unknown";
-  backend: "wgc" | "dda";
-  minimapSide: "left" | "right";
+  displayId: string
+  width: number
+  height: number
+  dpiScale: number
+  hdr: boolean
+  windowMode: 'windowed' | 'borderless' | 'exclusive-fullscreen' | 'unknown'
+  backend: 'wgc' | 'dda'
+  minimapSide: 'left' | 'right'
 }
 
 interface MinimapCalibration {
-  schemaVersion: 1;
-  id: string;
-  fingerprintHash: string;
-  roi: { x: number; y: number; width: number; height: number };
-  transform: "blue-normal" | "red-rotated";
-  source: "automatic" | "manual";
-  confidence: number;
-  createdAt: number;
+  schemaVersion: 1
+  id: string
+  fingerprintHash: string
+  roi: { x: number; y: number; width: number; height: number }
+  transform: 'blue-normal' | 'red-rotated'
+  source: 'automatic' | 'manual'
+  confidence: number
+  createdAt: number
 }
 ```
 
 ROI 使用相对窗口内容区的 0–1 坐标。环境指纹任一关键字段变化后，旧标定只能作为候选，必须重新健康检查。
 
-### 3.8 离线录像 Sidecar
+### 3.10 离线录像 Sidecar
 
 ```ts
 interface CoachReplaySidecarV1 {
-  schemaVersion: 1;
-  artifactSha256: string;
-  patch: string | null;
-  mapId: number | null;
-  queueId: number | null;
-  selfTeam: "blue" | "red" | null;
-  videoGameStartMs: number | null;
-  roster: Array<{ team: "blue" | "red"; championId: number }> | null;
+  schemaVersion: 1
+  artifactSha256: string
+  patch: string | null
+  mapId: number | null
+  queueId: number | null
+  selfTeam: 'blue' | 'red' | null
+  videoGameStartMs: number | null
+  roster: Array<{ team: 'blue' | 'red'; championId: number }> | null
   events: Array<{
-    videoTimeMs: number;
-    gameTimeSeconds: number | null;
-    kind: string;
-    payload: unknown;
-  }>;
+    videoTimeMs: number
+    gameTimeSeconds: number | null
+    kind: string
+    payload: unknown
+  }>
 }
 ```
 
 sidecar 缺失不阻止纯小地图复盘；依赖 patch、阵容、游戏时间或事件的规则必须逐项关闭。`artifactSha256` 不匹配时拒绝 sidecar。
 
-### 3.9 能力快照
+### 3.11 能力快照
 
 远程资源路径固定为 `live-coach/capabilities`，缓存路径固定为 `config/v1/live-coach/capabilities.json`。
 
 ```ts
 interface LiveCoachCapabilityEnvelope {
-  keyId: string;
-  payloadBase64: string;
-  signatureBase64: string;
+  keyId: string
+  payloadBase64: string
+  signatureBase64: string
 }
 
 interface LiveCoachCapabilityPayload {
-  schemaVersion: 1;
-  generation: number;
-  issuedAt: string;
-  expiresAt: string;
-  killSwitch: boolean;
-  rules: LiveCoachCapabilityRule[];
-  models: Record<string, { version: string; sha256: string; url: string }>;
+  schemaVersion: 1
+  generation: number
+  issuedAt: string
+  expiresAt: string
+  killSwitch: boolean
+  rules: LiveCoachCapabilityRule[]
+  models: Record<string, { version: string; sha256: string; url: string }>
 }
 ```
 
@@ -544,40 +628,55 @@ interface LiveCoachCapabilityPayload {
 
 所有用户可见设置属于 `live-coach-main`。默认总开关关闭，但这不代表功能不开发。
 
-| key                          | 类型/默认值                              | 约束                       | 首次阶段 |
-| ---------------------------- | ---------------------------------------- | -------------------------- | -------- |
-| `enabled`                    | boolean / false                          | 总开关                     | P1       |
-| `coachMode`                  | `minimal/balanced/training` / balanced   | 三种固定模式               | P1       |
-| `outputMode`                 | `sound/subtitle/speech`[] / 全部         | 至少允许全关               | P1       |
-| `captureBackend`             | `auto/wgc/dda` / auto                    | 普通用户默认 auto          | P1       |
-| `minimapSide`                | `auto/left/right` / auto                 | 手动选择覆盖自动结果       | P1       |
-| `manualCalibration`          | object/null                              | 分辨率、DPI、side 绑定     | P1       |
-| `speechEnabled`              | boolean / true                           | 受总开关控制               | P1       |
-| `speechVoiceId`              | string/null                              | 仅保存 token ID            | P1       |
-| `speechOutputDeviceId`       | string/null                              | null 为系统默认            | P1       |
-| `speechVolume`               | number / 0.8                             | 0–1                        | P1       |
-| `speechRate`                 | number / 1                               | 0.75–1.5                   | P1       |
-| `cueCategories`              | record / 默认全开                        | warning 可单独关闭但需确认 | P1       |
-| `pauseShortcut`              | string/null                              | 有状态快捷键               | P1       |
-| `muteShortcut`               | string/null                              | 普通切换                   | P1       |
-| `overlayShortcut`            | string/null                              | 有状态快捷键               | P1       |
-| `recalibrateShortcut`        | string/null                              | 普通触发                   | P1       |
-| `pushToTalkShortcut`         | string/null                              | 有状态快捷键               | P3       |
-| `overlayEnabled`             | boolean / true                           | 不影响语音后台运行         | P1       |
-| `overlayOpacity`             | number / 0.92                            | 0.4–1                      | P1       |
-| `replaySpeechSimulation`     | boolean / false                          | 用户主动开启               | P1       |
-| `detailedEventRetentionDays` | number / 30                              | 0–365                      | P2       |
-| `summaryRetentionDays`       | number / 180                             | 0–3650                     | P2       |
-| `cloudMode`                  | `local-only/cloud-enhanced` / local-only | 单独授权                   | P3       |
-| `cloudAsrEnabled`            | boolean / false                          | 需要 cloud-asr consent     | P3       |
-| `cloudLlmEnabled`            | boolean / false                          | 需要 cloud-ai consent      | P3       |
-| `cloudTtsEnabled`            | boolean / false                          | 需要 cloud-tts consent     | P3       |
-| `cloudBudgetPerGameCny`      | number / 0.30                            | 0–100                      | P3       |
-| `cloudBudgetMonthlyCny`      | number / 20                              | 0–10000                    | P3       |
-| `answerLength`               | `short/normal` / short                   | 实时不提供 long            | P3       |
-| `language`                   | `zh-CN/en` / zh-CN                       | en 通过评估后启用          | P3       |
+| key                               | 类型/默认值                              | 约束                          | 首次阶段 |
+| --------------------------------- | ---------------------------------------- | ----------------------------- | -------- |
+| `enabled`                         | boolean / false                          | 总开关                        | P1       |
+| `coachMode`                       | `minimal/balanced/training` / balanced   | 三种固定模式                  | P1       |
+| `outputMode`                      | `sound/subtitle/speech`[] / 全部         | 至少允许全关                  | P1       |
+| `captureBackend`                  | `auto/wgc/dda` / auto                    | 普通用户默认 auto             | P1       |
+| `minimapSide`                     | `auto/left/right` / auto                 | 手动选择覆盖自动结果          | P1       |
+| `manualCalibration`               | object/null                              | 分辨率、DPI、side 绑定        | P1       |
+| `speechEnabled`                   | boolean / true                           | 受总开关控制                  | P1       |
+| `speechVoiceId`                   | string/null                              | 仅保存 token ID               | P1       |
+| `speechOutputDeviceId`            | string/null                              | null 为系统默认               | P1       |
+| `speechVolume`                    | number / 0.8                             | 0–1                           | P1       |
+| `speechRate`                      | number / 1                               | 0.75–1.5                      | P1       |
+| `cueCategories`                   | record / 默认全开                        | warning 可单独关闭但需确认    | P1       |
+| `fogInferenceEnabled`             | boolean / true                           | 受总开关和能力快照控制        | P1       |
+| `fogInferenceDetail`              | `region/route/intent` / route            | 不改变观测与预测分层          | P1       |
+| `itemGuidanceEnabled`             | boolean / true                           | 只控制指导，不允许自动购买    | P1       |
+| `itemGuidanceMode`                | `recommended/adaptive/custom` / adaptive | 数据不匹配时 fail-closed      | P1       |
+| `cooldownTrackingEnabled`         | boolean / true                           | 来源与能力开关必须可见        | P1       |
+| `communicationAssistEnabled`      | boolean / false                          | 发送前默认需要用户确认        | P1       |
+| `microGuidanceEnabled`            | boolean / false                          | P2 条件式、P3 逐帧            | P2       |
+| `shotCallingMode`                 | `off/low/balanced/active` / balanced     | 不等于自动执行                | P3       |
+| `pauseShortcut`                   | string/null                              | 有状态快捷键                  | P1       |
+| `muteShortcut`                    | string/null                              | 普通切换                      | P1       |
+| `overlayShortcut`                 | string/null                              | 有状态快捷键                  | P1       |
+| `recalibrateShortcut`             | string/null                              | 普通触发                      | P1       |
+| `pushToTalkShortcut`              | string/null                              | 有状态快捷键                  | P3       |
+| `wakeWordEnabled`                 | boolean / false                          | 独立授权和持续指示            | P3       |
+| `continuousMicrophoneEnabled`     | boolean / false                          | 独立授权、立即关闭            | P3       |
+| `authorizedAudioAnalysis`         | string[] / []                            | voice/system/emotion 分项授权 | P3       |
+| `fullScreenMultimodalEnabled`     | boolean / false                          | 独立画面授权与隐私裁剪        | P3       |
+| `overlayEnabled`                  | boolean / true                           | 不影响语音后台运行            | P1       |
+| `overlayOpacity`                  | number / 0.92                            | 0.4–1                         | P1       |
+| `replaySpeechSimulation`          | boolean / false                          | 用户主动开启                  | P1       |
+| `detailedEventRetentionDays`      | number / 30                              | 0–365                         | P2       |
+| `summaryRetentionDays`            | number / 180                             | 0–3650                        | P2       |
+| `cloudMode`                       | `local-only/cloud-enhanced` / local-only | 单独授权                      | P3       |
+| `cloudAsrEnabled`                 | boolean / false                          | 需要 cloud-asr consent        | P3       |
+| `cloudLlmEnabled`                 | boolean / false                          | 需要 cloud-ai consent         | P3       |
+| `cloudTtsEnabled`                 | boolean / false                          | 需要 cloud-tts consent        | P3       |
+| `cloudBudgetPerGameCny`           | number / 0.30                            | 0–100                         | P3       |
+| `cloudBudgetMonthlyCny`           | number / 20                              | 0–10000                       | P3       |
+| `answerLength`                    | `short/normal/detailed` / short          | detailed 语音先播摘要         | P3       |
+| `teamCommunicationSummaryEnabled` | boolean / false                          | 依赖授权音频来源              | P3       |
+| `publicTrainingLeaderboardOptIn`  | boolean / false                          | 匿名、可退出、可删除          | P3       |
+| `spectatorCoachEnabled`           | boolean / false                          | 独立模式 capability           | P3       |
+| `language`                        | `zh-CN/en` / zh-CN                       | en 通过评估后启用             | P3       |
 
-以下是硬限制，不做成普通设置：20 秒录音上限、最低 5 FPS、frame age 300 ms、最多两个选项、burst cap、红线和公开 Gate。
+以下是硬限制，不做成普通设置：PTT/切换问句和常开 VAD 分片最长 20 秒、最低 5 FPS、frame age 300 ms、最多一个首选加一个备选、burst cap、永久红线和公开 Gate。
 
 ## 6. IPC 契约
 
@@ -604,6 +703,8 @@ interface LiveCoachCapabilityPayload {
 | `listReplaySessions`          | cursor、limit、filter                | page                          |
 | `getReplayTimelinePage`       | sessionId、cursor、limit             | event page                    |
 | `getEvidence`                 | evidence ID                          | public evidence DTO           |
+| `getFogInferences`            | sessionId、可选 enemyTrackId         | 当前有效预测 DTO              |
+| `getItemPurchaseGuidance`     | sessionId                            | 当前购买方案及备选方案        |
 | `askText`                     | question、context selector           | conversation result           |
 | `beginPushToTalk`             | source                               | conversation ID               |
 | `endPushToTalk`               | conversation ID                      | accepted/cancelled            |
@@ -714,28 +815,30 @@ conversation ID 贯穿音频、transcript、模型请求、答案、TTS 和用�
 
 任务必须按依赖顺序执行；同一 PR 保持单一主题。
 
-| 任务 ID    | 交付                                  | 依赖     | 完成条件                                   |
-| ---------- | ------------------------------------- | -------- | ------------------------------------------ |
-| ENG-P1-001 | shared types、schema、固定 ID、错误码 | 无       | 类型测试和 schema round-trip 通过          |
-| ENG-P1-002 | `live-game-data-main`                 | 001      | 四个 domain、健康、reset、subscribe 完成   |
-| ENG-P1-003 | 复活计时器迁移                        | 002      | 公开 state/settings 不变，停止独立轮询     |
-| ENG-P1-004 | CD Timer 迁移                         | 002      | 窗口契约不变，停止独立轮询                 |
-| ENG-P1-005 | WGC 原生采集                          | 001      | 1080p/1440p 窗口/无边框有帧和指标          |
-| ENG-P1-006 | DDA 备用与 HDR tone-map               | 005      | 后端切换、显示器变化、HDR fixture 通过     |
-| ENG-P1-007 | utility process 与 supervisor         | 005      | 心跳、背压、重启、crash-loop、打包通过     |
-| ENG-P1-008 | ROI 自动/手动标定                     | 007      | 左右侧、DPI、环境指纹和 unknown 流程完成   |
-| ENG-P1-009 | 基础单位检测、追踪、区域              | 008      | 回放指标达到一期门槛                       |
-| ENG-P1-010 | `live-coach-main` 会话与 capability   | 002、009 | 状态机、跨局 reset、内部/公开渠道完成      |
-| ENG-P1-011 | 事实融合和基础规则                    | 010      | evidence TTL、冲突、确定性回放通过         |
-| ENG-P1-012 | cue scheduler                         | 011      | 优先级、冷却、burst、替换、取消通过        |
-| ENG-P1-013 | 本地 SAPI TTS                         | 001      | voice/device/rate/volume/cancel 和打包通过 |
-| ENG-P1-014 | renderer shard 与主页面               | 010      | settings/state 同步，无原始帧 propSync     |
-| ENG-P1-015 | coach overlay window                  | 012、014 | 透明、置顶、点击穿透、快捷键和主题通过     |
-| ENG-P1-016 | 首次向导与标定 UX                     | 008、014 | 权限、演示、自动/手动/重置完整             |
-| ENG-P1-017 | 离线录像/sidecar 管线                 | 009、011 | 导入、标定、时间映射、取消、时间线通过     |
-| ENG-P1-018 | 本局摘要、反馈和导出                  | 012、017 | 结构化摘要、主动导出、错误反馈完成         |
-| ENG-P1-019 | 隐私、诊断、能力快照                  | 007、010 | 授权隔离、签名校验、kill switch 完成       |
-| ENG-P1-020 | 一期完整验收                          | 全部     | 技术基线第 7.13–7.16 节全部满足            |
+| 任务 ID    | 交付                                  | 依赖          | 完成条件                                   |
+| ---------- | ------------------------------------- | ------------- | ------------------------------------------ |
+| ENG-P1-001 | shared types、schema、固定 ID、错误码 | 无            | 类型测试和 schema round-trip 通过          |
+| ENG-P1-002 | `live-game-data-main`                 | 001           | 四个 domain、健康、reset、subscribe 完成   |
+| ENG-P1-003 | 复活计时器迁移                        | 002           | 公开 state/settings 不变，停止独立轮询     |
+| ENG-P1-004 | CD Timer 迁移                         | 002           | 窗口契约不变，停止独立轮询                 |
+| ENG-P1-005 | WGC 原生采集                          | 001           | 1080p/1440p 窗口/无边框有帧和指标          |
+| ENG-P1-006 | DDA 备用与 HDR tone-map               | 005           | 后端切换、显示器变化、HDR fixture 通过     |
+| ENG-P1-007 | utility process 与 supervisor         | 005           | 心跳、背压、重启、crash-loop、打包通过     |
+| ENG-P1-008 | ROI 自动/手动标定                     | 007           | 左右侧、DPI、环境指纹和 unknown 流程完成   |
+| ENG-P1-009 | 基础单位检测、追踪、区域              | 008           | 回放指标达到一期门槛                       |
+| ENG-P1-010 | `live-coach-main` 会话与 capability   | 002、009      | 状态机、跨局 reset、内部/公开渠道完成      |
+| ENG-P1-011 | 事实融合和基础规则                    | 010           | evidence TTL、冲突、确定性回放通过         |
+| ENG-P1-012 | cue scheduler                         | 011           | 优先级、冷却、burst、替换、取消通过        |
+| ENG-P1-013 | 本地 SAPI TTS                         | 001           | voice/device/rate/volume/cancel 和打包通过 |
+| ENG-P1-014 | renderer shard 与主页面               | 010           | settings/state 同步，无原始帧 propSync     |
+| ENG-P1-015 | coach overlay window                  | 012、014      | 透明、置顶、点击穿透、快捷键和主题通过     |
+| ENG-P1-016 | 首次向导与标定 UX                     | 008、014      | 权限、演示、自动/手动/重置完整             |
+| ENG-P1-017 | 离线录像/sidecar 管线                 | 009、011      | 导入、标定、时间映射、取消、时间线通过     |
+| ENG-P1-018 | 本局摘要、反馈和导出                  | 012、017      | 结构化摘要、主动导出、错误反馈完成         |
+| ENG-P1-019 | 隐私、诊断、能力快照                  | 007、010      | 授权隔离、签名校验、kill switch 完成       |
+| ENG-P1-020 | 迷雾与不可见敌人推断                  | 002、009、011 | 概率区域、路线、意图、TTL、撤销和评估完成  |
+| ENG-P1-021 | 装备购买指导                          | 002、011      | 补丁装备数据、主/备方案、合法性测试完成    |
+| ENG-P1-022 | 一期完整验收                          | 全部          | 技术基线第 7.13–7.16 节全部满足            |
 
 第一期不能以“页面能打开”代替真实 Electron、Windows、打包、离线回放和内部真实游戏验证。
 
@@ -745,8 +848,8 @@ conversation ID 贯穿音频、transcript、模型请求、答案、TTS 和用�
 | ---------- | ------------------------------------ | ------------------ | ------------------------------------------- |
 | ENG-P2-001 | 4K/超宽/HDR/独占全屏/高 DPI 支持矩阵 | P1                 | 每个环境独立标定与准确率报告                |
 | ENG-P2-002 | 英雄身份检测                         | P1 detector        | 阵容约束、unknown、混淆矩阵达到门槛         |
-| ENG-P2-003 | last-seen 与置信衰减                 | 002                | 只显示最后可见，过期不作当前事实            |
-| ENG-P2-004 | 移动趋势、聚集、局部人数             | 002                | track、角度、人数指标达到门槛               |
+| ENG-P2-003 | last-seen 与迷雾概率增强             | 002                | 动态概率区域、路线与置信衰减达到门槛        |
+| ENG-P2-004 | 移动趋势、聚集、局部人数与意图       | 002、003           | track、角度、人数、意图概率指标达到门槛     |
 | ENG-P2-005 | Ping 检测                            | P1 detector        | 独立开关、类别混淆和指标通过                |
 | ENG-P2-006 | 兵线/小兵检测                        | P1 detector        | 独立数据集、降级和指标通过                  |
 | ENG-P2-007 | 眼位检测                             | P1 detector        | 独立数据集、降级和指标通过                  |
@@ -758,33 +861,40 @@ conversation ID 贯穿音频、transcript、模型请求、答案、TTS 和用�
 | ENG-P2-013 | 关键时刻复盘                         | 009、012           | 三个关键时刻、当时证据、后续结果完成        |
 | ENG-P2-014 | 训练模式与反馈                       | 009、011           | 极简/均衡/训练、反馈和样本授权完成          |
 | ENG-P2-015 | 影子评估与补丁门禁                   | 全部               | detector/rule/patch 报告和 fail-closed 完成 |
-| ENG-P2-016 | 二期完整验收                         | 全部               | 技术基线第 8.11–8.13 节全部满足             |
+| ENG-P2-016 | 条件式微操、冷却与沟通辅助           | P1、002–009        | 连招/补刀/走位、冷却来源、Ping/聊天契约完成 |
+| ENG-P2-017 | 二期完整验收                         | 全部               | 技术基线第 8.11–8.13 节全部满足             |
 
 SGP 任务不能阻塞不依赖历史先验的实时功能；SGP 失败时必须保持明确降级，不能伪装成 LCU 成功。
 
 ## 10. 第三期开发任务
 
-| 任务 ID    | 交付                                     | 依赖       | 完成条件                                 |
-| ---------- | ---------------------------------------- | ---------- | ---------------------------------------- |
-| ENG-P3-001 | `coach-voice-main` 骨架和 speech adapter | P2         | 单向 DI、取消、设备状态完成              |
-| ENG-P3-002 | WASAPI PTT 与 VAD                        | 001        | 按住/切换、20 秒上限、首尾截断指标通过   |
-| ENG-P3-003 | 本地 whisper.cpp ASR                     | 002        | 模型校验、partial/final、中文 CER 报告   |
-| ENG-P3-004 | 意图与槽位解析                           | 003        | 支持意图 macro-F1 和关键槽位门槛通过     |
-| ENG-P3-005 | 对话事实冻结与时效监控                   | P2、004    | 当前/刚才上下文分离，失效可取消          |
-| ENG-P3-006 | 本地结构化回答                           | 005        | 所有支持意图在无云端时可回答或正确拒答   |
-| ENG-P3-007 | Provider 接口与凭据存储                  | 001        | local/cloud adapter、safeStorage、不泄密 |
-| ENG-P3-008 | OpenAI cloud ASR adapter                 | 007        | 上传授权、超时、取消、用量和删除记录     |
-| ENG-P3-009 | OpenAI GPT-5.6 Luna Responses adapter    | 005、007   | strict schema、最小上下文、请求审计      |
-| ENG-P3-010 | response validator                       | 009        | fact/option 子集、禁词、数字、时效校验   |
-| ENG-P3-011 | OpenAI TTS adapter                       | 007        | AI 语音披露、流式首包、SAPI 回退         |
-| ENG-P3-012 | 文字/PTT 问答 UI                         | 004–011    | 状态、partial、取消、证据跳转完成        |
-| ENG-P3-013 | 个人画像                                 | P2 storage | 可验证事件、置信度、纠正、清空完成       |
-| ENG-P3-014 | 多局训练计划                             | 013        | 目标、代理指标、复盘和中途调整完成       |
-| ENG-P3-015 | 长期报告                                 | 013、014   | 趋势、样本量、补丁分段和导出完成         |
-| ENG-P3-016 | 云端用量、BYOK 和预算                    | 007–011    | 单局/月预算、熔断、本地回退、历史记录    |
-| ENG-P3-017 | 授权中心与云端删除                       | 007、016   | 分项授权、撤回、导出、删除 E2E 通过      |
-| ENG-P3-018 | AI/ASR 安全评估                          | 004、010   | 注入、恶意 ASR、无依据事实和拒答指标通过 |
-| ENG-P3-019 | 三期完整验收                             | 全部       | 技术基线第 9.14–9.16 节全部满足          |
+| 任务 ID    | 交付                                     | 依赖         | 完成条件                                 |
+| ---------- | ---------------------------------------- | ------------ | ---------------------------------------- |
+| ENG-P3-001 | `coach-voice-main` 骨架和 speech adapter | P2           | 单向 DI、取消、设备状态完成              |
+| ENG-P3-002 | WASAPI PTT 与 VAD                        | 001          | 按住/切换、20 秒上限、首尾截断指标通过   |
+| ENG-P3-003 | 本地 whisper.cpp ASR                     | 002          | 模型校验、partial/final、中文 CER 报告   |
+| ENG-P3-004 | 意图与槽位解析                           | 003          | 支持意图 macro-F1 和关键槽位门槛通过     |
+| ENG-P3-005 | 对话事实冻结与时效监控                   | P2、004      | 当前/刚才上下文分离，失效可取消          |
+| ENG-P3-006 | 本地结构化回答                           | 005          | 所有支持意图在无云端时可回答或正确拒答   |
+| ENG-P3-007 | Provider 接口与凭据存储                  | 001          | local/cloud adapter、safeStorage、不泄密 |
+| ENG-P3-008 | OpenAI cloud ASR adapter                 | 007          | 上传授权、超时、取消、用量和删除记录     |
+| ENG-P3-009 | OpenAI GPT-5.6 Luna Responses adapter    | 005、007     | strict schema、最小上下文、请求审计      |
+| ENG-P3-010 | response validator                       | 009          | fact/option 子集、禁词、数字、时效校验   |
+| ENG-P3-011 | OpenAI TTS adapter                       | 007          | AI 语音披露、流式首包、SAPI 回退         |
+| ENG-P3-012 | 文字/PTT 问答 UI                         | 004–011      | 状态、partial、取消、证据跳转完成        |
+| ENG-P3-013 | 个人画像                                 | P2 storage   | 可验证事件、置信度、纠正、清空完成       |
+| ENG-P3-014 | 多局训练计划                             | 013          | 目标、代理指标、复盘和中途调整完成       |
+| ENG-P3-015 | 长期报告                                 | 013、014     | 趋势、样本量、补丁分段和导出完成         |
+| ENG-P3-016 | 云端用量、BYOK 和预算                    | 007–011      | 单局/月预算、熔断、本地回退、历史记录    |
+| ENG-P3-017 | 授权中心与云端删除                       | 007、016     | 分项授权、撤回、导出、删除 E2E 通过      |
+| ENG-P3-018 | AI/ASR 安全评估                          | 004、010     | 注入、恶意 ASR、无依据事实和拒答指标通过 |
+| ENG-P3-019 | 唤醒词、常开麦克风与授权音频分析         | 001–004      | 分项授权、持续指示、本地处理、删除完成   |
+| ENG-P3-020 | 完整画面多模态观察                       | P2、005      | 隐私裁剪、证据化输出、性能和撤销完成     |
+| ENG-P3-021 | 逐帧微操与主动 shot calling              | 020、010     | 连招/补刀/走位/指挥的证据和延迟门槛通过  |
+| ENG-P3-022 | ARAM、Arena、轮换与观战模式适配          | P2、020      | 独立地图、数据集、规则和 capability 完成 |
+| ENG-P3-023 | 授权音色与跨地区增强                     | 007、017     | 权利证明、撤回、endpoint/地区降级完成    |
+| ENG-P3-024 | 训练分位、排行榜与团队协同               | 013–015、017 | 统计口径、匿名、opt-in、反刷和删除完成   |
+| ENG-P3-025 | 三期完整验收                             | 全部         | 技术基线第 9.14–9.16 节全部满足          |
 
 OpenAI 参考 adapter 的实现依据官方文档；模型 ID、价格和地区可用性必须在集成测试时重新确认，并通过配置更新，不写死为永久产品事实。
 
@@ -995,20 +1105,20 @@ overlay 有四种密度：
 
 ### 14.1 第一期
 
-| 产品大项目                  | 主工程任务           |
-| --------------------------- | -------------------- |
-| P1-M01 产品入口与首次启用   | ENG-P1-014、016、019 |
-| P1-M02 教练会话管理         | ENG-P1-010           |
-| P1-M03 小地图设置与标定     | ENG-P1-008、016      |
-| P1-M04 基础小地图观察       | ENG-P1-009、011      |
-| P1-M05 基础教练提醒         | ENG-P1-011、012      |
-| P1-M06 语音、提示音与字幕   | ENG-P1-013、015      |
-| P1-M07 教练悬浮窗           | ENG-P1-015           |
-| P1-M08 教练模式与功能设置   | ENG-P1-010、014、019 |
-| P1-M09 离线录像分析         | ENG-P1-017           |
-| P1-M10 本局摘要与基础复盘   | ENG-P1-018           |
-| P1-M11 隐私与数据控制       | ENG-P1-018、019      |
-| P1-M12 诊断、帮助与产品运营 | ENG-P1-016、019、020 |
+| 产品大项目                              | 主工程任务                |
+| --------------------------------------- | ------------------------- |
+| P1-M01 产品入口与首次启用               | ENG-P1-014、016、019      |
+| P1-M02 教练会话管理                     | ENG-P1-010                |
+| P1-M03 小地图设置与标定                 | ENG-P1-008、016           |
+| P1-M04 基础小地图观察                   | ENG-P1-009、011           |
+| P1-M05 基础教练提醒、迷雾推断与装备指导 | ENG-P1-011、012、020、021 |
+| P1-M06 语音、提示音与字幕               | ENG-P1-013、015           |
+| P1-M07 教练悬浮窗                       | ENG-P1-015                |
+| P1-M08 教练模式与功能设置               | ENG-P1-010、014、019      |
+| P1-M09 离线录像分析                     | ENG-P1-017                |
+| P1-M10 本局摘要与基础复盘               | ENG-P1-018                |
+| P1-M11 隐私与数据控制                   | ENG-P1-018、019           |
+| P1-M12 诊断、帮助与产品运营             | ENG-P1-016、019、022      |
 
 ### 14.2 第二期
 
@@ -1027,26 +1137,26 @@ overlay 有四种密度：
 | P2-M11 局内反馈             | ENG-P2-014           |
 | P2-M12 赛后关键时刻复盘     | ENG-P2-012、013      |
 | P2-M13 离线态势复盘增强     | ENG-P2-008、009、013 |
-| P2-M14 产品质量与运营反馈   | ENG-P2-015、016      |
+| P2-M14 产品质量与运营反馈   | ENG-P2-015、017      |
 
 ### 14.3 第三期
 
-| 产品大项目                | 主工程任务           |
-| ------------------------- | -------------------- |
-| P3-M01 离线赛后证据问答   | ENG-P3-005、006、012 |
-| P3-M02 按键说话           | ENG-P3-001–003       |
-| P3-M03 实时语音与文字问答 | ENG-P3-004–012       |
-| P3-M04 对话交互体验       | ENG-P3-005、012      |
-| P3-M05 回答证据与可信体验 | ENG-P3-005、009、010 |
-| P3-M06 游戏知识与解释     | ENG-P3-006、009、010 |
-| P3-M07 个人教练画像       | ENG-P3-013           |
-| P3-M08 多局训练计划       | ENG-P3-014           |
-| P3-M09 长期进步报告       | ENG-P3-015           |
-| P3-M10 个性化语音体验     | ENG-P3-001、011、012 |
-| P3-M11 本地与云端服务选择 | ENG-P3-006–011、016  |
-| P3-M12 隐私与授权中心     | ENG-P3-007、017      |
-| P3-M13 回答反馈与纠错     | ENG-P3-010、012、018 |
-| P3-M14 服务状态与降级体验 | ENG-P3-006–012、016  |
+| 产品大项目                | 主工程任务                          |
+| ------------------------- | ----------------------------------- |
+| P3-M01 离线赛后证据问答   | ENG-P3-005、006、012                |
+| P3-M02 语音输入与持续收音 | ENG-P3-001–003、019                 |
+| P3-M03 实时语音与文字问答 | ENG-P3-004–012、020–022             |
+| P3-M04 对话交互体验       | ENG-P3-005、012                     |
+| P3-M05 回答证据与可信体验 | ENG-P3-005、009、010                |
+| P3-M06 游戏知识与解释     | ENG-P3-006、009、010、023           |
+| P3-M07 个人教练画像       | ENG-P3-013                          |
+| P3-M08 多局训练计划       | ENG-P3-014                          |
+| P3-M09 长期进步报告       | ENG-P3-015、024                     |
+| P3-M10 个性化语音体验     | ENG-P3-001、011、012、019、023      |
+| P3-M11 本地与云端服务选择 | ENG-P3-006–011、016、023            |
+| P3-M12 隐私与授权中心     | ENG-P3-007、017、019、020、023、024 |
+| P3-M13 回答反馈与纠错     | ENG-P3-010、012、018                |
+| P3-M14 服务状态与降级体验 | ENG-P3-006–012、016、019–024        |
 
 所有 40 个产品大项目都有工程归属。具体子功能以产品功能清单为验收输入，不能只完成表中部分文件就勾选大项目。
 

@@ -1,7 +1,7 @@
 # League Akari 实时语音 AI 教练：P0 技术决策
 
 > 文档状态：已冻结，可直接用于开发
-> 版本：v1.0
+> 版本：v1.2
 > 最后更新：2026-08-25
 > 适用仓库：League Akari 1.5.x 及后续兼容版本
 > 适用平台：Windows x64
@@ -10,13 +10,15 @@
 
 本文冻结实时语音 AI 教练开工前必须确定的技术选择。程序员不需要重新比较同类方案；实现如果需要改变本文结论，必须新增 ADR，写明原因、兼容影响、迁移方式、测试证据和回滚方案。
 
+本版范围变更由 [ADR-0001：迷雾推断与装备购买指导进入必做范围](./adr/live-coach-0001-fog-inference-and-item-guidance.md) 和 [ADR-0002：永久红线重新分类](./adr/live-coach-0002-redline-reclassification.md) 批准。
+
 研发范围遵循以下固定规则：
 
 - 除红线外，三个阶段产品清单中的功能全部开发、测试并保留可运行实现；
 - 审核、地区和运营状态只控制外部版本是否开启，不删除代码，不中止内部开发；
 - 内部构建只供项目负责人开发测试；公开构建默认关闭未获准的实时能力；
 - 本文不存在条件性研发范围；审核状态不影响开发排期；
-- 读取内存、注入、Hook、驱动、封包解密、自动操作游戏等红线永久不实现。
+- 未经官方 SDK、公开接口或书面授权的游戏进程内存访问、注入、Hook、驱动、封包篡改、输入自动化、反作弊规避和未授权数据/语音处理永久不实现；功能类别本身不因技术难度、审核状态或外部暂未开放而列为红线。
 
 配套文档：
 
@@ -27,28 +29,31 @@
 
 ## 1. 冻结结论总表
 
-| 决策 ID | 主题            | 冻结结论                                                                                                |
-| ------- | --------------- | ------------------------------------------------------------------------------------------------------- |
-| P0-D01  | 首发系统        | Windows 10 22H2 x64、Windows 11 x64；其他平台明确显示不支持                                             |
-| P0-D02  | 首发游戏范围    | 召唤师峡谷 5v5，地图 ID 11；内部构建覆盖训练、自定义、匹配和排位，外部按队列独立开关                    |
-| P0-D03  | 空间事实来源    | 只以当前采集到的小地图像素为准；LCU、2999、SGP 不提供地图坐标                                           |
-| P0-D04  | 当前状态来源    | LCU 管生命周期；Live Client Data 提供当前非空间事实；SGP 只用于赛前/赛后历史增强                        |
-| P0-D05  | 采集后端        | Windows Graphics Capture 主路径；DXGI Desktop Duplication 备用；Electron desktopCapturer 只用于诊断对照 |
-| P0-D06  | 进程隔离        | Electron utilityProcess 承载采集与 CV；原生崩溃不得带走 Electron main                                   |
-| P0-D07  | 视觉运行时      | ONNX Runtime C API；DirectML 优先、CPU 回退；模型格式统一为 ONNX                                        |
-| P0-D08  | 小地图资源      | LCU 本地游戏资源提供版本与身份元数据；真实 ROI 标注样本训练检测器，不用方形英雄原画直接做匹配           |
-| P0-D09  | 一期语音        | Windows SAPI 5.4 本地 TTS，支持已安装语音、设备、音量、语速、取消                                       |
-| P0-D10  | 三期麦克风      | WASAPI shared-mode、16 kHz mono PCM、Push-to-Talk、VAD、20 秒硬上限                                     |
-| P0-D11  | 三期本地 ASR    | whisper.cpp 多语言模型；默认 small 级别，低配置允许 base 级别；模型按 SHA-256 校验                      |
-| P0-D12  | 三期本地回答    | 确定性规则与模板完整可用；不把本地生成式模型作为基础依赖                                                |
-| P0-D13  | 云端参考实现    | OpenAI：音频转写 + GPT-5.6 Luna Responses 严格结构化输出 + 可选 TTS；所有能力置于可替换 Provider 接口后 |
-| P0-D14  | 云端调用方式    | 三期统一采用用户自有 API Key（BYOK）直连；三期内不建设自有付费网关                                      |
-| P0-D15  | 密钥存储        | Electron safeStorage/Windows DPAPI 加密后存本地；不进入 SQLite 明文、日志、崩溃报告或 IPC 状态          |
-| P0-D16  | 数据存储        | 一期会话默认内存；二期起 SQLite 存结构化会话；原始画面和音频默认不落盘                                  |
-| P0-D17  | 远程开关        | 现有 feature-gating 做粗粒度门控，教练能力快照做地区/队列/补丁/功能细粒度门控                           |
-| P0-D18  | UI 落点         | 主窗口增加 `/live-coach/:section?`；新增独立 coach overlay，不复用现有对局窗口                          |
-| P0-D19  | 首发语言        | 中文普通话完整交付；英文同属必做，在第三期语言评估通过后启用                                            |
-| P0-D20  | 研发/审核负责人 | 项目负责人同时担任产品、内部测试和外部开关批准人；具体编码任务按角色标记                                |
+| 决策 ID | 主题            | 冻结结论                                                                                                                                     |
+| ------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| P0-D01  | 首发系统        | Windows 10 22H2 x64、Windows 11 x64；其他平台明确显示不支持                                                                                  |
+| P0-D02  | 游戏范围        | 一期首发召唤师峡谷 5v5（地图 ID 11）；三期必须扩展 ARAM、斗魂竞技场、轮换模式和观战教练，外部按地图/队列独立开关                             |
+| P0-D03  | 空间观测与推断  | 当前采集到的小地图像素是直接空间观测核心；基于小地图、last-seen、地图图结构和允许状态生成独立的概率预测层；LCU、2999、SGP 不直接提供地图坐标 |
+| P0-D04  | 当前状态来源    | LCU 管生命周期；Live Client Data 提供当前非空间事实；SGP 只用于赛前/赛后历史增强                                                             |
+| P0-D05  | 采集后端        | Windows Graphics Capture 主路径；DXGI Desktop Duplication 备用；Electron desktopCapturer 只用于诊断对照                                      |
+| P0-D06  | 进程隔离        | Electron utilityProcess 承载采集与 CV；原生崩溃不得带走 Electron main                                                                        |
+| P0-D07  | 视觉运行时      | ONNX Runtime C API；DirectML 优先、CPU 回退；模型格式统一为 ONNX                                                                             |
+| P0-D08  | 小地图资源      | LCU 本地游戏资源提供版本与身份元数据；真实 ROI 标注样本训练检测器，不用方形英雄原画直接做匹配                                                |
+| P0-D09  | 一期语音        | Windows SAPI 5.4 本地 TTS，支持已安装语音、设备、音量、语速、取消                                                                            |
+| P0-D10  | 三期麦克风      | WASAPI shared-mode、16 kHz mono PCM；默认 PTT，同时实现唤醒词与常开模式；VAD 分片，每片最多 20 秒                                            |
+| P0-D11  | 三期本地 ASR    | whisper.cpp 多语言模型；默认 small 级别，低配置允许 base 级别；模型按 SHA-256 校验                                                           |
+| P0-D12  | 三期本地回答    | 确定性规则与模板完整可用；不把本地生成式模型作为基础依赖                                                                                     |
+| P0-D13  | 云端参考实现    | OpenAI：音频转写 + GPT-5.6 Luna Responses 严格结构化输出 + 可选 TTS；所有能力置于可替换 Provider 接口后                                      |
+| P0-D14  | 云端调用方式    | 三期统一采用用户自有 API Key（BYOK）直连；三期内不建设自有付费网关                                                                           |
+| P0-D15  | 密钥存储        | Electron safeStorage/Windows DPAPI 加密后存本地；不进入 SQLite 明文、日志、崩溃报告或 IPC 状态                                               |
+| P0-D16  | 数据存储        | 一期会话默认内存；二期起 SQLite 存结构化会话；原始画面和音频默认不落盘                                                                       |
+| P0-D17  | 远程开关        | 现有 feature-gating 做粗粒度门控，教练能力快照做地区/队列/补丁/功能细粒度门控                                                                |
+| P0-D18  | UI 落点         | 主窗口增加 `/live-coach/:section?`；新增独立 coach overlay，不复用现有对局窗口                                                               |
+| P0-D19  | 首发语言        | 中文普通话完整交付；英文同属必做，在第三期语言评估通过后启用                                                                                 |
+| P0-D20  | 研发/审核负责人 | 项目负责人同时担任产品、内部测试和外部开关批准人；具体编码任务按角色标记                                                                     |
+| P0-D21  | 迷雾推断        | 第一期必须实现不可见敌人概率区域、候选路线、到达时间范围和意图预测；每项预测带证据、置信度、时限和撤销机制                                   |
+| P0-D22  | 装备购买指导    | 第一期必须实现基于英雄、金币、已有装备、阵容、局势和补丁数据的购买指导；提供备选方案但不执行自动购买                                         |
+| P0-D23  | 红线重新分类    | 永久红线仅限未经授权的进程、输入、数据、反作弊和隐私行为；微操、冷却、通信、唤醒词、多模态、shot calling、其他模式等全部进入开发与内部测试   |
 
 ## 2. 平台、游戏模式与构建渠道
 
@@ -68,9 +73,10 @@ macOS 版本继续构建，但教练能力返回 `unsupported-platform`，不得
 
 ### 2.2 游戏范围
 
-- 地图固定为召唤师峡谷，`mapId = 11`；
-- 内部构建必须覆盖训练模式、自定义、匹配、单双排与灵活排位；
-- ARAM、斗魂竞技场、云顶之弈、轮换模式和观战不属于首个三期范围；
+- 一期首发地图为召唤师峡谷，`mapId = 11`；
+- 一期内部构建必须覆盖训练模式、自定义、匹配、单双排与灵活排位；
+- 二期完成多地图 discovery、适配器和数据集基座；三期必须正式支持 ARAM、斗魂竞技场、轮换模式和观战教练；
+- 云顶之弈使用独立玩法模型和产品入口；本三期完成数据/窗口可行性 discovery，后续实施不得复用召唤师峡谷规则冒充支持；
 - 队列 ID 不写死为单个列表，使用 LCU 游戏数据和能力快照共同判断；
 - 未识别地图、队列或补丁一律进入 `unsupported` 或 `unknown`，不输出实时提示。
 
@@ -79,7 +85,7 @@ macOS 版本继续构建，但教练能力返回 `unsupported-platform`，不得
 构建时生成只读常量：
 
 ```ts
-type LiveCoachBuildChannel = "internal" | "public";
+type LiveCoachBuildChannel = 'internal' | 'public'
 ```
 
 - `internal`：项目负责人自用，允许开启未对外开放但非红线的能力；
@@ -91,15 +97,17 @@ type LiveCoachBuildChannel = "internal" | "public";
 
 ### 3.1 数据源职责
 
-| 数据源                | 允许用途                                                        | 禁止误用                           |
-| --------------------- | --------------------------------------------------------------- | ---------------------------------- |
-| 当前小地图 ROI        | 当前可见单位、粗区域、聚集、移动趋势、Ping、兵线/眼位等空间观察 | 不补全迷雾，不推断不可见精确位置   |
-| LCU gameflow/session  | 阶段、地图、队列、当前登录身份、游戏启动和结束                  | 不提供当前地图坐标                 |
-| Live Client Data 2999 | 游戏时间、玩家、等级、装备、死亡、分数、已发生事件              | `position` 字段不是地图坐标        |
-| LCU 历史接口          | 当前登录区服的历史数据                                          | 不覆盖当前小地图事实               |
-| SGP                   | 明确端点支持时的赛前/赛后历史增强                               | 不作为当前空间事实，不假设通用跨区 |
-| 用户自述              | 训练目标、偏好、反馈                                            | 不覆盖传感器事实                   |
-| LLM                   | 组织已经验证的事实和候选选项                                    | 不创造事实、动作或唯一决策         |
+| 数据源                | 允许用途                                                                                                     | 禁止误用                           |
+| --------------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------- |
+| 当前小地图 ROI        | 当前可见单位、粗区域、聚集、移动趋势、Ping、兵线/眼位等直接空间观察；作为 last-seen 与迷雾概率模型的主要证据 | 不能把预测伪装成当前直接观测       |
+| LCU gameflow/session  | 阶段、地图、队列、当前登录身份、游戏启动和结束                                                               | 不提供当前地图坐标                 |
+| Live Client Data 2999 | 游戏时间、玩家、等级、装备、死亡、分数、已发生事件                                                           | `position` 字段不是地图坐标        |
+| LCU 历史接口          | 当前登录区服的历史数据                                                                                       | 不覆盖当前小地图事实               |
+| SGP                   | 明确端点支持时的赛前/赛后历史增强                                                                            | 不作为当前空间事实，不假设通用跨区 |
+| 第三期完整画面        | 近身相对位置、动作、血条、技能表现和战斗状态                                                                 | 不替代小地图宏观空间，不证明迷雾   |
+| 第三期授权音频        | 语音转写、声学事件、沟通强度、协同意图和情绪趋势                                                             | 不自动证明游戏事件或说话者真实身份 |
+| 用户自述              | 训练目标、偏好、反馈                                                                                         | 不覆盖传感器事实                   |
+| LLM                   | 组织已经验证的事实和候选选项，排序并突出当前首选                                                             | 不创造观测、无证据预测或候选外动作 |
 
 ### 3.2 2999 轮询
 
@@ -254,6 +262,20 @@ live-coach-data/
 
 LCU 本地 `/lol-game-data/assets` 只提供版本、英雄 ID、名称和辅助素材。视觉模型必须用真实小地图 ROI 样本训练和验证。
 
+### 5.4 迷雾推断与装备推荐
+
+迷雾推断固定由 `live-coach-main` 中的确定性状态估计器执行，不由 CV worker 或 LLM 自由猜测。输入包括当前与历史小地图观察、last-seen、英雄基础移动能力、已确认位移状态、地图可达图、游戏时间、死亡/回城确认和已发生目标事件。输出至少包含：
+
+- 敌人预测区域或概率热区；
+- 最多三条候选路线；
+- 到达目标区域的时间范围；
+- 游走、回城、埋伏、包夹、资源集结和换线等意图概率；
+- 支持证据 ID、反证条件、模型/规则版本、生成时间和失效时间。
+
+预测不得覆盖原始观测。任何 UI、语音、导出和问答都必须使用独立的 `predicted` 来源与“可能/预计/风险”措辞。新观测与预测冲突时立即撤销旧预测；模型不确定时输出 `unknown`。
+
+装备购买指导固定由版本化装备规则和数据表执行。输入包括英雄、位置、等级、当前金币、已有装备、装备栏、敌我阵容、伤害/控制/回复结构、游戏模式、补丁和用户方案。输出至少包含推荐购买顺序、当前可买组件、金币差额、替代方案、购买后剩余金币、适用条件和数据版本。不得通过键鼠模拟、客户端接口或游戏输入执行购买。
+
 ## 6. 本地语音、麦克风与 ASR
 
 ### 6.1 一期本地 TTS
@@ -273,10 +295,11 @@ LCU 本地 `/lol-game-data/assets` 只提供版本、英雄 ID、名称和辅助
 - WASAPI shared-mode；
 - 16 kHz、16-bit、mono PCM 作为 ASR 内部标准；
 - 设备原始格式由 audio client 重采样；
-- 默认 Push-to-Talk，不提供常开麦；
+- 默认 Push-to-Talk，同时实现用户主动开启的唤醒词和常开模式；
 - 开始录音前先打断正在播放的 TTS；
-- 松键、再次按键、VAD 静音、20 秒上限、设备拔出、会话结束均结束或取消；
-- 不采集系统 loopback、队伍语音或其他应用音频；
+- PTT/切换模式在松键、再次按键、VAD 静音或 20 秒上限时结束；常开模式以相同上限滚动切片；设备拔出、撤权和会话结束立即停止；
+- 系统 loopback、队伍语音或其他应用音频按来源分别授权；来源不可合法取得或未授权时零采集；
+- 常开和外部音频始终显示不可忽略的采集来源与状态，可一键暂停和逐项撤权；
 - 原始 PCM 默认只在内存，提交完成或取消后立即清理。
 
 ### 6.3 本地 ASR
@@ -299,24 +322,15 @@ LCU 本地 `/lol-game-data/assets` 只提供版本、英雄 ID、名称和辅助
 
 ```ts
 interface CoachAsrProvider {
-  transcribe(
-    request: CoachAsrRequest,
-    signal: AbortSignal,
-  ): Promise<CoachTranscript>;
+  transcribe(request: CoachAsrRequest, signal: AbortSignal): Promise<CoachTranscript>
 }
 
 interface CoachResponseProvider {
-  createAnswerPlan(
-    request: CoachModelRequest,
-    signal: AbortSignal,
-  ): Promise<CoachModelAnswerPlan>;
+  createAnswerPlan(request: CoachModelRequest, signal: AbortSignal): Promise<CoachModelAnswerPlan>
 }
 
 interface CoachTtsProvider {
-  synthesize(
-    request: CoachTtsRequest,
-    signal: AbortSignal,
-  ): AsyncIterable<CoachAudioChunk>;
+  synthesize(request: CoachTtsRequest, signal: AbortSignal): AsyncIterable<CoachAudioChunk>
 }
 ```
 
@@ -341,11 +355,11 @@ Responses 模型 ID不得散落在代码中。内部构建从安全配置读取�
 
 ```ts
 interface CoachModelAnswerPlan {
-  result: "answer" | "refuse";
-  factIds: string[];
-  optionIds: string[];
-  answerText: string;
-  spokenText: string;
+  result: 'answer' | 'refuse'
+  factIds: string[]
+  optionIds: string[]
+  answerText: string
+  spokenText: string
 }
 ```
 
@@ -418,23 +432,38 @@ interface CoachModelAnswerPlan {
 
 ### 9.1 固定功能 ID
 
-| 功能 ID                          | 含义               |
-| -------------------------------- | ------------------ |
-| `coach.offline-review`           | 导入录像与离线复盘 |
-| `coach.capture.screen`           | 真实游戏窗口采集   |
-| `coach.analyze.minimap-basic`    | 基础小地图观察     |
-| `coach.analyze.minimap-advanced` | 高级态势检测       |
-| `coach.output.subtitle`          | 实时字幕           |
-| `coach.output.sound`             | 提示音             |
-| `coach.output.tts`               | 实时 TTS           |
-| `coach.qa.text`                  | 文字问答           |
-| `coach.qa.microphone`            | PTT 和本地 ASR     |
-| `coach.qa.cloud-asr`             | 云端 ASR           |
-| `coach.qa.cloud-llm`             | 云端回答增强       |
-| `coach.qa.cloud-tts`             | 云端语音           |
-| `coach.history.sgp`              | SGP 历史增强       |
-| `coach.profile.longitudinal`     | 长期画像与训练计划 |
-| `coach.data.sample-upload`       | 用户主动贡献样本   |
+| 功能 ID                           | 含义                       |
+| --------------------------------- | -------------------------- |
+| `coach.offline-review`            | 导入录像与离线复盘         |
+| `coach.capture.screen`            | 真实游戏窗口采集           |
+| `coach.analyze.minimap-basic`     | 基础小地图观察             |
+| `coach.analyze.minimap-advanced`  | 高级态势检测               |
+| `coach.analyze.fog-inference`     | 迷雾与不可见敌人预测       |
+| `coach.guidance.item-purchase`    | 装备购买指导               |
+| `coach.guidance.micro`            | 连招、补刀、走位与微操指导 |
+| `coach.track.cooldowns`           | 技能、召唤师技能与资源计时 |
+| `coach.communication.ping`        | Ping 建议与获准发送        |
+| `coach.communication.chat`        | 喊话、聊天与沟通辅助       |
+| `coach.analyze.screen-multimodal` | 完整画面多模态分析         |
+| `coach.output.shot-calling`       | 主动连续战术指挥           |
+| `coach.output.subtitle`           | 实时字幕                   |
+| `coach.output.sound`              | 提示音                     |
+| `coach.output.tts`                | 实时 TTS                   |
+| `coach.qa.text`                   | 文字问答                   |
+| `coach.qa.microphone`             | PTT 和本地 ASR             |
+| `coach.qa.wake-word`              | 唤醒词与常开麦克风         |
+| `coach.qa.voice-analysis`         | 获准语音/声音/情绪分析     |
+| `coach.qa.cloud-asr`              | 云端 ASR                   |
+| `coach.qa.cloud-llm`              | 云端回答增强               |
+| `coach.qa.cloud-tts`              | 云端语音                   |
+| `coach.history.sgp`               | SGP 历史增强               |
+| `coach.profile.longitudinal`      | 长期画像与训练计划         |
+| `coach.training.leaderboard`      | 匿名训练分位与排行榜       |
+| `coach.data.sample-upload`        | 用户主动贡献样本           |
+| `coach.mode.aram`                 | 极地大乱斗支持             |
+| `coach.mode.arena`                | 斗魂竞技场支持             |
+| `coach.mode.rotating`             | 轮换模式支持               |
+| `coach.mode.spectator`            | 观战教练支持               |
 
 ### 9.2 Gate
 
@@ -538,8 +567,11 @@ CoachVoiceMain
 - 证据失效到取消播放 p95 ≤200 ms；
 - 支持环境 1% low FPS 降幅 <5%，目标 <3%；
 - 关键实时播报 Precision 的 95% 下界 ≥98%；
+- 迷雾预测必须单独报告区域 top-k 命中率、路线命中率、意图 Precision/Recall、Brier score、ECE、覆盖率和撤销延迟；未完成独立回放评估时不得标记为正式可用；
+- 装备推荐的装备存在性、模式可用性、价格、合成路径和唯一限制合法率必须为 100%，补丁数据不匹配时停止推荐；
 - 无依据当前事实率单侧 95% 上界 <0.1%；
 - 原始画面、音频或密钥越权落盘/上传一次即停止相关能力；
+- 未经授权的进程访问、输入自动化、反作弊规避、他人语音/身份处理或受保护数据访问一次即停止相关能力并保全证据；
 - utility process crash-loop、采集黑帧、未知补丁和能力快照失效全部 fail-closed。
 
 ## 12. 负责人和变更流程

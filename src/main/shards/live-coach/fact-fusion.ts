@@ -248,6 +248,12 @@ const CHAMPION_ROLES_MAP: Record<
   swain: 'mage',
   taliyah: 'mage',
   twistedfate: 'mage',
+  teemo: 'mage',
+  rumble: 'mage',
+  gwen: 'mage',
+  morgana: 'mage',
+  kennen: 'mage',
+  mordekaiser: 'mage',
   velkoz: 'mage',
   vex: 'mage',
   vladimir: 'mage',
@@ -263,7 +269,6 @@ const CHAMPION_ROLES_MAP: Record<
   irelia: 'fighter',
   jax: 'fighter',
   kled: 'fighter',
-  mordekaiser: 'fighter',
   olaf: 'fighter',
   pantheon: 'fighter',
   riven: 'fighter',
@@ -668,17 +673,10 @@ export class FactFusionEngine {
       return
     }
 
-    // 确定英雄流派
-    let role = CHAMPION_ROLES_MAP[championNameClean]
-    if (!role && matchingPlayer?.position) {
-      const pos = matchingPlayer.position.toUpperCase()
-      if (pos === 'TOP' || pos === 'JUNGLE') role = 'fighter'
-      else if (pos === 'MIDDLE') role = 'mage'
-      else if (pos === 'BOTTOM') role = 'marksman'
-      else if (pos === 'UTILITY') role = 'support'
-    }
+    // 确定英雄流派（严格使用显式英雄配置，严禁仅凭位置强行推导流派！）
+    const role = CHAMPION_ROLES_MAP[championNameClean]
     if (!role) {
-      // 关键修复：未分类英雄不得默认使用 fighter 出装，应返回无推荐以防误导
+      // 关键修复：未显式配置流派的英雄一律返回无推荐，杜绝将 Teemo/Rumble/Gwen 等上单强行按分路归为战士出装
       this._latestItemGuidance = null
       return
     }
@@ -876,11 +874,11 @@ export class FactFusionEngine {
         conditions: [`已完成核心装备：${targetItemName}`]
       }
     } else {
-      // 检查是否有玩家买得起的未拥有组件（优先推荐买得起的组件）
-      const nextCompId = deductionResult.nextPurchasableItemIds[0] || chosenTarget.id
-      const nextCompDef = recipeEngine.getItem(nextCompId)
-      const nextCompName = nextCompDef ? nextCompDef.name : `Item_${nextCompId}`
-      const nextCompCost = nextCompDef ? nextCompDef.totalCost : netCost
+      // 关键修复：使用 recipeEngine 精确计算的 purchaseCost（扣除已拥有子组件后的实际购买/升级花费）
+      const opt = deductionResult.nextPurchasableOption
+      const nextCompId = opt ? opt.itemId : chosenTarget.id
+      const nextCompName = opt ? opt.name : targetItemName
+      const nextCompCost = opt ? opt.purchaseCost : netCost
 
       if (currentGold >= nextCompCost) {
         primaryPlan = {
@@ -889,7 +887,11 @@ export class FactFusionEngine {
           remainingGold: currentGold - nextCompCost,
           missingGold: 0,
           reasonCodes: ['CORE_COMPONENT_AFFORDABLE'],
-          conditions: [`合成 ${targetItemName} 组件：${nextCompName}`]
+          conditions: [
+            opt?.isCombineUpgrade
+              ? `合成进阶装备：${nextCompName}（升级费用 ${nextCompCost}g）`
+              : `合成 ${targetItemName} 组件：${nextCompName}（花费 ${nextCompCost}g）`
+          ]
         }
       } else {
         primaryPlan = {
@@ -898,7 +900,11 @@ export class FactFusionEngine {
           remainingGold: 0,
           missingGold: Math.max(0, nextCompCost - currentGold),
           reasonCodes: ['CORE_COMPONENT_PROGRESSION'],
-          conditions: [`合成 ${targetItemName} 组件：${nextCompName}`]
+          conditions: [
+            opt?.isCombineUpgrade
+              ? `合成进阶装备：${nextCompName}（升级费用 ${nextCompCost}g）`
+              : `合成 ${targetItemName} 组件：${nextCompName}（花费 ${nextCompCost}g）`
+          ]
         }
       }
     }

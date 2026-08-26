@@ -5,6 +5,7 @@ export type CoachCapabilityId =
   | 'coach.capture.screen'
   | 'coach.analyze.minimap-basic'
   | 'coach.analyze.minimap-advanced'
+  | 'coach.analyze.minimap-identity'
   | 'coach.analyze.fog-inference'
   | 'coach.guidance.item-purchase'
   | 'coach.guidance.micro'

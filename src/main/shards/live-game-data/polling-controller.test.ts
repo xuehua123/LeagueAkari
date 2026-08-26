@@ -6,7 +6,13 @@ describe('LiveGameDataPollingController', () => {
   function createMockContext() {
     let phase = 'None'
     let session: any = null
-    const reactionDisposers: Array<() => void> = []
+    const listeners: Array<() => void> = []
+
+    const triggerReaction = () => {
+      for (const listener of listeners) {
+        listener()
+      }
+    }
 
     return {
       leagueClient: {
@@ -27,16 +33,20 @@ describe('LiveGameDataPollingController', () => {
       mobxUtils: {
         reaction: vi.fn((fn, effect) => {
           let lastVal: any = undefined
-          const check = () => {
+          const check = async () => {
             const val = fn()
             if (JSON.stringify(val) !== JSON.stringify(lastVal)) {
               lastVal = val
-              effect(val)
+              await effect(val)
             }
           }
+          listeners.push(check)
+          // fire immediately
           check()
-          const disposer = () => {}
-          reactionDisposers.push(disposer)
+          const disposer = () => {
+            const idx = listeners.indexOf(check)
+            if (idx !== -1) listeners.splice(idx, 1)
+          }
           return disposer
         })
       },
@@ -54,6 +64,7 @@ describe('LiveGameDataPollingController', () => {
       setGameflow(newPhase: string, newSession: any = null) {
         phase = newPhase
         session = newSession
+        triggerReaction()
       }
     } as any
   }
@@ -77,31 +88,35 @@ describe('LiveGameDataPollingController', () => {
     controller.dispose()
   })
 
-  it('protects against race conditions when disposed while async request is pending', async () => {
+  it('protects against cross-session race condition when Game A request finishes after Game B starts', async () => {
     const ctx = createMockContext()
-    let resolveRequest: any = null
+    let resolvePatchRequestA: any = null
+
     ctx.leagueClient.http.request.mockImplementation(
       () =>
         new Promise((resolve) => {
-          resolveRequest = resolve
+          resolvePatchRequestA = resolve
         })
     )
 
     const controller = new LiveGameDataPollingController(ctx)
     controller.init()
 
-    // 触发 InProgress
-    ctx.setGameflow('InProgress', { gameData: { gameId: 12345 } })
+    // 1. 对局 A 启动 (InProgress, gameId: 10001)，发起异步补丁请求
+    ctx.setGameflow('InProgress', { gameData: { gameId: 10001 } })
+    // 2. 在对局 A 补丁请求尚未返回前，对局 A 结束并切换至对局 B (None / InProgress 20002)
+    ctx.setGameflow('None', null)
 
-    // 在异步请求完成前 dispose 控制器
-    controller.dispose()
-
-    // 随后请求返回
-    if (resolveRequest) {
-      resolveRequest({ data: '16.16.1' })
+    // 3. 对局 A 滞后的异步请求返回，断言：由于代数不一致，严禁启动对局 A 的轮询！
+    if (resolvePatchRequestA) {
+      resolvePatchRequestA({ data: '16.16.1' })
     }
+    await new Promise((r) => setTimeout(r, 10))
 
-    // 验证：由于 generation 改变，不会重新启动轮询
-    expect(ctx.state.setIsPolling).not.toHaveBeenCalled()
+    expect(ctx.logger.info).not.toHaveBeenCalledWith(
+      expect.stringContaining('Starting LiveGameData polling for session: 10001')
+    )
+
+    controller.dispose()
   })
 })

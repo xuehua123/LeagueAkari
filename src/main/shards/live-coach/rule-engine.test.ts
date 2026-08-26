@@ -646,7 +646,10 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
       patch: '16.16.1',
       fusion,
       enabledCategories: { warning: true, information: true, opportunity: true },
-      enabledCapabilities: new Set(['coach.analyze.minimap-basic']),
+      enabledCapabilities: new Set([
+        'coach.analyze.minimap-basic',
+        'coach.analyze.minimap-identity'
+      ]),
       currentTime: now
     })
 
@@ -834,7 +837,10 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
       patch: '16.16.1',
       fusion,
       enabledCategories: { warning: true, information: true, opportunity: true },
-      enabledCapabilities: new Set(['coach.analyze.minimap-basic']),
+      enabledCapabilities: new Set([
+        'coach.analyze.minimap-basic',
+        'coach.analyze.minimap-identity'
+      ]),
       currentTime: now
     })
     expect(fogCues.find((c) => c.ruleId === 'rule_basic_skills_and_tactics')).toBeDefined()
@@ -958,9 +964,9 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     const guidance = fusion.getItemPurchaseGuidance(now)
     expect(guidance).toBeDefined()
     expect(guidance?.championId).toBe(516)
-    // 验证推荐买得起的未拥有组件（第 2 个巨人腰带 1011），花费 900g
-    expect(guidance?.primaryPlan.itemIds).toEqual([1011])
-    expect(guidance?.primaryPlan.totalCost).toBe(900)
+    // 验证推荐买得起的未拥有组件（治疗宝珠 1006），花费 300g
+    expect(guidance?.primaryPlan.itemIds).toEqual([1006])
+    expect(guidance?.primaryPlan.totalCost).toBe(300)
     expect(guidance?.primaryPlan.missingGold).toBe(0)
   })
 
@@ -1096,7 +1102,10 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
       patch: '16.16.1',
       fusion,
       enabledCategories: { warning: true, information: true, opportunity: true },
-      enabledCapabilities: new Set(['coach.analyze.minimap-basic']),
+      enabledCapabilities: new Set([
+        'coach.analyze.minimap-basic',
+        'coach.analyze.minimap-identity'
+      ]),
       currentTime: now
     })
     expect(
@@ -1149,7 +1158,10 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
       patch: '16.16.1',
       fusion,
       enabledCategories: { warning: true, information: true, opportunity: true },
-      enabledCapabilities: new Set(['coach.analyze.minimap-basic']),
+      enabledCapabilities: new Set([
+        'coach.analyze.minimap-basic',
+        'coach.analyze.minimap-identity'
+      ]),
       currentTime: now + 100000
     })
     expect(anonymousCues.find((c) => c.ruleId === 'rule_basic_skills_and_tactics')).toBeDefined()
@@ -1175,7 +1187,10 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
       patch: '16.16.1',
       fusion,
       enabledCategories: { warning: true, information: true, opportunity: true },
-      enabledCapabilities: new Set(['coach.analyze.minimap-basic']),
+      enabledCapabilities: new Set([
+        'coach.analyze.minimap-basic',
+        'coach.analyze.minimap-identity'
+      ]),
       currentTime: now + 200000
     })
     expect(
@@ -1254,8 +1269,9 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
 
     const apGuidance = fusion.getItemPurchaseGuidance(now)
     expect(apGuidance).toBeDefined()
-    expect(apGuidance?.primaryPlan.itemIds).toEqual([3155]) // 优先推荐海克斯饮魔刀 3155 组件 (1300g)
-    expect(apGuidance?.primaryPlan.totalCost).toBe(1300)
+    // 验证优先推荐最基础可买起的散件（发光微粒 2022，250g）
+    expect(apGuidance?.primaryPlan.itemIds).toEqual([2022])
+    expect(apGuidance?.primaryPlan.totalCost).toBe(250)
     expect(apGuidance?.primaryPlan.conditions[0]).toContain('玛莫提乌斯之噬')
   })
 
@@ -1302,6 +1318,153 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     )
 
     // 非 16.16.1 补丁必须严格返回 null，杜绝错误指导
+    expect(fusion.getItemPurchaseGuidance(now)).toBeNull()
+  })
+
+  it('handles two Long Swords with 500g to complete Tiamat without false Long Sword recommendations', () => {
+    const fusion = new FactFusionEngine()
+    const now = 1700000000000
+
+    // 盖伦持有两把长剑 1036 (350g x 2)，合成挺进破坏者第 1 件大件提亚马特 3077 (1200g, 500g 合成费)
+    // 当前持有 600g (>= 500g)
+    // 验证：
+    // 1. 提亚马特 purchaseCost 精确为 500g，而不是 1200g；
+    // 2. 推荐购买提亚马特进阶装备（升级费用 500g），绝不重复推荐已被消费的两把长剑！
+    fusion.updateLiveGameSnapshot(
+      {
+        sessionId: 'sess_tiamat_upgrade',
+        patch: '16.16.1',
+        gameTimeSeconds: 400,
+        clock: { observedAt: now, receivedAt: now, sequence: 1 },
+        activePlayer: {
+          summonerName: 'GarenPlayer',
+          riotId: 'Garen#CN',
+          riotIdGameName: 'Garen',
+          riotIdTagLine: 'CN',
+          championName: 'Garen',
+          level: 6,
+          currentGold: 600,
+          team: 'ORDER',
+          abilities: {}
+        },
+        players: [
+          {
+            summonerName: 'GarenPlayer',
+            riotId: 'Garen#CN',
+            riotIdGameName: 'Garen',
+            riotIdTagLine: 'CN',
+            championName: 'Garen',
+            championId: 86,
+            team: 'ORDER',
+            position: 'TOP',
+            isDead: false,
+            respawnTimer: 0,
+            items: [
+              { itemID: 1036, count: 1 }, // 长剑 1
+              { itemID: 1036, count: 1 } // 长剑 2
+            ]
+          } as any
+        ],
+        events: [],
+        sourceHealth: []
+      },
+      now
+    )
+
+    const guidance = fusion.getItemPurchaseGuidance(now)
+    expect(guidance).toBeDefined()
+    expect(guidance?.primaryPlan.itemIds).toEqual([3077])
+    expect(guidance?.primaryPlan.totalCost).toBe(500)
+    expect(guidance?.primaryPlan.remainingGold).toBe(100) // 600 - 500 = 100
+    expect(guidance?.primaryPlan.conditions[0]).toContain('500g')
+  })
+
+  it('correctly maps Teemo TOP and Rumble TOP to AP Mage build and returns null for unconfigured champions', () => {
+    const fusion = new FactFusionEngine()
+    const now = 1700000000000
+
+    // 1. Teemo TOP 必须推荐 AP 法系核心（卢登/影焰/法穿鞋），严禁误归为战士 (Stridebreaker/BC)
+    fusion.updateLiveGameSnapshot(
+      {
+        sessionId: 'sess_teemo_top',
+        patch: '16.16.1',
+        gameTimeSeconds: 300,
+        clock: { observedAt: now, receivedAt: now, sequence: 1 },
+        activePlayer: {
+          summonerName: 'TeemoPlayer',
+          riotId: 'Teemo#CN',
+          riotIdGameName: 'Teemo',
+          riotIdTagLine: 'CN',
+          championName: 'Teemo',
+          level: 5,
+          currentGold: 1300,
+          team: 'ORDER',
+          abilities: {}
+        },
+        players: [
+          {
+            summonerName: 'TeemoPlayer',
+            riotId: 'Teemo#CN',
+            riotIdGameName: 'Teemo',
+            riotIdTagLine: 'CN',
+            championName: 'Teemo',
+            championId: 17,
+            team: 'ORDER',
+            position: 'TOP', // 虽然走 TOP，但绝不能推战士装
+            isDead: false,
+            respawnTimer: 0,
+            items: []
+          } as any
+        ],
+        events: [],
+        sourceHealth: []
+      },
+      now
+    )
+
+    const teemoGuidance = fusion.getItemPurchaseGuidance(now)
+    expect(teemoGuidance).toBeDefined()
+    expect(teemoGuidance?.primaryPlan.conditions[0]).toContain('卢登的回声') // 官方 16.16.1 中文名称 6655 卢登的回声
+
+    // 2. 未在配置表中的未知英雄直接返回 null，杜绝凭 position 强行推导
+    fusion.updateLiveGameSnapshot(
+      {
+        sessionId: 'sess_unconfigured_champ',
+        patch: '16.16.1',
+        gameTimeSeconds: 300,
+        clock: { observedAt: now, receivedAt: now, sequence: 1 },
+        activePlayer: {
+          summonerName: 'HeroPlayer',
+          riotId: 'Hero#CN',
+          riotIdGameName: 'Hero',
+          riotIdTagLine: 'CN',
+          championName: 'CustomUnlistedChampionXYZ',
+          level: 5,
+          currentGold: 1300,
+          team: 'ORDER',
+          abilities: {}
+        },
+        players: [
+          {
+            summonerName: 'HeroPlayer',
+            riotId: 'Hero#CN',
+            riotIdGameName: 'Hero',
+            riotIdTagLine: 'CN',
+            championName: 'CustomUnlistedChampionXYZ',
+            championId: 99999,
+            team: 'ORDER',
+            position: 'TOP',
+            isDead: false,
+            respawnTimer: 0,
+            items: []
+          } as any
+        ],
+        events: [],
+        sourceHealth: []
+      },
+      now
+    )
+
     expect(fusion.getItemPurchaseGuidance(now)).toBeNull()
   })
 

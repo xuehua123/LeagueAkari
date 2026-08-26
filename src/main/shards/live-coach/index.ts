@@ -174,15 +174,15 @@ export class LiveCoachMain implements IAkariShardInitDispose {
     if (buildChannel === 'internal') {
       this._capabilityController.setGates(true, true)
     } else {
-      const gateA = this._featureGating.isEnabled('live-coach.fog-inference', false)
-      const gateB = this._featureGating.isEnabled('live-coach.item-guidance', false)
+      const gateA = this._featureGating.isEnabled('live-coach.capture', false)
+      const gateB = this._featureGating.isEnabled('live-coach.realtime-output', false)
       this._capabilityController.setGates(gateA, gateB)
     }
 
     this._featureGatingDisposer = this._mobxUtils.reaction(
       () => ({
-        gateA: this._featureGating.isEnabled('live-coach.fog-inference', false),
-        gateB: this._featureGating.isEnabled('live-coach.item-guidance', false)
+        gateA: this._featureGating.isEnabled('live-coach.capture', false),
+        gateB: this._featureGating.isEnabled('live-coach.realtime-output', false)
       }),
       ({ gateA, gateB }) => {
         if (this._capabilityController.buildChannel === 'public') {

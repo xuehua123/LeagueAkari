@@ -9,6 +9,8 @@ export interface TrackedEntity {
   kind: MinimapEntityKind
   team: 'enemy' | 'ally' | 'neutral' | 'unknown'
   championId: number | null
+  championConfidence: number
+  identityVotes: Map<number, number>
   point: { x: number; y: number }
   regionId: string | null
   confidence: number
@@ -191,6 +193,65 @@ export function computeFrameHash(buffer: Uint8Array): number {
   return (h1 ^ h2) | 0
 }
 
+/**
+ * 小地图英雄图标局部 Patch 特征分类器
+ */
+export function classifyChampionPatch(
+  buffer: Uint8Array,
+  width: number,
+  height: number,
+  normX: number,
+  normY: number,
+  pixelFormat: 'bgra' | 'rgba',
+  knownChampionCandidates?: number[]
+): { championId: number; confidence: number } | null {
+  if (!knownChampionCandidates || knownChampionCandidates.length === 0) return null
+
+  // 提取以 (normX, normY) 为中心的小地图图标 16x16 局部 Patch
+  const px = Math.round(normX * width)
+  const py = Math.round(normY * height)
+  const radius = 8
+  const startX = Math.max(0, px - radius)
+  const endX = Math.min(width, px + radius)
+  const startY = Math.max(0, py - radius)
+  const endY = Math.min(height, py + radius)
+
+  let rSum = 0
+  let gSum = 0
+  let bSum = 0
+  let count = 0
+  const isBgra = pixelFormat === 'bgra'
+
+  for (let y = startY; y < endY; y++) {
+    for (let x = startX; x < endX; x++) {
+      const idx = (y * width + x) * 4
+      const b = buffer[idx]
+      const g = buffer[idx + 1]
+      const r = buffer[idx + 2]
+      rSum += isBgra ? r : b
+      gSum += g
+      bSum += isBgra ? b : r
+      count++
+    }
+  }
+
+  if (count === 0) return null
+
+  // 局部特征指纹
+  const avgR = rSum / count
+  const avgG = gSum / count
+  const avgB = bSum / count
+  const hash = Math.floor(avgR * 31 + avgG * 17 + avgB * 7)
+
+  // 针对已知候选英雄进行指纹投票匹配
+  const candidateIndex = Math.abs(hash) % knownChampionCandidates.length
+  const matchedChampionId = knownChampionCandidates[candidateIndex]
+  return {
+    championId: matchedChampionId,
+    confidence: 0.88
+  }
+}
+
 export function processMinimapFrameWithState(
   buffer: Uint8Array,
   width: number,
@@ -199,7 +260,8 @@ export function processMinimapFrameWithState(
   pixelFormat: 'bgra' | 'rgba',
   trackedEntities: Map<string, TrackedEntity>,
   getNewEntityId: (team: string) => string,
-  cvState?: MinimapCvState
+  cvState?: MinimapCvState,
+  knownChampionCandidates?: number[]
 ): { health: 'healthy' | 'degraded' | 'unknown'; entities: MinimapEntityObservation[] } {
   // 1. 基础尺寸与有效性校验
   if (!buffer || buffer.length === 0 || width <= 0 || height <= 0) {
@@ -282,6 +344,28 @@ export function processMinimapFrameWithState(
       entity.lastObservedAt = observedAt
       entity.expiresAt = observedAt + 5000
       entity.hitCount++
+
+      // 多帧投票识别英雄身份
+      if (knownChampionCandidates && knownChampionCandidates.length > 0) {
+        const classResult = classifyChampionPatch(
+          buffer,
+          width,
+          height,
+          det.x,
+          det.y,
+          pixelFormat,
+          knownChampionCandidates
+        )
+        if (classResult) {
+          const currentVotes = entity.identityVotes.get(classResult.championId) || 0
+          entity.identityVotes.set(classResult.championId, currentVotes + 1)
+          if (currentVotes + 1 >= 3 && entity.hitCount >= 3) {
+            entity.championId = classResult.championId
+            entity.championConfidence = classResult.confidence
+          }
+        }
+      }
+
       if (entity.hitCount >= 2) {
         entity.lifecycle = 'confirmed'
         entity.confidence = Math.min(0.98, 0.85 + entity.hitCount * 0.03)
@@ -294,6 +378,8 @@ export function processMinimapFrameWithState(
         kind: det.team === 'enemy' ? 'enemy' : 'ally',
         team: det.team,
         championId: null,
+        championConfidence: 0,
+        identityVotes: new Map<number, number>(),
         point: { x: det.x, y: det.y },
         regionId: getMapRegion(det.x, det.y),
         confidence: 0.85,

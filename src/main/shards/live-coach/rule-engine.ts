@@ -459,7 +459,12 @@ export class RuleBasicSkillsAndTactics implements CoachRule {
 
   evaluate(ctx: RuleEvaluationContext): CoachCue | null {
     if (!ctx.enabledCategories[this.category]) return null
-    if (ctx.enabledCapabilities && !ctx.enabledCapabilities.has('coach.analyze.minimap-basic')) {
+    // 关键修复：该规则严格依赖小地图基础分析能力与英雄身份识别能力（身份识别未就绪前 fail-closed，严禁断言打野在迷雾中）
+    if (
+      ctx.enabledCapabilities &&
+      (!ctx.enabledCapabilities.has('coach.analyze.minimap-basic') ||
+        !ctx.enabledCapabilities.has('coach.analyze.minimap-identity'))
+    ) {
       return null
     }
 

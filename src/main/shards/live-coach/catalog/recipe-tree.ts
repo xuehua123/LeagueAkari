@@ -1,4 +1,14 @@
-import { ItemCatalogSnapshot, RiotItemCatalog16_16_1 } from './items-16-16-1'
+import { RiotItemCatalog, RiotItemCatalog16_16_1 } from './items-16-16-1'
+
+export interface PurchasableItemOption {
+  itemId: number
+  name: string
+  purchaseCost: number
+  missingGold: number
+  quantity?: number
+  isDirectTarget: boolean
+  isCombineUpgrade: boolean
+}
 
 export interface ItemDeductionResult {
   targetItemId: number
@@ -8,14 +18,25 @@ export interface ItemDeductionResult {
   netCost: number
   missingGold: number
   consumedItemIds: number[]
-  nextPurchasableItemIds: number[]
+  purchasableOptions: PurchasableItemOption[]
+  nextPurchasableOption: PurchasableItemOption | null
   isCompleted: boolean
 }
 
-export class RecipeTreeEngine {
-  private _catalog: ItemCatalogSnapshot
+export interface RecipeTreeNode {
+  itemId: number
+  name: string
+  totalCost: number
+  baseCost: number
+  children: RecipeTreeNode[]
+  isFulfilled: boolean
+  remainingPurchaseCost: number
+}
 
-  constructor(catalog: ItemCatalogSnapshot = RiotItemCatalog16_16_1) {
+export class RecipeTreeEngine {
+  private _catalog: RiotItemCatalog
+
+  constructor(catalog: RiotItemCatalog = RiotItemCatalog16_16_1) {
     this._catalog = catalog
   }
 
@@ -28,11 +49,10 @@ export class RecipeTreeEngine {
   }
 
   /**
-   * 递归多重集合装备树抵扣计算 (Recursive Multiset Item Tree Consumption)
-   * 完美支持：
-   * 1. 任意深度下级组件（如长剑 1036、红水晶 1028 抵扣挺进破坏者/黑切/玛莫提乌斯）
-   * 2. 重复组件多重集合（如狂徒铠甲持有多条巨人腰带 1011）
-   * 3. 贪心优先抵扣最高层级组件，未拥有时递归抵扣子组件
+   * 递归多重集合装备树抵扣与升级费用计算 (Recursive Multiset Item Tree Consumption & Purchase Cost)
+   * 1. 递归消费背包物品多重集合；
+   * 2. 计算每个树节点的剩余购买/升级花费 (remainingPurchaseCost = baseCost + 未满足子组件成本)；
+   * 3. 精准返回可购买组件及其实际所需费用 purchaseCost，杜绝重复推荐已拥有组件或使用全额总价。
    */
   public calculateNetCost(
     targetItemId: number,
@@ -49,7 +69,8 @@ export class RecipeTreeEngine {
         netCost: 0,
         missingGold: 0,
         consumedItemIds: [],
-        nextPurchasableItemIds: [],
+        purchasableOptions: [],
+        nextPurchasableOption: null,
         isCompleted: false
       }
     }
@@ -71,100 +92,161 @@ export class RecipeTreeEngine {
         netCost: 0,
         missingGold: 0,
         consumedItemIds: [targetItemId],
-        nextPurchasableItemIds: [],
+        purchasableOptions: [],
+        nextPurchasableOption: null,
         isCompleted: true
       }
     }
 
     const consumedItemIds: number[] = []
-    let totalDeductedCost = 0
-    const unfulfilledComponents: number[] = []
 
-    // 3. 递归消费配方树节点
-    const consumeNode = (itemId: number): boolean => {
-      const currentAvailable = availableItems.get(itemId) || 0
-      if (currentAvailable > 0) {
-        availableItems.set(itemId, currentAvailable - 1)
-        consumedItemIds.push(itemId)
-        const def = this.getItem(itemId)
-        totalDeductedCost += def ? def.totalCost : 0
-        return true
-      }
+    // 3. 递归构建配方树并消费库存
+    const buildNode = (id: number): RecipeTreeNode => {
+      const def = this.getItem(id)
+      const name = def?.name ?? `Item_${id}`
+      const totalCost = def?.totalCost ?? 0
+      const baseCost = def?.baseCost ?? totalCost
 
-      const itemDef = this.getItem(itemId)
-      if (!itemDef || !itemDef.from || itemDef.from.length === 0) {
-        return false
-      }
-
-      // 玩家没有该合成件，尝试递归消费其子组件
-      let anyChildConsumed = false
-      for (const childId of itemDef.from) {
-        if (consumeNode(childId)) {
-          anyChildConsumed = true
+      // A. 若背包中持有该组件，则直接消费该组件
+      const availableCount = availableItems.get(id) || 0
+      if (availableCount > 0) {
+        availableItems.set(id, availableCount - 1)
+        consumedItemIds.push(id)
+        return {
+          itemId: id,
+          name,
+          totalCost,
+          baseCost,
+          children: [],
+          isFulfilled: true,
+          remainingPurchaseCost: 0
         }
       }
-      return anyChildConsumed
-    }
 
-    // 针对目标装备的直接合成路线进行消费
-    if (targetItem.from && targetItem.from.length > 0) {
-      for (const compId of targetItem.from) {
-        const compDef = this.getItem(compId)
-        const compCount = availableItems.get(compId) || 0
-        if (compCount > 0) {
-          availableItems.set(compId, compCount - 1)
-          consumedItemIds.push(compId)
-          totalDeductedCost += compDef ? compDef.totalCost : 0
-        } else {
-          // 尝试子组件消费
-          if (compDef && compDef.from && compDef.from.length > 0) {
-            for (const childId of compDef.from) {
-              consumeNode(childId)
-            }
-          }
-          unfulfilledComponents.push(compId)
+      // B. 若为复合装备，递归消费子组件
+      if (def && def.from && def.from.length > 0) {
+        const children = def.from.map((childId) => buildNode(childId))
+        const childrenRemainingCost = children.reduce((sum, c) => sum + c.remainingPurchaseCost, 0)
+        const remainingPurchaseCost = baseCost + childrenRemainingCost
+
+        return {
+          itemId: id,
+          name,
+          totalCost,
+          baseCost,
+          children,
+          isFulfilled: false,
+          remainingPurchaseCost
         }
+      }
+
+      // C. 基础组件未拥有
+      return {
+        itemId: id,
+        name,
+        totalCost,
+        baseCost,
+        children: [],
+        isFulfilled: false,
+        remainingPurchaseCost: totalCost
       }
     }
 
-    const netCost = Math.max(0, targetItem.totalCost - totalDeductedCost)
+    const rootNode = buildNode(targetItemId)
+    const netCost = rootNode.remainingPurchaseCost
+    const deductedCost = Math.max(0, targetItem.totalCost - netCost)
     const missingGold = Math.max(0, netCost - currentGold)
 
-    // 计算下一步推荐购买的组件（优先推荐买得起的未拥有组件）
-    const nextPurchasableItemIds: number[] = []
-    for (const compId of unfulfilledComponents) {
-      const compDef = this.getItem(compId)
-      if (compDef) {
-        // 如果买得起该直接组件
-        if (currentGold >= compDef.totalCost) {
-          nextPurchasableItemIds.push(compId)
-        } else if (compDef.from && compDef.from.length > 0) {
-          // 推荐买得起的子组件
-          for (const subId of compDef.from) {
-            const subDef = this.getItem(subId)
-            if (subDef && currentGold >= subDef.totalCost) {
-              nextPurchasableItemIds.push(subId)
-            }
-          }
-        } else {
-          nextPurchasableItemIds.push(compId)
+    // 4. 收集所有未满足节点的购买选项（携带精准 purchaseCost）
+    const rawOptions: PurchasableItemOption[] = []
+
+    const collectOptions = (node: RecipeTreeNode) => {
+      if (node.isFulfilled) return
+
+      const hasChildren = node.children.length > 0
+      const allChildrenFulfilled = hasChildren && node.children.every((c) => c.isFulfilled)
+
+      if (allChildrenFulfilled) {
+        // 子组件已全齐，可以合成为该节点（仅需支付 baseCost 合成费）
+        rawOptions.push({
+          itemId: node.itemId,
+          name: node.name,
+          purchaseCost: node.remainingPurchaseCost,
+          missingGold: Math.max(0, node.remainingPurchaseCost - currentGold),
+          isDirectTarget: node.itemId === targetItemId,
+          isCombineUpgrade: true
+        })
+        return
+      }
+
+      if (hasChildren) {
+        for (const child of node.children) {
+          collectOptions(child)
         }
+        // 若玩家买得起整件/中间件，也作为备选
+        rawOptions.push({
+          itemId: node.itemId,
+          name: node.name,
+          purchaseCost: node.remainingPurchaseCost,
+          missingGold: Math.max(0, node.remainingPurchaseCost - currentGold),
+          isDirectTarget: node.itemId === targetItemId,
+          isCombineUpgrade: false
+        })
+      } else {
+        // 基础散件
+        rawOptions.push({
+          itemId: node.itemId,
+          name: node.name,
+          purchaseCost: node.remainingPurchaseCost,
+          missingGold: Math.max(0, node.remainingPurchaseCost - currentGold),
+          isDirectTarget: node.itemId === targetItemId,
+          isCombineUpgrade: false
+        })
       }
     }
 
-    if (nextPurchasableItemIds.length === 0 && unfulfilledComponents.length > 0) {
-      nextPurchasableItemIds.push(unfulfilledComponents[0])
+    collectOptions(rootNode)
+
+    // 去重并按优先级排序
+    const optionMap = new Map<number, PurchasableItemOption>()
+    for (const opt of rawOptions) {
+      const existing = optionMap.get(opt.itemId)
+      if (!existing || opt.purchaseCost < existing.purchaseCost) {
+        optionMap.set(opt.itemId, opt)
+      }
     }
+
+    const purchasableOptions = Array.from(optionMap.values())
+
+    // 排序逻辑：
+    // 1. 如果买得起直接目标装备，目标装备排第 1
+    // 2. 如果已满足子组件可以合成进阶装备且买得起合成费，进阶装备优先
+    // 3. 买得起的散件/组件优先
+    // 4. 金币差额最小的组件优先
+    purchasableOptions.sort((a, b) => {
+      if (a.isDirectTarget && a.purchaseCost <= currentGold) return -1
+      if (b.isDirectTarget && b.purchaseCost <= currentGold) return 1
+      if (a.isCombineUpgrade && a.purchaseCost <= currentGold && !b.isCombineUpgrade) return -1
+      if (b.isCombineUpgrade && b.purchaseCost <= currentGold && !a.isCombineUpgrade) return 1
+      const aAffordable = a.purchaseCost <= currentGold
+      const bAffordable = b.purchaseCost <= currentGold
+      if (aAffordable && !bAffordable) return -1
+      if (!aAffordable && bAffordable) return 1
+      return a.purchaseCost - b.purchaseCost
+    })
+
+    const nextPurchasableOption = purchasableOptions[0] || null
 
     return {
       targetItemId,
       targetItemName: targetItem.name,
       totalOriginalCost: targetItem.totalCost,
-      deductedCost: totalDeductedCost,
+      deductedCost,
       netCost,
       missingGold,
       consumedItemIds,
-      nextPurchasableItemIds: Array.from(new Set(nextPurchasableItemIds)),
+      purchasableOptions,
+      nextPurchasableOption,
       isCompleted: netCost === 0
     }
   }

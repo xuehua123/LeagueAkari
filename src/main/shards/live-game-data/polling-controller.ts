@@ -20,7 +20,9 @@ export class LiveGameDataPollingController {
   private _isPollingActive = false
   private _currentSessionId = ''
   private _currentPatch = ''
-  private _generation = 0
+  private _phaseLookupGeneration = 0
+  private _pollingGeneration = 0
+  private _abortController: AbortController | null = null
   private _gameflowDisposer: (() => void) | null = null
 
   constructor(private readonly _context: LiveGameDataMainContext) {
@@ -35,7 +37,7 @@ export class LiveGameDataPollingController {
         session: this._context.leagueClient.data.gameflow.session
       }),
       async ({ phase, session }) => {
-        const generation = ++this._generation
+        const generation = ++this._phaseLookupGeneration
 
         if (phase === 'InProgress') {
           const sessionId = session?.gameData?.gameId
@@ -77,9 +79,9 @@ export class LiveGameDataPollingController {
             }
           }
 
-          // 竞态保护：如果异步请求返回时 generation 改变或离开了当前对局，直接丢弃，严禁重新启动轮询
+          // 竞态保护：如果异步请求返回时 phaseLookupGeneration 改变或离开了当前对局，直接丢弃，严禁重新启动轮询
           if (
-            generation !== this._generation ||
+            generation !== this._phaseLookupGeneration ||
             this._context.leagueClient.data.gameflow.phase !== 'InProgress'
           ) {
             return
@@ -100,7 +102,8 @@ export class LiveGameDataPollingController {
   }
 
   public dispose(): void {
-    this._generation++
+    this._phaseLookupGeneration++
+    this._pollingGeneration++
     this.stopPolling()
     if (this._gameflowDisposer) {
       this._gameflowDisposer()
@@ -130,6 +133,7 @@ export class LiveGameDataPollingController {
     this._currentSessionId = sessionId
     this._currentPatch = patch
     this._isPollingActive = true
+    this._pollingGeneration++
     this._loader.resetHealth()
     this._context.state.setIsPolling(true)
 
@@ -143,23 +147,34 @@ export class LiveGameDataPollingController {
       return
     }
 
-    this._generation++
+    this._pollingGeneration++
     this._isPollingActive = false
+
+    if (this._abortController) {
+      try {
+        this._abortController.abort()
+      } catch {
+        // ignore
+      }
+      this._abortController = null
+    }
+
     if (this._timer) {
       clearTimeout(this._timer)
       this._timer = null
     }
 
-    this._context.state.reset(this._currentSessionId)
+    const previousSessionId = this._currentSessionId
+    this._currentSessionId = ''
+
+    this._context.state.reset(previousSessionId)
     this._loader.resetHealth()
 
-    this._context.logger.info(`Stopped LiveGameData polling for session: ${this._currentSessionId}`)
+    this._context.logger.info(`Stopped LiveGameData polling for session: ${previousSessionId}`)
 
     // Broadcast reset snapshot to all subscribers
-    const resetSnapshot = createInitialSnapshot(this._currentSessionId)
+    const resetSnapshot = createInitialSnapshot(previousSessionId)
     this._notifyAllSubscribers(resetSnapshot)
-
-    this._currentSessionId = ''
   }
 
   private _scheduleNextPoll(delayMs: number): void {
@@ -172,8 +187,16 @@ export class LiveGameDataPollingController {
       this._timer = null
     }
 
+    const currentPollingGen = this._pollingGeneration
+    const currentSessionId = this._currentSessionId
+
     this._timer = setTimeout(async () => {
-      if (!this._isPollingActive) {
+      // 校验当前轮询代数与会话一致性
+      if (
+        !this._isPollingActive ||
+        this._pollingGeneration !== currentPollingGen ||
+        this._currentSessionId !== currentSessionId
+      ) {
         return
       }
 
@@ -186,6 +209,16 @@ export class LiveGameDataPollingController {
             url: '/lol-patch/v1/game-version',
             method: 'GET'
           })
+
+          // 异步等待后二次校验代数与会话
+          if (
+            !this._isPollingActive ||
+            this._pollingGeneration !== currentPollingGen ||
+            this._currentSessionId !== currentSessionId
+          ) {
+            return
+          }
+
           const versionStr =
             typeof res.data === 'string'
               ? res.data
@@ -207,11 +240,29 @@ export class LiveGameDataPollingController {
         }
       }
 
+      // 再次校验代数
+      if (
+        !this._isPollingActive ||
+        this._pollingGeneration !== currentPollingGen ||
+        this._currentSessionId !== currentSessionId
+      ) {
+        return
+      }
+
       try {
         const snapshot = await this._loader.fetchSnapshot(
           this._currentSessionId,
           this._currentPatch
         )
+
+        // 异步等待返回后三次严格校验代数与会话：严禁跨局脏写！
+        if (
+          !this._isPollingActive ||
+          this._pollingGeneration !== currentPollingGen ||
+          this._currentSessionId !== currentSessionId
+        ) {
+          return
+        }
 
         if (snapshot) {
           this._context.state.setSnapshot(snapshot)
@@ -222,6 +273,13 @@ export class LiveGameDataPollingController {
           this._scheduleNextPoll(3000)
         }
       } catch (err) {
+        if (
+          !this._isPollingActive ||
+          this._pollingGeneration !== currentPollingGen ||
+          this._currentSessionId !== currentSessionId
+        ) {
+          return
+        }
         this._context.logger.warn(`Error during LiveGameData poll tick: ${formatError(err)}`)
         this._scheduleNextPoll(3000)
       }

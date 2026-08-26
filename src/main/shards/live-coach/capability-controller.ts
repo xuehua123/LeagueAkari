@@ -102,14 +102,22 @@ export class LiveCoachCapabilityController {
       unavailable['coach.capture.screen'] = 'capture-stalled'
     }
 
-    // 6. Public 构建通道 Gate A / Gate B 门禁评估
+    // 6. Public 构建通道 Gate A / Gate B 门禁评估（严格依据技术决策冻结文档）
     if (this._buildChannel === 'public') {
       if (!this._gateAEnabled) {
+        // Gate A: 实时采集与实时分析能力
+        unavailable['coach.capture.screen'] = 'capability-disabled'
+        unavailable['coach.analyze.minimap-basic'] = 'capability-disabled'
+        unavailable['coach.analyze.minimap-advanced'] = 'capability-disabled'
+        unavailable['coach.analyze.minimap-identity'] = 'capability-disabled'
         unavailable['coach.analyze.fog-inference'] = 'capability-disabled'
         unavailable['coach.communication.ping'] = 'capability-disabled'
       }
       if (!this._gateBEnabled) {
-        unavailable['coach.guidance.item-purchase'] = 'capability-disabled'
+        // Gate B: 实时字幕、声音、语音、提示等实时输出能力
+        unavailable['coach.output.subtitle'] = 'capability-disabled'
+        unavailable['coach.output.sound'] = 'capability-disabled'
+        unavailable['coach.output.tts'] = 'capability-disabled'
       }
     }
 
@@ -119,6 +127,7 @@ export class LiveCoachCapabilityController {
       'coach.capture.screen',
       'coach.analyze.minimap-basic',
       'coach.analyze.minimap-advanced',
+      'coach.analyze.minimap-identity',
       'coach.analyze.fog-inference',
       'coach.guidance.item-purchase',
       'coach.communication.ping',

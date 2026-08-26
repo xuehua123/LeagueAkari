@@ -73,20 +73,37 @@ describe('LiveCoachCapabilityController', () => {
     // 初始状态评估
     controller.evaluateCapabilities(11, 420, '16.16.1', { roiHealth: 'healthy' })
 
-    // 1. 关闭 Gate A (fog-inference disabled)，Gate B 开启 (item-purchase enabled)
+    // 1. 关闭 Gate A (实时采集与分析能力禁用)，Gate B 开启
     controller.setGates(false, true)
 
     expect(ctx.state.setCapability).toHaveBeenLastCalledWith(
-      expect.not.arrayContaining(['coach.analyze.fog-inference']),
-      expect.objectContaining({ 'coach.analyze.fog-inference': 'capability-disabled' })
+      expect.not.arrayContaining([
+        'coach.capture.screen',
+        'coach.analyze.minimap-basic',
+        'coach.analyze.minimap-advanced',
+        'coach.analyze.minimap-identity',
+        'coach.analyze.fog-inference'
+      ]),
+      expect.objectContaining({
+        'coach.capture.screen': 'capability-disabled',
+        'coach.analyze.minimap-basic': 'capability-disabled',
+        'coach.analyze.fog-inference': 'capability-disabled'
+      })
     )
 
-    // 2. 关闭 Gate B (item-purchase disabled)，Gate A 开启
+    // 2. 关闭 Gate B (实时输出能力禁用)，Gate A 开启
     controller.setGates(true, false)
 
     expect(ctx.state.setCapability).toHaveBeenLastCalledWith(
-      expect.not.arrayContaining(['coach.guidance.item-purchase']),
-      expect.objectContaining({ 'coach.guidance.item-purchase': 'capability-disabled' })
+      expect.not.arrayContaining([
+        'coach.output.subtitle',
+        'coach.output.sound',
+        'coach.output.tts'
+      ]),
+      expect.objectContaining({
+        'coach.output.subtitle': 'capability-disabled',
+        'coach.output.tts': 'capability-disabled'
+      })
     )
   })
 })

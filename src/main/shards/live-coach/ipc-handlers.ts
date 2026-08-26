@@ -21,7 +21,7 @@ export class LiveCoachIpcHandlers {
 
     ipc.onCall(namespace, 'startInternalSession', async (_e, options: any = {}) => {
       const sessionId = options.sessionId || `manual_${Date.now()}`
-      this._sessionController.startSession(sessionId, 11, 420, '14.15.1')
+      this._sessionController.startSession(sessionId, 11, 420, options.patch || '16.16.1')
       return { success: true, sessionId }
     })
 

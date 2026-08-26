@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   TrackedEntity,
+  computeFrameHash,
   extractConnectedComponents,
   getMapRegion,
   processMinimapFrameWithState
@@ -218,5 +219,61 @@ describe('Minimap Observer CV & Tracking Algorithms (minimap-cv)', () => {
     )
     expect(frozenRes.health).toBe('degraded')
     expect(frozenRes.entities).toEqual([])
+  })
+
+  it('differentiates small 5x5 icon movements in a 250x250 frame and resets frozen counter without false degradation', () => {
+    const width = 250
+    const height = 250
+    const frameA = new Uint8Array(width * height * 4)
+    // 填充底图纹理（高方差真实小地图底色）
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 4
+        const val = ((x * 7 + y * 13) % 180) + 30
+        frameA[idx] = val
+        frameA[idx + 1] = (val * 2) % 255
+        frameA[idx + 2] = (val * 3) % 255
+        frameA[idx + 3] = 255
+      }
+    }
+
+    const frameB = new Uint8Array(frameA)
+    // 在 (120, 120) 处绘制一个 5x5 的小英雄图标移动
+    for (let y = 120; y < 125; y++) {
+      for (let x = 120; x < 125; x++) {
+        const idx = (y * width + x) * 4
+        frameB[idx] = 255 // 改变像素
+        frameB[idx + 1] = 0
+        frameB[idx + 2] = 0
+        frameB[idx + 3] = 255
+      }
+    }
+
+    // 验证全量 32-bit 双哈希能够精确捕获 5x5 小图标运动，产生不同哈希值
+    const hashA = computeFrameHash(frameA)
+    const hashB = computeFrameHash(frameB)
+    expect(hashA).not.toBe(hashB)
+
+    const trackedEntities = new Map<string, TrackedEntity>()
+    const getNewEntityId = (team: string) => `track_${team}_1`
+    const cvState = {
+      consecutiveFrozenFrames: 10,
+      lastFrameHash: hashA
+    }
+
+    // 传入发生运动的 frameB，验证连续冻结帧计数器被成功重置为 1
+    const res = processMinimapFrameWithState(
+      frameB,
+      width,
+      height,
+      Date.now(),
+      'bgra',
+      trackedEntities,
+      getNewEntityId,
+      cvState
+    )
+    expect(cvState.consecutiveFrozenFrames).toBe(1)
+    expect(cvState.lastFrameHash).toBe(hashB)
+    expect(res.health).toBe('healthy')
   })
 })

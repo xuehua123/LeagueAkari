@@ -27,6 +27,8 @@ export class LiveGameDataPollingController {
   }
 
   public init(): void {
+    let currentPollingToken = 0
+
     // Watch gameflow phase changes
     this._gameflowDisposer = this._context.mobxUtils.reaction(
       () => ({
@@ -34,6 +36,8 @@ export class LiveGameDataPollingController {
         session: this._context.leagueClient.data.gameflow.session
       }),
       async ({ phase, session }) => {
+        const token = ++currentPollingToken
+
         if (phase === 'InProgress') {
           const sessionId = session?.gameData?.gameId
             ? String(session.gameData.gameId)
@@ -52,12 +56,19 @@ export class LiveGameDataPollingController {
 
           if (!patch) {
             try {
-              const res = await this._context.leagueClient.http.request<{ version?: string }>({
-                url: '/system/v1/builds',
+              // 使用已有正确 LCU 端点 /lol-patch/v1/game-version
+              const res = await this._context.leagueClient.http.request<
+                string | { version?: string; gameVersion?: string }
+              >({
+                url: '/lol-patch/v1/game-version',
                 method: 'GET'
               })
-              if (res.data?.version) {
-                const parts = res.data.version.split('.')
+              const versionStr =
+                typeof res.data === 'string'
+                  ? res.data
+                  : res.data?.version || res.data?.gameVersion || ''
+              if (versionStr) {
+                const parts = versionStr.split('.')
                 if (parts.length >= 2) {
                   patch = `${parts[0]}.${parts[1]}.1`
                 }
@@ -67,8 +78,17 @@ export class LiveGameDataPollingController {
             }
           }
 
+          // 竞态保护：如果异步请求返回时 phase 已经改变或离开了当前对局，直接丢弃，严禁重新启动轮询
+          if (
+            token !== currentPollingToken ||
+            this._context.leagueClient.data.gameflow.phase !== 'InProgress'
+          ) {
+            return
+          }
+
+          // 如果仍未获取到有效 patch，设为 'unknown'（严禁伪造版本导致错误出装）
           if (!patch) {
-            patch = '16.16.1' // 默认权威补丁版本
+            patch = 'unknown'
           }
 
           this.startPolling(sessionId, patch)

@@ -377,7 +377,7 @@ export class FactFusionEngine {
         source: 'live-client-data',
         kind: 'player-economy-inventory',
         confidence: 1,
-        patch: snapshot.patch || '14.15.1',
+        patch: snapshot.patch || '16.16.1',
         clock: { observedAt: now, receivedAt: now, sequence: 1 },
         freshness: { expiresAt: now + 35000, state: 'fresh' },
         payload: snapshot.activePlayer
@@ -658,9 +658,9 @@ export class FactFusionEngine {
       return
     }
 
-    // 补丁有效性校验：若对局补丁无法识别或为不兼容版本，停用推荐以保证绝对准确
-    const patch = snapshot.patch || '16.16.1'
-    if (!patch.startsWith('16.') && !patch.startsWith('15.') && !patch.startsWith('14.')) {
+    // 补丁有效性校验：当前装备数据库严格基于 16.16.1 权威补丁。非 16.x 补丁一律停用推荐以保证绝对准确
+    const patch = snapshot.patch
+    if (!patch || !patch.startsWith('16.')) {
       this._latestItemGuidance = null
       return
     }
@@ -681,23 +681,24 @@ export class FactFusionEngine {
     const buildDef = CHAMPION_BUILDS[role] || CHAMPION_BUILDS.fighter
     const inventoryItemIds = (matchingPlayer?.items ?? []).map((i) => i.itemID)
 
-    // 装备栏容量校验：计算非饰品道具数量（召唤师峡谷主装备栏最大 6 格，Slot 7 为饰品栏 3340/3363/3364，控制守卫 2055 正常占用 1-6 格）
+    // 装备栏容量校验：计算非饰品道具占用格数（召唤师峡谷主装备栏最大 6 格，Slot 7 为饰品栏 3340/3363/3364）
     const TRINKET_IDS = new Set([3340, 3363, 3364])
     const normalItems = (matchingPlayer?.items ?? []).filter((i) => !TRINKET_IDS.has(i.itemID))
-    const normalItemsCount = normalItems.reduce(
-      (acc, item) => acc + (item.itemID === 2055 ? 1 : item.count || 1),
-      0
-    )
-    const freeSlots = Math.max(0, 6 - normalItemsCount)
+    // 关键修复：items 数组中每个元素对应 1 个格位（堆叠药水 count > 1 仍仅占用 1 格）
+    const occupiedSlots = normalItems.length
+    const freeSlots = Math.max(0, 6 - occupiedSlots)
     const isInventoryFull = freeSlots === 0
 
-    // 控制守卫购买资格：有空位，或已有未叠满的控制守卫 (最大堆叠 2)
+    // 控制守卫购买资格：有空余格位，或已有未叠满的控制守卫 (最大堆叠 2)
     const controlWardItem = (matchingPlayer?.items ?? []).find((i) => i.itemID === 2055)
     const canBuyControlWard = freeSlots > 0 || (controlWardItem && (controlWardItem.count || 1) < 2)
 
-    // 2级鞋唯一性校验：若已拥有任意 2 级鞋，则不重复推荐鞋子
+    // 鞋子唯一性与升级资格校验：
+    // 若已拥有任意 2 级鞋，则不重复推荐鞋子；若已拥有草鞋 (1001)，则支持原位升级（无需空槽）
     const TIER2_BOOTS = new Set([3047, 3111, 3006, 3020, 3158, 3009, 3117])
     const hasTier2Boots = inventoryItemIds.some((id) => TIER2_BOOTS.has(id))
+    const hasTier1Boots = inventoryItemIds.includes(1001)
+    const canUpgradeBoots = freeSlots > 0 || hasTier1Boots
 
     // 分析敌方阵容威胁（AP 法系伤害、重伤需求）并进行战局自适应出装微调
     const myTeam = normalizeTeamName(active.team)
@@ -794,13 +795,12 @@ export class FactFusionEngine {
     if (apCount >= 2) {
       if (role === 'fighter' || role === 'assassin') {
         adaptiveItems.push({
-          id: 3155, // 玛莫提乌斯之噬 (3100g)
+          id: 3156, // 玛莫提乌斯之噬 (3100g)
           name: '玛莫提乌斯之噬',
           cost: 3100,
           components: [
-            { id: 3134, name: '锯齿短匕', cost: 1000 },
-            { id: 1033, name: '抗魔斗篷', cost: 400 },
-            { id: 1036, name: '长剑', cost: 350 }
+            { id: 3155, name: '海克斯饮魔刀', cost: 1300 },
+            { id: 1037, name: '十字镐', cost: 1025 }
           ],
           reason: '敌方法系伤害较高，自适应提供魔抗与救主灵刃护盾'
         })
@@ -810,19 +810,19 @@ export class FactFusionEngine {
           name: '女妖面纱',
           cost: 3000,
           components: [
-            { id: 3145, name: '海克斯科技发电机', cost: 1100 },
-            { id: 1057, name: '负极斗篷', cost: 900 }
+            { id: 1058, name: '无用大棒', cost: 1200 },
+            { id: 4632, name: '翠绿屏障', cost: 1800 }
           ],
           reason: '敌方法系爆发较高，自适应提供魔抗与法术护盾'
         })
       } else if (role === 'tank') {
         adaptiveItems.push({
-          id: 6665, // 败魔 (2900g)
+          id: 2504, // 败魔 (2900g)
           name: '败魔',
           cost: 2900,
           components: [
             { id: 3211, name: '幽魂斗篷', cost: 1250 },
-            { id: 1057, name: '负极斗篷', cost: 900 }
+            { id: 1057, name: '负极斗篷', cost: 850 }
           ],
           reason: '敌方法系伤害主导，自适应提供高额魔抗与魔法护盾'
         })
@@ -923,14 +923,21 @@ export class FactFusionEngine {
     }
 
     const alternativePlans: ItemPurchasePlan[] = []
-    if (!hasTier2Boots && !inventoryItemIds.includes(buildDef.boots.id)) {
+    if (!hasTier2Boots && canUpgradeBoots && !inventoryItemIds.includes(buildDef.boots.id)) {
+      const bootsNetCost = hasTier1Boots
+        ? Math.max(0, buildDef.boots.cost - 300)
+        : buildDef.boots.cost
       alternativePlans.push({
         itemIds: [buildDef.boots.id],
-        totalCost: buildDef.boots.cost,
-        remainingGold: Math.max(0, currentGold - buildDef.boots.cost),
-        missingGold: Math.max(0, buildDef.boots.cost - currentGold),
+        totalCost: bootsNetCost,
+        remainingGold: Math.max(0, currentGold - bootsNetCost),
+        missingGold: Math.max(0, bootsNetCost - currentGold),
         reasonCodes: ['BOOTS_MOBILITY'],
-        conditions: [`备选：${buildDef.boots.name}（${buildDef.boots.reason}）`]
+        conditions: [
+          hasTier1Boots
+            ? `备选：原位升级为 ${buildDef.boots.name}（${buildDef.boots.reason}）`
+            : `备选：${buildDef.boots.name}（${buildDef.boots.reason}）`
+        ]
       })
     }
 
@@ -948,7 +955,7 @@ export class FactFusionEngine {
     const guidance: ItemPurchaseGuidance = {
       id: `item_guidance_${now}`,
       sessionId: snapshot.sessionId,
-      patch: snapshot.patch || '14.15.1',
+      patch,
       championId,
       currentGold,
       inventoryItemIds,
@@ -970,7 +977,7 @@ export class FactFusionEngine {
       source: 'item-guidance',
       kind: 'item-purchase-advice',
       confidence: 1,
-      patch: snapshot.patch || '14.15.1',
+      patch,
       clock: { observedAt: now, receivedAt: now, sequence: 1 },
       freshness: { expiresAt: guidance.expiresAt, state: 'fresh' },
       payload: guidance

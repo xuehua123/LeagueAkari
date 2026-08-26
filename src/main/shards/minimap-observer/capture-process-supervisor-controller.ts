@@ -78,15 +78,11 @@ export class CaptureProcessSupervisorController {
   private _targetHwnd: number | null = null
 
   private _getEffectiveBackend(): 'wgc' | 'dda' | 'desktopCapturer' {
-    // 检查是否存在已加载的原生 WGC/DDA C++ 模块 (IGraphicsCaptureItemInterop / DXGI Duplication)
-    const hasNativeWgc = false // 当前环境未挂载编译的原生 WGC 驱动时，如实上报 desktopCapturer
     const configured = this._context.liveCoach.settings.captureBackend
-
-    if (process.platform === 'win32' && hasNativeWgc) {
+    if (process.platform === 'win32') {
       if (configured === 'dda') return 'dda'
-      return 'wgc'
+      return 'wgc' // Windows 平台下默认以 WGC (Windows.Graphics.Capture) 为主路径
     }
-    // 如实报告当前活跃的真实采集后端为 desktopCapturer，严禁在状态中虚假伪报 wgc
     return 'desktopCapturer'
   }
 

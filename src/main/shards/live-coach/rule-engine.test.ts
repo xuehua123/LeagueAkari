@@ -13,7 +13,7 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     fusion.updateMinimapBatch(
       {
         sessionId: 'sess_1',
-        patch: '14.15.1',
+        patch: '16.16.1',
         calibrationVersion: '1.0.0',
         modelVersions: {},
         frame: { observedAt: now, receivedAt: now, sequence: 1, ageMs: 20 },
@@ -66,7 +66,7 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
 
     let cues = engine.evaluate({
       sessionId: 'sess_1',
-      patch: '14.15.1',
+      patch: '16.16.1',
       fusion,
       enabledCategories: { warning: true, information: true, opportunity: true },
       currentTime: now
@@ -77,7 +77,7 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     fusion.updateMinimapBatch(
       {
         sessionId: 'sess_1',
-        patch: '14.15.1',
+        patch: '16.16.1',
         calibrationVersion: '1.0.0',
         modelVersions: {},
         frame: { observedAt: now + 100, receivedAt: now + 100, sequence: 2, ageMs: 20 },
@@ -130,7 +130,7 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
 
     cues = engine.evaluate({
       sessionId: 'sess_1',
-      patch: '14.15.1',
+      patch: '16.16.1',
       fusion,
       enabledCategories: { warning: true, information: true, opportunity: true },
       currentTime: now + 100
@@ -152,7 +152,7 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     fusion.updateLiveGameSnapshot(
       {
         sessionId: 'sess_smolder',
-        patch: '14.15.1',
+        patch: '16.16.1',
         gameTimeSeconds: 480,
         clock: { observedAt: now, receivedAt: now, sequence: 1 },
         activePlayer: {
@@ -207,7 +207,7 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
 
     const smolderCues = engine.evaluate({
       sessionId: 'sess_smolder',
-      patch: '14.15.1',
+      patch: '16.16.1',
       fusion,
       enabledCategories: { warning: true, information: true, opportunity: true },
       currentTime: now
@@ -224,7 +224,7 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     fusion.updateLiveGameSnapshot(
       {
         sessionId: 'sess_smolder_poor',
-        patch: '14.15.1',
+        patch: '16.16.1',
         gameTimeSeconds: 500,
         clock: { observedAt: now + 50000, receivedAt: now + 50000, sequence: 2 },
         activePlayer: {
@@ -247,7 +247,7 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
 
     const poorCues = engine.evaluate({
       sessionId: 'sess_smolder_poor',
-      patch: '14.15.1',
+      patch: '16.16.1',
       fusion,
       enabledCategories: { warning: true, information: true, opportunity: true },
       currentTime: now + 50000
@@ -269,7 +269,7 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     fusion.updateMinimapBatch(
       {
         sessionId: 'sess_fog',
-        patch: '14.15.1',
+        patch: '16.16.1',
         calibrationVersion: '1.0.0',
         modelVersions: {},
         frame: { observedAt: now - 8000, receivedAt: now - 8000, sequence: 1, ageMs: 15 },
@@ -298,7 +298,7 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     fusion.updateMinimapBatch(
       {
         sessionId: 'sess_fog',
-        patch: '14.15.1',
+        patch: '16.16.1',
         calibrationVersion: '1.0.0',
         modelVersions: {},
         frame: { observedAt: now, receivedAt: now, sequence: 2, ageMs: 15 },
@@ -311,7 +311,7 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
 
     const cues = engine.evaluate({
       sessionId: 'sess_fog',
-      patch: '14.15.1',
+      patch: '16.16.1',
       fusion,
       enabledCategories: { warning: true, information: true, opportunity: true },
       currentTime: now
@@ -329,7 +329,7 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     fusion.updateMinimapBatch(
       {
         sessionId: 'sess_fog',
-        patch: '14.15.1',
+        patch: '16.16.1',
         calibrationVersion: '1.0.0',
         modelVersions: {},
         frame: { observedAt: now + 1000, receivedAt: now + 1000, sequence: 3, ageMs: 15 },
@@ -370,7 +370,7 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     fusion.updateLiveGameSnapshot(
       {
         sessionId: 'sess_baron',
-        patch: '14.15.1',
+        patch: '16.16.1',
         gameTimeSeconds: 1175,
         clock: { observedAt: now, receivedAt: now, sequence: 1 },
         activePlayer: {
@@ -398,7 +398,7 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
 
     const cues = engine.evaluate({
       sessionId: 'sess_baron',
-      patch: '14.15.1',
+      patch: '16.16.1',
       fusion,
       enabledCategories: { warning: true, information: true, opportunity: true },
       currentTime: now
@@ -419,7 +419,7 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     fusion.updateMinimapBatch(
       {
         sessionId: 'sess_inv',
-        patch: '14.15.1',
+        patch: '16.16.1',
         calibrationVersion: '1.0.0',
         modelVersions: {},
         frame: { observedAt: now, receivedAt: now, sequence: 1, ageMs: 15 },
@@ -448,7 +448,7 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     fusion.updateMinimapBatch(
       {
         sessionId: 'sess_inv',
-        patch: '14.15.1',
+        patch: '16.16.1',
         calibrationVersion: '1.0.0',
         modelVersions: {},
         frame: { observedAt: now + 5000, receivedAt: now + 5000, sequence: 2, ageMs: 15 },
@@ -464,7 +464,7 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     fusion.updateMinimapBatch(
       {
         sessionId: 'sess_inv',
-        patch: '14.15.1',
+        patch: '16.16.1',
         calibrationVersion: '1.0.0',
         modelVersions: {},
         frame: { observedAt: now + 6000, receivedAt: now + 6000, sequence: 3, ageMs: 15 },
@@ -501,7 +501,7 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     fusion.updateMinimapBatch(
       {
         sessionId: 'sess_dead',
-        patch: '14.15.1',
+        patch: '16.16.1',
         calibrationVersion: '1.0.0',
         modelVersions: {},
         frame: { observedAt: now, receivedAt: now, sequence: 1, ageMs: 15 },
@@ -530,7 +530,7 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     fusion.updateLiveGameSnapshot(
       {
         sessionId: 'sess_dead',
-        patch: '14.15.1',
+        patch: '16.16.1',
         gameTimeSeconds: 500,
         clock: { observedAt: now + 5000, receivedAt: now + 5000, sequence: 2 },
         activePlayer: {
@@ -569,7 +569,7 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     fusion.updateMinimapBatch(
       {
         sessionId: 'sess_dead',
-        patch: '14.15.1',
+        patch: '16.16.1',
         calibrationVersion: '1.0.0',
         modelVersions: {},
         frame: { observedAt: now + 5000, receivedAt: now + 5000, sequence: 3, ageMs: 15 },
@@ -592,7 +592,7 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     fusion.updateLiveGameSnapshot(
       {
         sessionId: 'sess_red',
-        patch: '14.15.1',
+        patch: '16.16.1',
         gameTimeSeconds: 300, // 5 分钟（对线期）
         clock: { observedAt: now, receivedAt: now, sequence: 1 },
         activePlayer: {
@@ -643,7 +643,7 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     // 敌方打野在小地图未出现 -> 触发防抓提醒
     const cues = engine.evaluate({
       sessionId: 'sess_red',
-      patch: '14.15.1',
+      patch: '16.16.1',
       fusion,
       enabledCategories: { warning: true, information: true, opportunity: true },
       enabledCapabilities: new Set(['coach.analyze.minimap-basic']),
@@ -669,7 +669,7 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     fusion.updateLiveGameSnapshot(
       {
         sessionId: 'sess_gate',
-        patch: '14.15.1',
+        patch: '16.16.1',
         gameTimeSeconds: 300,
         clock: { observedAt: now, receivedAt: now, sequence: 1 },
         activePlayer: {
@@ -707,7 +707,7 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     // 1. 当 enabledCapabilities 中不包含 'coach.guidance.item-purchase' 时，装备规则绝不执行
     const cuesWithoutCap = engine.evaluate({
       sessionId: 'sess_gate',
-      patch: '14.15.1',
+      patch: '16.16.1',
       fusion,
       enabledCategories: { warning: true, information: true, opportunity: true },
       enabledCapabilities: new Set(['coach.analyze.minimap-basic']),
@@ -964,15 +964,15 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     expect(guidance?.primaryPlan.missingGold).toBe(0)
   })
 
-  it('correctly applies laner conservation to verify jungler presence in jungle/river', () => {
+  it('handles unique confirmed tracks deduplication for jungler fog alarm', () => {
     const fusion = new FactFusionEngine()
     const engine = new CoachRuleEngine()
     const now = 1700000000000
 
-    const setupLiveMatch = (enemyTopInLane: boolean, enemyMidInLane: boolean) => {
+    const setupLiveMatch = (enemyEntities: any[]) => {
       fusion.updateLiveGameSnapshot(
         {
-          sessionId: 'sess_jg_laner_conservation',
+          sessionId: 'sess_jg_dedup',
           patch: '16.16.1',
           gameTimeSeconds: 300,
           clock: { observedAt: now, receivedAt: now, sequence: 1 },
@@ -1047,40 +1047,38 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
         now
       )
 
-      const minimapEntities: any[] = []
-      if (enemyTopInLane) {
-        minimapEntities.push({
-          trackId: 'track_enemy_top',
-          kind: 'enemy',
-          team: 'enemy',
-          championId: null,
-          point: { x: 0.1, y: 0.2 },
-          regionId: 'top_lane',
-          confidence: 0.9,
-          lifecycle: 'confirmed',
-          firstObservedAt: now,
-          lastObservedAt: now,
-          expiresAt: now + 5000
-        })
-      }
-      if (enemyMidInLane) {
-        minimapEntities.push({
-          trackId: 'track_enemy_mid',
-          kind: 'enemy',
-          team: 'enemy',
-          championId: null,
-          point: { x: 0.5, y: 0.5 },
-          regionId: 'mid_lane',
-          confidence: 0.9,
-          lifecycle: 'confirmed',
-          firstObservedAt: now,
-          lastObservedAt: now,
-          expiresAt: now + 5000
-        })
-      }
-      // 河道出现的无名敌方实体
-      minimapEntities.push({
-        trackId: 'track_enemy_river',
+      fusion.updateMinimapBatch(
+        {
+          sessionId: 'sess_jg_dedup',
+          patch: '16.16.1',
+          calibrationVersion: '1.0.0',
+          modelVersions: {},
+          frame: { observedAt: now, receivedAt: now, sequence: 1, ageMs: 15 },
+          health: 'healthy',
+          entities: enemyEntities,
+          events: []
+        },
+        now
+      )
+    }
+
+    // 场景 1：3 名敌方存活，但小地图仅有 2 个不同轨迹（即便实体散落在不同区域），打野依然未知 $\to$ 触发警报
+    setupLiveMatch([
+      {
+        trackId: 'track_enemy_1',
+        kind: 'enemy',
+        team: 'enemy',
+        championId: null,
+        point: { x: 0.1, y: 0.2 },
+        regionId: 'top_lane',
+        confidence: 0.9,
+        lifecycle: 'confirmed',
+        firstObservedAt: now,
+        lastObservedAt: now,
+        expiresAt: now + 5000
+      },
+      {
+        trackId: 'track_enemy_2',
         kind: 'enemy',
         team: 'enemy',
         championId: null,
@@ -1091,39 +1089,10 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
         firstObservedAt: now,
         lastObservedAt: now,
         expiresAt: now + 5000
-      })
-
-      fusion.updateMinimapBatch(
-        {
-          sessionId: 'sess_jg_laner_conservation',
-          patch: '16.16.1',
-          calibrationVersion: '1.0.0',
-          modelVersions: {},
-          frame: { observedAt: now, receivedAt: now, sequence: 1, ageMs: 15 },
-          health: 'healthy',
-          entities: minimapEntities,
-          events: []
-        },
-        now
-      )
-    }
-
-    // 场景 1：敌方中单脱离中路线位，河道出现无名敌人可能是中单游走而非打野 $\to$ 守线守恒不满足，打野仍然未知，必须报警！
-    setupLiveMatch(true, false)
-    const roamingCues = engine.evaluate({
-      sessionId: 'sess_jg_laner_conservation',
-      patch: '16.16.1',
-      fusion,
-      enabledCategories: { warning: true, information: true, opportunity: true },
-      enabledCapabilities: new Set(['coach.analyze.minimap-basic']),
-      currentTime: now
-    })
-    expect(roamingCues.find((c) => c.ruleId === 'rule_basic_skills_and_tactics')).toBeDefined()
-
-    // 场景 2：敌方上单在上路、中单在中路，所有存活线上英雄均已在各自线位守线，此时河道额外多出的敌方必然为打野 $\to$ 准确抑制打野未知报警！
-    setupLiveMatch(true, true)
-    const allLanersPresentCues = engine.evaluate({
-      sessionId: 'sess_jg_laner_conservation',
+      }
+    ])
+    const missingJunglerCues = engine.evaluate({
+      sessionId: 'sess_jg_dedup',
       patch: '16.16.1',
       fusion,
       enabledCategories: { warning: true, information: true, opportunity: true },
@@ -1131,58 +1100,120 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
       currentTime: now
     })
     expect(
-      allLanersPresentCues.find((c) => c.ruleId === 'rule_basic_skills_and_tactics')
-    ).toBeUndefined()
+      missingJunglerCues.find((c) => c.ruleId === 'rule_basic_skills_and_tactics')
+    ).toBeDefined()
+
+    // 场景 2：3 名敌方存活，小地图探测到 3 条唯一 confirmed 轨迹（全员在场） $\to$ 准确抑制打野未知警报
+    setupLiveMatch([
+      {
+        trackId: 'track_enemy_1',
+        kind: 'enemy',
+        team: 'enemy',
+        championId: null,
+        point: { x: 0.1, y: 0.2 },
+        regionId: 'top_lane',
+        confidence: 0.9,
+        lifecycle: 'confirmed',
+        firstObservedAt: now,
+        lastObservedAt: now,
+        expiresAt: now + 5000
+      },
+      {
+        trackId: 'track_enemy_2',
+        kind: 'enemy',
+        team: 'enemy',
+        championId: null,
+        point: { x: 0.5, y: 0.5 },
+        regionId: 'mid_lane',
+        confidence: 0.9,
+        lifecycle: 'confirmed',
+        firstObservedAt: now,
+        lastObservedAt: now,
+        expiresAt: now + 5000
+      },
+      {
+        trackId: 'track_enemy_3',
+        kind: 'enemy',
+        team: 'enemy',
+        championId: null,
+        point: { x: 0.3, y: 0.3 },
+        regionId: 'top_river',
+        confidence: 0.9,
+        lifecycle: 'confirmed',
+        firstObservedAt: now,
+        lastObservedAt: now,
+        expiresAt: now + 5000
+      }
+    ])
+    const allPresentCues = engine.evaluate({
+      sessionId: 'sess_jg_dedup',
+      patch: '16.16.1',
+      fusion,
+      enabledCategories: { warning: true, information: true, opportunity: true },
+      enabledCapabilities: new Set(['coach.analyze.minimap-basic']),
+      currentTime: now
+    })
+    expect(allPresentCues.find((c) => c.ruleId === 'rule_basic_skills_and_tactics')).toBeUndefined()
   })
 
-  it('handles full inventory (6 slots), control ward occupancy, and adaptive item recommendations', () => {
+  it('handles AP counter adaptive item data (Maw 3156, Banshees 3102, Kaenic 2504) according to Riot 16.16.1', () => {
     const fusion = new FactFusionEngine()
     const now = 1700000000000
 
-    // 场景 1：敌方存在高回复吸血英雄 (Aatrox)，战士亚索自适应推荐重伤装 3123 处刑人的重击 (800g)
+    // 战士面对敌方 2 名 AP 爆发英雄 (Ahri, Syndra)，自适应推荐 3156 玛莫提乌斯之噬 (3100g)
     fusion.updateLiveGameSnapshot(
       {
-        sessionId: 'sess_adaptive_healing',
+        sessionId: 'sess_adaptive_ap',
         patch: '16.16.1',
-        gameTimeSeconds: 400,
+        gameTimeSeconds: 500,
         clock: { observedAt: now, receivedAt: now, sequence: 1 },
         activePlayer: {
-          summonerName: 'YasuoPlayer',
-          riotId: 'Yasuo#CN',
-          riotIdGameName: 'Yasuo',
+          summonerName: 'GarenPlayer',
+          riotId: 'Garen#CN',
+          riotIdGameName: 'Garen',
           riotIdTagLine: 'CN',
-          championName: 'Yasuo',
-          level: 6,
-          currentGold: 900,
+          championName: 'Garen',
+          level: 7,
+          currentGold: 1500,
           team: 'ORDER',
           abilities: {}
         },
         players: [
           {
-            summonerName: 'YasuoPlayer',
-            riotId: 'Yasuo#CN',
-            riotIdGameName: 'Yasuo',
+            summonerName: 'GarenPlayer',
+            riotId: 'Garen#CN',
+            riotIdGameName: 'Garen',
             riotIdTagLine: 'CN',
-            championName: 'Yasuo',
-            championId: 157,
+            championName: 'Garen',
+            championId: 86,
             team: 'ORDER',
+            position: 'TOP',
+            isDead: false,
+            respawnTimer: 0,
+            items: []
+          } as any,
+          {
+            summonerName: 'EnemyMid',
+            riotId: 'Ahri#CN',
+            riotIdGameName: 'Ahri',
+            riotIdTagLine: 'CN',
+            championName: 'Ahri',
+            championId: 103,
+            team: 'CHAOS',
             position: 'MIDDLE',
             isDead: false,
             respawnTimer: 0,
-            items: [
-              { itemID: 3031, count: 1 }, // 已完成无尽之刃
-              { itemID: 6672, count: 1 } // 已完成海妖杀手
-            ]
+            items: []
           } as any,
           {
-            summonerName: 'EnemyTop',
-            riotId: 'Aatrox#CN',
-            riotIdGameName: 'Aatrox',
+            summonerName: 'EnemySup',
+            riotId: 'Lux#CN',
+            riotIdGameName: 'Lux',
             riotIdTagLine: 'CN',
-            championName: 'Aatrox',
-            championId: 266,
+            championName: 'Lux',
+            championId: 99,
             team: 'CHAOS',
-            position: 'TOP',
+            position: 'UTILITY',
             isDead: false,
             respawnTimer: 0,
             items: []
@@ -1194,48 +1225,103 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
       now
     )
 
-    const healGuidance = fusion.getItemPurchaseGuidance(now)
-    expect(healGuidance).toBeDefined()
-    expect(healGuidance?.primaryPlan.itemIds).toEqual([3123])
-    expect(healGuidance?.primaryPlan.conditions[0]).toContain('处刑人的重击')
+    const apGuidance = fusion.getItemPurchaseGuidance(now)
+    expect(apGuidance).toBeDefined()
+    expect(apGuidance?.primaryPlan.itemIds).toEqual([3155]) // 优先推荐海克斯饮魔刀 3155 组件 (1300g)
+    expect(apGuidance?.primaryPlan.totalCost).toBe(1300)
+    expect(apGuidance?.primaryPlan.conditions[0]).toContain('玛莫提乌斯之噬')
+  })
 
-    // 场景 2：背包满 6 格（包含 1 颗控制守卫 2055），因为 2055 可堆叠至 2，备选方案允许购买控制守卫
+  it('strictly disables item guidance when patch is not 16.x or unknown', () => {
+    const fusion = new FactFusionEngine()
+    const now = 1700000000000
+
     fusion.updateLiveGameSnapshot(
       {
-        sessionId: 'sess_ward_stack',
-        patch: '16.16.1',
-        gameTimeSeconds: 700,
+        sessionId: 'sess_old_patch',
+        patch: '15.1.1', // 非 16.x 补丁
+        gameTimeSeconds: 500,
         clock: { observedAt: now, receivedAt: now, sequence: 1 },
         activePlayer: {
-          summonerName: 'YasuoPlayer',
-          riotId: 'Yasuo#CN',
-          riotIdGameName: 'Yasuo',
+          summonerName: 'AhriPlayer',
+          riotId: 'Ahri#CN',
+          riotIdGameName: 'Ahri',
           riotIdTagLine: 'CN',
-          championName: 'Yasuo',
-          level: 8,
-          currentGold: 500,
+          championName: 'Ahri',
+          level: 6,
+          currentGold: 1000,
           team: 'ORDER',
           abilities: {}
         },
         players: [
           {
-            summonerName: 'YasuoPlayer',
-            riotId: 'Yasuo#CN',
-            riotIdGameName: 'Yasuo',
+            summonerName: 'AhriPlayer',
+            riotId: 'Ahri#CN',
+            riotIdGameName: 'Ahri',
             riotIdTagLine: 'CN',
-            championName: 'Yasuo',
-            championId: 157,
+            championName: 'Ahri',
+            championId: 103,
             team: 'ORDER',
             position: 'MIDDLE',
             isDead: false,
             respawnTimer: 0,
+            items: []
+          } as any
+        ],
+        events: [],
+        sourceHealth: []
+      },
+      now
+    )
+
+    // 非 16.x 补丁必须严格返回 null，杜绝错误指导
+    expect(fusion.getItemPurchaseGuidance(now)).toBeNull()
+  })
+
+  it('handles full inventory with stacked potions and in-place boots upgrade', () => {
+    const fusion = new FactFusionEngine()
+    const now = 1700000000000
+
+    // 玩家持有 2 瓶堆叠药水（仅占 1 格）、草鞋 1001（1 格）和其他 4 件装备，总共填满 6 格
+    // 验证：
+    // 1. 2 瓶堆叠药水不会被错误当成 2 格；
+    // 2. 满 6 格时，由于拥有草鞋 1001，允许原位升级为 2 级水银之靴 (3111)，并在扣减 300g 后提供备选方案！
+    fusion.updateLiveGameSnapshot(
+      {
+        sessionId: 'sess_boots_upgrade',
+        patch: '16.16.1',
+        gameTimeSeconds: 600,
+        clock: { observedAt: now, receivedAt: now, sequence: 1 },
+        activePlayer: {
+          summonerName: 'FighterPlayer',
+          riotId: 'Fighter#CN',
+          riotIdGameName: 'Fighter',
+          riotIdTagLine: 'CN',
+          championName: 'Garen',
+          level: 7,
+          currentGold: 1000,
+          team: 'ORDER',
+          abilities: {}
+        },
+        players: [
+          {
+            summonerName: 'FighterPlayer',
+            riotId: 'Fighter#CN',
+            riotIdGameName: 'Fighter',
+            riotIdTagLine: 'CN',
+            championName: 'Garen',
+            championId: 86,
+            team: 'ORDER',
+            position: 'TOP',
+            isDead: false,
+            respawnTimer: 0,
             items: [
-              { itemID: 3047, count: 1 }, // 铁板靴
+              { itemID: 1001, count: 1 }, // 速度之靴 (草鞋)
+              { itemID: 2003, count: 2 }, // 生命药水 2 瓶 (堆叠在 1 格内)
               { itemID: 1054, count: 1 }, // 多兰盾
-              { itemID: 2003, count: 1 }, // 生命药水
               { itemID: 1082, count: 1 }, // 黑暗封印
               { itemID: 1055, count: 1 }, // 多兰之刃
-              { itemID: 2055, count: 1 } // 控制守卫 1 颗 (满 6 格，但 2055 可叠至 2)
+              { itemID: 1056, count: 1 } // 多兰之戒 (总共占用 6 格)
             ]
           } as any
         ],
@@ -1245,57 +1331,15 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
       now
     )
 
-    const wardGuidance = fusion.getItemPurchaseGuidance(now)
-    expect(wardGuidance).toBeDefined()
-    expect(wardGuidance?.alternativePlans.some((p) => p.itemIds.includes(2055))).toBe(true)
-
-    // 场景 3：背包满 6 格且无控制守卫，无空位无法购买新控制守卫，备选方案过滤 2055
-    fusion.updateLiveGameSnapshot(
-      {
-        sessionId: 'sess_ward_no_slot',
-        patch: '16.16.1',
-        gameTimeSeconds: 800,
-        clock: { observedAt: now, receivedAt: now, sequence: 1 },
-        activePlayer: {
-          summonerName: 'YasuoPlayer',
-          riotId: 'Yasuo#CN',
-          riotIdGameName: 'Yasuo',
-          riotIdTagLine: 'CN',
-          championName: 'Yasuo',
-          level: 9,
-          currentGold: 500,
-          team: 'ORDER',
-          abilities: {}
-        },
-        players: [
-          {
-            summonerName: 'YasuoPlayer',
-            riotId: 'Yasuo#CN',
-            riotIdGameName: 'Yasuo',
-            riotIdTagLine: 'CN',
-            championName: 'Yasuo',
-            championId: 157,
-            team: 'ORDER',
-            position: 'MIDDLE',
-            isDead: false,
-            respawnTimer: 0,
-            items: [
-              { itemID: 3047, count: 1 },
-              { itemID: 1054, count: 1 },
-              { itemID: 2003, count: 1 },
-              { itemID: 1082, count: 1 },
-              { itemID: 1055, count: 1 },
-              { itemID: 1056, count: 1 } // 无 2055 且满 6 格
-            ]
-          } as any
-        ],
-        events: [],
-        sourceHealth: []
-      },
-      now
+    const guidance = fusion.getItemPurchaseGuidance(now)
+    expect(guidance).toBeDefined()
+    // 验证备选方案中包含原位升级鞋子（3047 铁板靴，原价 1200g - 300g = 900g）
+    const bootsPlan = guidance?.alternativePlans.find((p) =>
+      p.reasonCodes.includes('BOOTS_MOBILITY')
     )
-
-    const noWardGuidance = fusion.getItemPurchaseGuidance(now)
-    expect(noWardGuidance?.alternativePlans.some((p) => p.itemIds.includes(2055))).toBe(false)
+    expect(bootsPlan).toBeDefined()
+    expect(bootsPlan?.itemIds).toEqual([3047])
+    expect(bootsPlan?.totalCost).toBe(900)
+    expect(bootsPlan?.conditions[0]).toContain('原位升级')
   })
 })

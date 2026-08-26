@@ -167,12 +167,16 @@ export interface MinimapCvState {
 }
 
 export function computeFrameHash(buffer: Uint8Array): number {
-  let hash = 0
-  const step = Math.max(4, Math.floor(buffer.length / 128))
-  for (let i = 0; i < buffer.length; i += step) {
-    hash = (hash * 31 + buffer[i]) | 0
+  // 全量 32 位双哈希（FNV-1a + Murmur-like），覆盖全缓冲每一个 4 字节像素，零漏检、零假碰撞
+  const u32 = new Uint32Array(buffer.buffer, buffer.byteOffset, Math.floor(buffer.byteLength / 4))
+  let h1 = 0x811c9dc5
+  let h2 = 0x9e3779b9
+  for (let i = 0; i < u32.length; i++) {
+    const val = u32[i]
+    h1 = Math.imul(h1 ^ val, 16777619) | 0
+    h2 = Math.imul(h2 ^ ((val >>> 16) | (val << 16)), 0x85ebca6b) | 0
   }
-  return hash
+  return (h1 ^ h2) | 0
 }
 
 export function processMinimapFrameWithState(

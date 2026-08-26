@@ -93,7 +93,7 @@ export class CoachReplaySimulator {
       version: '1.0.0',
       sessionId: session.metadata.sessionId,
       gameDurationSeconds: session.metadata.durationSeconds || 1200,
-      patch: session.metadata.patch || '14.15.1',
+      patch: session.metadata.patch || '16.16.1',
       totalCues: cues.length,
       timeline: cues.map((c) => {
         const totalSec = Math.floor((c.createdAt - session.metadata.recordedAt) / 1000)
@@ -145,7 +145,7 @@ export class CoachReplaySimulator {
         sessionId: `replay_sample_${now}`,
         mapId: 11,
         queueId: 420,
-        patch: '14.15.1',
+        patch: '16.16.1',
         recordedAt,
         durationSeconds: 900
       },
@@ -155,7 +155,7 @@ export class CoachReplaySimulator {
           timestamp: recordedAt + 270000,
           liveData: {
             sessionId: `replay_sample_${now}`,
-            patch: '14.15.1',
+            patch: '16.16.1',
             gameTimeSeconds: 270,
             clock: {
               observedAt: recordedAt + 270000,
@@ -215,7 +215,7 @@ export class CoachReplaySimulator {
           timestamp: recordedAt + 435000,
           minimap: {
             sessionId: `replay_sample_${now}`,
-            patch: '14.15.1',
+            patch: '16.16.1',
             calibrationVersion: '1.0.0',
             modelVersions: {},
             frame: {
@@ -248,7 +248,7 @@ export class CoachReplaySimulator {
           timestamp: recordedAt + 445000,
           liveData: {
             sessionId: `replay_sample_${now}`,
-            patch: '14.15.1',
+            patch: '16.16.1',
             gameTimeSeconds: 445,
             clock: {
               observedAt: recordedAt + 445000,
@@ -272,7 +272,7 @@ export class CoachReplaySimulator {
           },
           minimap: {
             sessionId: `replay_sample_${now}`,
-            patch: '14.15.1',
+            patch: '16.16.1',
             calibrationVersion: '1.0.0',
             modelVersions: {},
             frame: {
@@ -291,7 +291,7 @@ export class CoachReplaySimulator {
           timestamp: recordedAt + 820000,
           liveData: {
             sessionId: `replay_sample_${now}`,
-            patch: '14.15.1',
+            patch: '16.16.1',
             gameTimeSeconds: 820,
             clock: {
               observedAt: recordedAt + 820000,
@@ -319,7 +319,7 @@ export class CoachReplaySimulator {
           timestamp: recordedAt + 850000,
           liveData: {
             sessionId: `replay_sample_${now}`,
-            patch: '14.15.1',
+            patch: '16.16.1',
             gameTimeSeconds: 850,
             clock: {
               observedAt: recordedAt + 850000,
@@ -343,7 +343,7 @@ export class CoachReplaySimulator {
           },
           minimap: {
             sessionId: `replay_sample_${now}`,
-            patch: '14.15.1',
+            patch: '16.16.1',
             calibrationVersion: '1.0.0',
             modelVersions: {},
             frame: {

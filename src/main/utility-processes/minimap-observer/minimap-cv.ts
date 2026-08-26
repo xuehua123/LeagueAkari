@@ -167,15 +167,27 @@ export interface MinimapCvState {
 }
 
 export function computeFrameHash(buffer: Uint8Array): number {
-  // 全量 32 位双哈希（FNV-1a + Murmur-like），覆盖全缓冲每一个 4 字节像素，零漏检、零假碰撞
-  const u32 = new Uint32Array(buffer.buffer, buffer.byteOffset, Math.floor(buffer.byteLength / 4))
+  if (!buffer || buffer.byteLength === 0) return 0
+
+  // 使用 DataView 安全读取任意 byteOffset（非四字节对齐如 byteOffset % 4 !== 0 绝不崩溃）
+  const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength)
   let h1 = 0x811c9dc5
   let h2 = 0x9e3779b9
-  for (let i = 0; i < u32.length; i++) {
-    const val = u32[i]
+  const numWords = Math.floor(buffer.byteLength / 4)
+
+  for (let i = 0; i < numWords; i++) {
+    const val = view.getUint32(i * 4, true)
     h1 = Math.imul(h1 ^ val, 16777619) | 0
     h2 = Math.imul(h2 ^ ((val >>> 16) | (val << 16)), 0x85ebca6b) | 0
   }
+
+  // 补齐尾部不足 4 字节的零散字节
+  for (let i = numWords * 4; i < buffer.byteLength; i++) {
+    const b = buffer[i]
+    h1 = Math.imul(h1 ^ b, 16777619) | 0
+    h2 = Math.imul(h2 ^ b, 0x85ebca6b) | 0
+  }
+
   return (h1 ^ h2) | 0
 }
 

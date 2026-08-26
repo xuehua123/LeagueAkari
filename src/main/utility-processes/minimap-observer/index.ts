@@ -201,6 +201,8 @@ function handleMainMessage(rawMsg: unknown) {
       lastFpsCheckTime = Date.now()
       lastProcessedSequence = -1
       lastProcessedHealth = 'unknown'
+      cvState.consecutiveFrozenFrames = 0
+      cvState.lastFrameHash = 0
 
       if (loopTimer) {
         clearInterval(loopTimer)
@@ -220,6 +222,8 @@ function handleMainMessage(rawMsg: unknown) {
       latestFrameObservedAt = 0
       latestFrameReceivedTime = 0
       lastProcessedSequence = -1
+      cvState.consecutiveFrozenFrames = 0
+      cvState.lastFrameHash = 0
       trackedEntities.clear()
       break
     }

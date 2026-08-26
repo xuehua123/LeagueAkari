@@ -491,25 +491,17 @@ export class RuleBasicSkillsAndTactics implements CoachRule {
       )
 
       // 检查敌方打野是否确认在小地图上可见：
-      // 1. 显式身份识别匹配（championId 或召唤师名匹配）
+      // 严格判定准则：
+      // 1. 实体必须具有显式 championId 且与 enemyJungler.championId 精确匹配，且轨迹状态为 confirmed
+      // 2. 绝对删除 areAllLivingEnemiesVisible 与匿名轨迹数量推断，杜绝误检与匿名图元抑制打野防抓提醒
       const isExplicitlySeen = visibleEnemyEntities.some(
         (e) =>
-          (enemyJungler.championId && e.championId === enemyJungler.championId) ||
-          e.trackId === enemyJungler.summonerName
+          enemyJungler.championId &&
+          e.championId === enemyJungler.championId &&
+          e.lifecycle === 'confirmed'
       )
 
-      // 2. 全局独立实体全员覆盖（严格根据唯一 confirmed 活跃轨迹 ID 计数，杜绝重复轨迹与误检）：
-      const livingEnemies = players.filter((p) => p.team === enemyTeam && !p.isDead)
-      const uniqueConfirmedTrackIds = new Set(
-        visibleEnemyEntities
-          .filter((e) => e.lifecycle === 'confirmed' || e.confidence >= 0.8)
-          .map((e) => e.trackId)
-      )
-      const areAllLivingEnemiesVisible =
-        livingEnemies.length > 0 && uniqueConfirmedTrackIds.size >= livingEnemies.length
-
-      // 严格判定：匿名图元由于没有 championId 无法证明英雄身份，杜绝依赖匿名位置猜测打野
-      const isEnemyJunglerSeen = isExplicitlySeen || areAllLivingEnemiesVisible
+      const isEnemyJunglerSeen = isExplicitlySeen
 
       // 当敌方打野处于迷雾中时，触发控线与防抓提醒
       if (!isEnemyJunglerSeen) {

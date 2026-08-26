@@ -20,6 +20,7 @@ export class LiveGameDataPollingController {
   private _isPollingActive = false
   private _currentSessionId = ''
   private _currentPatch = ''
+  private _generation = 0
   private _gameflowDisposer: (() => void) | null = null
 
   constructor(private readonly _context: LiveGameDataMainContext) {
@@ -27,8 +28,6 @@ export class LiveGameDataPollingController {
   }
 
   public init(): void {
-    let currentPollingToken = 0
-
     // Watch gameflow phase changes
     this._gameflowDisposer = this._context.mobxUtils.reaction(
       () => ({
@@ -36,7 +35,7 @@ export class LiveGameDataPollingController {
         session: this._context.leagueClient.data.gameflow.session
       }),
       async ({ phase, session }) => {
-        const token = ++currentPollingToken
+        const generation = ++this._generation
 
         if (phase === 'InProgress') {
           const sessionId = session?.gameData?.gameId
@@ -78,9 +77,9 @@ export class LiveGameDataPollingController {
             }
           }
 
-          // 竞态保护：如果异步请求返回时 phase 已经改变或离开了当前对局，直接丢弃，严禁重新启动轮询
+          // 竞态保护：如果异步请求返回时 generation 改变或离开了当前对局，直接丢弃，严禁重新启动轮询
           if (
-            token !== currentPollingToken ||
+            generation !== this._generation ||
             this._context.leagueClient.data.gameflow.phase !== 'InProgress'
           ) {
             return
@@ -101,6 +100,7 @@ export class LiveGameDataPollingController {
   }
 
   public dispose(): void {
+    this._generation++
     this.stopPolling()
     if (this._gameflowDisposer) {
       this._gameflowDisposer()
@@ -113,6 +113,13 @@ export class LiveGameDataPollingController {
 
   public startPolling(sessionId: string, patch: string = ''): void {
     if (this._isPollingActive && this._currentSessionId === sessionId) {
+      // 关键修复：当已在轮询相同 session 时，若获取到新的有效补丁版本，必须更新 _currentPatch 而不是直接忽略
+      if (patch && patch !== 'unknown' && patch !== this._currentPatch) {
+        this._currentPatch = patch
+        this._context.logger.info(
+          `Updated LiveGameData polling patch to ${patch} for session: ${sessionId}`
+        )
+      }
       return
     }
 
@@ -136,6 +143,7 @@ export class LiveGameDataPollingController {
       return
     }
 
+    this._generation++
     this._isPollingActive = false
     if (this._timer) {
       clearTimeout(this._timer)
@@ -167,6 +175,36 @@ export class LiveGameDataPollingController {
     this._timer = setTimeout(async () => {
       if (!this._isPollingActive) {
         return
+      }
+
+      // 如果当前补丁处于 unknown 状态，尝试在轮询期间异步重试获取最新游戏补丁
+      if (this._currentPatch === 'unknown' || !this._currentPatch) {
+        try {
+          const res = await this._context.leagueClient.http.request<
+            string | { version?: string; gameVersion?: string }
+          >({
+            url: '/lol-patch/v1/game-version',
+            method: 'GET'
+          })
+          const versionStr =
+            typeof res.data === 'string'
+              ? res.data
+              : res.data?.version || res.data?.gameVersion || ''
+          if (versionStr) {
+            const parts = versionStr.split('.')
+            if (parts.length >= 2) {
+              const newPatch = `${parts[0]}.${parts[1]}.1`
+              if (newPatch !== this._currentPatch) {
+                this._currentPatch = newPatch
+                this._context.logger.info(
+                  `Recovered LiveGameData patch from unknown to ${newPatch} for session: ${this._currentSessionId}`
+                )
+              }
+            }
+          }
+        } catch {
+          // ignore
+        }
       }
 
       try {

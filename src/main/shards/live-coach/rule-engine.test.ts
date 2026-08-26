@@ -958,9 +958,9 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     const guidance = fusion.getItemPurchaseGuidance(now)
     expect(guidance).toBeDefined()
     expect(guidance?.championId).toBe(516)
-    // 验证推荐买得起的未拥有组件（3801 晶体护腕），花费 800g
-    expect(guidance?.primaryPlan.itemIds).toEqual([3801])
-    expect(guidance?.primaryPlan.totalCost).toBe(800)
+    // 验证推荐买得起的未拥有组件（第 2 个巨人腰带 1011），花费 900g
+    expect(guidance?.primaryPlan.itemIds).toEqual([1011])
+    expect(guidance?.primaryPlan.totalCost).toBe(900)
     expect(guidance?.primaryPlan.missingGold).toBe(0)
   })
 
@@ -1102,8 +1102,7 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     expect(
       missingJunglerCues.find((c) => c.ruleId === 'rule_basic_skills_and_tactics')
     ).toBeDefined()
-
-    // 场景 2：3 名敌方存活，小地图探测到 3 条唯一 confirmed 轨迹（全员在场） $\to$ 准确抑制打野未知警报
+    // 场景 2：3 名敌方存活，小地图即使有 3 条匿名 confirmed 轨迹，因为无 championId 无法证明打野身份 $\to$ 依然必须报警！
     setupLiveMatch([
       {
         trackId: 'track_enemy_1',
@@ -1114,9 +1113,9 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
         regionId: 'top_lane',
         confidence: 0.9,
         lifecycle: 'confirmed',
-        firstObservedAt: now,
-        lastObservedAt: now,
-        expiresAt: now + 5000
+        firstObservedAt: now + 100000,
+        lastObservedAt: now + 100000,
+        expiresAt: now + 105000
       },
       {
         trackId: 'track_enemy_2',
@@ -1127,9 +1126,9 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
         regionId: 'mid_lane',
         confidence: 0.9,
         lifecycle: 'confirmed',
-        firstObservedAt: now,
-        lastObservedAt: now,
-        expiresAt: now + 5000
+        firstObservedAt: now + 100000,
+        lastObservedAt: now + 100000,
+        expiresAt: now + 105000
       },
       {
         trackId: 'track_enemy_3',
@@ -1140,20 +1139,48 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
         regionId: 'top_river',
         confidence: 0.9,
         lifecycle: 'confirmed',
-        firstObservedAt: now,
-        lastObservedAt: now,
-        expiresAt: now + 5000
+        firstObservedAt: now + 100000,
+        lastObservedAt: now + 100000,
+        expiresAt: now + 105000
       }
     ])
-    const allPresentCues = engine.evaluate({
+    const anonymousCues = engine.evaluate({
       sessionId: 'sess_jg_dedup',
       patch: '16.16.1',
       fusion,
       enabledCategories: { warning: true, information: true, opportunity: true },
       enabledCapabilities: new Set(['coach.analyze.minimap-basic']),
-      currentTime: now
+      currentTime: now + 100000
     })
-    expect(allPresentCues.find((c) => c.ruleId === 'rule_basic_skills_and_tactics')).toBeUndefined()
+    expect(anonymousCues.find((c) => c.ruleId === 'rule_basic_skills_and_tactics')).toBeDefined()
+
+    // 场景 3：小地图检测到 confirmed 且 explicit championId === 64 (Lee Sin) 的实体 $\to$ 准确抑制打野未知警报
+    setupLiveMatch([
+      {
+        trackId: 'track_enemy_lee',
+        kind: 'enemy',
+        team: 'enemy',
+        championId: 64, // 显式匹配打野英雄 ID
+        point: { x: 0.3, y: 0.3 },
+        regionId: 'top_river',
+        confidence: 0.9,
+        lifecycle: 'confirmed',
+        firstObservedAt: now + 200000,
+        lastObservedAt: now + 200000,
+        expiresAt: now + 205000
+      }
+    ])
+    const explicitSeenCues = engine.evaluate({
+      sessionId: 'sess_jg_dedup',
+      patch: '16.16.1',
+      fusion,
+      enabledCategories: { warning: true, information: true, opportunity: true },
+      enabledCapabilities: new Set(['coach.analyze.minimap-basic']),
+      currentTime: now + 200000
+    })
+    expect(
+      explicitSeenCues.find((c) => c.ruleId === 'rule_basic_skills_and_tactics')
+    ).toBeUndefined()
   })
 
   it('handles AP counter adaptive item data (Maw 3156, Banshees 3102, Kaenic 2504) according to Riot 16.16.1', () => {
@@ -1232,14 +1259,14 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     expect(apGuidance?.primaryPlan.conditions[0]).toContain('玛莫提乌斯之噬')
   })
 
-  it('strictly disables item guidance when patch is not 16.x or unknown', () => {
+  it('strictly disables item guidance when patch is not 16.16.1 or unknown', () => {
     const fusion = new FactFusionEngine()
     const now = 1700000000000
 
     fusion.updateLiveGameSnapshot(
       {
         sessionId: 'sess_old_patch',
-        patch: '15.1.1', // 非 16.x 补丁
+        patch: '15.1.1', // 非 16.16.1 补丁
         gameTimeSeconds: 500,
         clock: { observedAt: now, receivedAt: now, sequence: 1 },
         activePlayer: {
@@ -1274,7 +1301,101 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
       now
     )
 
-    // 非 16.x 补丁必须严格返回 null，杜绝错误指导
+    // 非 16.16.1 补丁必须严格返回 null，杜绝错误指导
+    expect(fusion.getItemPurchaseGuidance(now)).toBeNull()
+  })
+
+  it('handles recursive multiset sub-component deduction and unknown champion safety', () => {
+    const fusion = new FactFusionEngine()
+    const now = 1700000000000
+
+    // 1. 盖伦持有长剑 1036 (350g)，合成挺进破坏者 6631 (3300g)，验证递归抵扣 350g，netCost = 2950g
+    fusion.updateLiveGameSnapshot(
+      {
+        sessionId: 'sess_sub_comp',
+        patch: '16.16.1',
+        gameTimeSeconds: 400,
+        clock: { observedAt: now, receivedAt: now, sequence: 1 },
+        activePlayer: {
+          summonerName: 'GarenPlayer',
+          riotId: 'Garen#CN',
+          riotIdGameName: 'Garen',
+          riotIdTagLine: 'CN',
+          championName: 'Garen',
+          level: 6,
+          currentGold: 3000,
+          team: 'ORDER',
+          abilities: {}
+        },
+        players: [
+          {
+            summonerName: 'GarenPlayer',
+            riotId: 'Garen#CN',
+            riotIdGameName: 'Garen',
+            riotIdTagLine: 'CN',
+            championName: 'Garen',
+            championId: 86,
+            team: 'ORDER',
+            position: 'TOP',
+            isDead: false,
+            respawnTimer: 0,
+            items: [
+              { itemID: 1036, count: 1 } // 持有一把长剑 (350g)
+            ]
+          } as any
+        ],
+        events: [],
+        sourceHealth: []
+      },
+      now
+    )
+
+    const guidance = fusion.getItemPurchaseGuidance(now)
+    expect(guidance).toBeDefined()
+    expect(guidance?.primaryPlan.itemIds).toEqual([6631])
+    // 3300g - 350g = 2950g
+    expect(guidance?.primaryPlan.totalCost).toBe(2950)
+    expect(guidance?.primaryPlan.remainingGold).toBe(50) // 3000 - 2950 = 50
+
+    // 2. 未分类英雄且无 position 时返回 null，杜绝错误假设为 fighter
+    fusion.updateLiveGameSnapshot(
+      {
+        sessionId: 'sess_unknown_champ',
+        patch: '16.16.1',
+        gameTimeSeconds: 400,
+        clock: { observedAt: now, receivedAt: now, sequence: 1 },
+        activePlayer: {
+          summonerName: 'CustomHeroPlayer',
+          riotId: 'Hero#CN',
+          riotIdGameName: 'Hero',
+          riotIdTagLine: 'CN',
+          championName: 'UnknownNewChampion2026',
+          level: 6,
+          currentGold: 3000,
+          team: 'ORDER',
+          abilities: {}
+        },
+        players: [
+          {
+            summonerName: 'CustomHeroPlayer',
+            riotId: 'Hero#CN',
+            riotIdGameName: 'Hero',
+            riotIdTagLine: 'CN',
+            championName: 'UnknownNewChampion2026',
+            championId: 99999,
+            team: 'ORDER',
+            position: '',
+            isDead: false,
+            respawnTimer: 0,
+            items: []
+          } as any
+        ],
+        events: [],
+        sourceHealth: []
+      },
+      now
+    )
+
     expect(fusion.getItemPurchaseGuidance(now)).toBeNull()
   })
 
@@ -1283,9 +1404,6 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     const now = 1700000000000
 
     // 玩家持有 2 瓶堆叠药水（仅占 1 格）、草鞋 1001（1 格）和其他 4 件装备，总共填满 6 格
-    // 验证：
-    // 1. 2 瓶堆叠药水不会被错误当成 2 格；
-    // 2. 满 6 格时，由于拥有草鞋 1001，允许原位升级为 2 级水银之靴 (3111)，并在扣减 300g 后提供备选方案！
     fusion.updateLiveGameSnapshot(
       {
         sessionId: 'sess_boots_upgrade',

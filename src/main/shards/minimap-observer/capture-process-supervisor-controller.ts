@@ -78,11 +78,23 @@ export class CaptureProcessSupervisorController {
   private _targetHwnd: number | null = null
 
   private _getEffectiveBackend(): 'wgc' | 'dda' | 'desktopCapturer' {
-    const configured = this._context.liveCoach.settings.captureBackend
-    if (process.platform === 'win32') {
-      if (configured === 'dda') return 'dda'
-      return 'wgc' // Windows 平台下默认以 WGC (Windows.Graphics.Capture) 为主路径
+    // 检查是否存在已加载编译的 Win32 原生 WGC/DDA 采集驱动模块
+    let hasNativeCapture = false
+    try {
+      const native = require('league-akari-native-win32')
+      if (native && (native.wgc || native.capture)) {
+        hasNativeCapture = true
+      }
+    } catch {
+      hasNativeCapture = false
     }
+
+    const configured = this._context.liveCoach.settings.captureBackend
+    if (process.platform === 'win32' && hasNativeCapture) {
+      if (configured === 'dda') return 'dda'
+      return 'wgc'
+    }
+    // 原生驱动未挂载就绪前，如实报告当前活跃的真实采集后端为 desktopCapturer，绝不虚假伪报 WGC/DDA
     return 'desktopCapturer'
   }
 

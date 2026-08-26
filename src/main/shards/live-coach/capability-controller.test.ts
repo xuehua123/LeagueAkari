@@ -64,4 +64,29 @@ describe('LiveCoachCapabilityController', () => {
       expect.not.objectContaining({ 'coach.capture.screen': 'roi-occluded' })
     )
   })
+
+  it('immediately recalculates capabilities when setGates is called in public build channel', () => {
+    const ctx = createMockContext()
+    const controller = new LiveCoachCapabilityController(ctx)
+
+    controller.setBuildChannel('public')
+    // 初始状态评估
+    controller.evaluateCapabilities(11, 420, '16.16.1', { roiHealth: 'healthy' })
+
+    // 1. 关闭 Gate A (fog-inference disabled)，Gate B 开启 (item-purchase enabled)
+    controller.setGates(false, true)
+
+    expect(ctx.state.setCapability).toHaveBeenLastCalledWith(
+      expect.not.arrayContaining(['coach.analyze.fog-inference']),
+      expect.objectContaining({ 'coach.analyze.fog-inference': 'capability-disabled' })
+    )
+
+    // 2. 关闭 Gate B (item-purchase disabled)，Gate A 开启
+    controller.setGates(true, false)
+
+    expect(ctx.state.setCapability).toHaveBeenLastCalledWith(
+      expect.not.arrayContaining(['coach.guidance.item-purchase']),
+      expect.objectContaining({ 'coach.guidance.item-purchase': 'capability-disabled' })
+    )
+  })
 })

@@ -38,6 +38,7 @@ export class LiveCoachMain implements IAkariShardInitDispose {
   private readonly _cueScheduler: CueSchedulerController
   private readonly _sessionController: LiveCoachSessionController
   private readonly _ipcHandlers: LiveCoachIpcHandlers
+  private _featureGatingDisposer: (() => void) | null = null
 
   constructor(
     private readonly _ipc: AkariIpcMain,
@@ -173,15 +174,19 @@ export class LiveCoachMain implements IAkariShardInitDispose {
     if (buildChannel === 'internal') {
       this._capabilityController.setGates(true, true)
     } else {
-      const gateB = this._featureGating.isEnabled('live-coach.capture', false)
-      this._capabilityController.setGates(false, gateB)
+      const gateA = this._featureGating.isEnabled('live-coach.fog-inference', false)
+      const gateB = this._featureGating.isEnabled('live-coach.item-guidance', false)
+      this._capabilityController.setGates(gateA, gateB)
     }
 
-    this._mobxUtils.reaction(
-      () => this._featureGating.isEnabled('live-coach.capture', false),
-      (enabled) => {
-        if (buildChannel === 'public') {
-          this._capabilityController.setGates(false, enabled)
+    this._featureGatingDisposer = this._mobxUtils.reaction(
+      () => ({
+        gateA: this._featureGating.isEnabled('live-coach.fog-inference', false),
+        gateB: this._featureGating.isEnabled('live-coach.item-guidance', false)
+      }),
+      ({ gateA, gateB }) => {
+        if (this._capabilityController.buildChannel === 'public') {
+          this._capabilityController.setGates(gateA, gateB)
         }
       }
     )
@@ -199,6 +204,10 @@ export class LiveCoachMain implements IAkariShardInitDispose {
 
   public async onDispose(): Promise<void> {
     this._logger.info('Disposing LiveCoachMain')
+    if (this._featureGatingDisposer) {
+      this._featureGatingDisposer()
+      this._featureGatingDisposer = null
+    }
     this._sessionController.dispose()
     this._cueScheduler.dispose()
   }

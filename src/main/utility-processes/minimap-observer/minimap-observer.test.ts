@@ -276,4 +276,24 @@ describe('Minimap Observer CV & Tracking Algorithms (minimap-cv)', () => {
     expect(cvState.lastFrameHash).toBe(hashB)
     expect(res.health).toBe('healthy')
   })
+
+  it('safely computes frame hash on unaligned Uint8Array slices without RangeError', () => {
+    // 构造非 4 字节对齐的 ArrayBuffer 视图 (byteOffset = 1, 2, 3)
+    const rawBuffer = new ArrayBuffer(127)
+    const u8Offset1 = new Uint8Array(rawBuffer, 1, 120)
+    for (let i = 0; i < u8Offset1.length; i++) {
+      u8Offset1[i] = (i * 17) % 256
+    }
+
+    expect(() => {
+      const hash = computeFrameHash(u8Offset1)
+      expect(typeof hash).toBe('number')
+    }).not.toThrow()
+
+    const u8Offset3 = new Uint8Array(rawBuffer, 3, 115)
+    expect(() => {
+      const hash = computeFrameHash(u8Offset3)
+      expect(typeof hash).toBe('number')
+    }).not.toThrow()
+  })
 })

@@ -8,6 +8,10 @@ export class LiveCoachCapabilityController {
   private _buildChannel: LiveCoachBuildChannel = 'internal'
   private _gateAEnabled = true
   private _gateBEnabled = true
+  private _lastMapId: number | null = null
+  private _lastQueueId: number | null = null
+  private _lastPatch: string | null = null
+  private _lastWorkerStatus?: { roiHealth?: string; state?: string }
 
   constructor(private readonly _context: LiveCoachMainContext) {}
 
@@ -22,14 +26,29 @@ export class LiveCoachCapabilityController {
   public setGates(gateA: boolean, gateB: boolean): void {
     this._gateAEnabled = gateA
     this._gateBEnabled = gateB
+    this.refreshCapabilities()
+  }
+
+  public refreshCapabilities(): void {
+    this.evaluateCapabilities(
+      this._lastMapId,
+      this._lastQueueId,
+      this._lastPatch,
+      this._lastWorkerStatus
+    )
   }
 
   public evaluateCapabilities(
     mapId: number | null,
-    _queueId: number | null = null,
+    queueId: number | null = null,
     patch: string | null = null,
     workerStatus?: { roiHealth?: string; state?: string }
   ): void {
+    this._lastMapId = mapId
+    this._lastQueueId = queueId
+    this._lastPatch = patch
+    this._lastWorkerStatus = workerStatus
+
     const enabledFeatureIds: string[] = []
     const unavailable: Record<string, CoachUnavailableReason> = {}
 

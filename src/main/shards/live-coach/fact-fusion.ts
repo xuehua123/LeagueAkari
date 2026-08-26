@@ -9,6 +9,9 @@ import {
 } from '@shared/types/live-coach'
 import { LiveGameSnapshot, NormalizedPlayer } from '@shared/types/live-game-data'
 
+import { RiotItemCatalog16_16_1 } from './catalog/items-16-16-1'
+import { RecipeTreeEngine } from './catalog/recipe-tree'
+
 export interface ObjectiveSchedule {
   name: string
   nextSpawnGameTime: number
@@ -658,9 +661,9 @@ export class FactFusionEngine {
       return
     }
 
-    // 补丁有效性校验：当前装备数据库严格基于 16.16.1 权威补丁。非 16.x 补丁一律停用推荐以保证绝对准确
+    // 补丁有效性校验：当前装备数据库严格基于 16.16.1 权威补丁。非 16.16.1 补丁一律停用推荐以保证绝对准确
     const patch = snapshot.patch
-    if (!patch || !patch.startsWith('16.')) {
+    if (!patch || patch !== RiotItemCatalog16_16_1.version) {
       this._latestItemGuidance = null
       return
     }
@@ -675,22 +678,29 @@ export class FactFusionEngine {
       else if (pos === 'UTILITY') role = 'support'
     }
     if (!role) {
-      role = 'fighter'
+      // 关键修复：未分类英雄不得默认使用 fighter 出装，应返回无推荐以防误导
+      this._latestItemGuidance = null
+      return
     }
 
-    const buildDef = CHAMPION_BUILDS[role] || CHAMPION_BUILDS.fighter
+    const buildDef = CHAMPION_BUILDS[role]
+    if (!buildDef) {
+      this._latestItemGuidance = null
+      return
+    }
+
     const inventoryItemIds = (matchingPlayer?.items ?? []).map((i) => i.itemID)
+    const playerItems = matchingPlayer?.items ?? []
 
     // 装备栏容量校验：计算非饰品道具占用格数（召唤师峡谷主装备栏最大 6 格，Slot 7 为饰品栏 3340/3363/3364）
     const TRINKET_IDS = new Set([3340, 3363, 3364])
-    const normalItems = (matchingPlayer?.items ?? []).filter((i) => !TRINKET_IDS.has(i.itemID))
-    // 关键修复：items 数组中每个元素对应 1 个格位（堆叠药水 count > 1 仍仅占用 1 格）
+    const normalItems = playerItems.filter((i) => !TRINKET_IDS.has(i.itemID))
     const occupiedSlots = normalItems.length
     const freeSlots = Math.max(0, 6 - occupiedSlots)
     const isInventoryFull = freeSlots === 0
 
     // 控制守卫购买资格：有空余格位，或已有未叠满的控制守卫 (最大堆叠 2)
-    const controlWardItem = (matchingPlayer?.items ?? []).find((i) => i.itemID === 2055)
+    const controlWardItem = playerItems.find((i) => i.itemID === 2055)
     const canBuyControlWard = freeSlots > 0 || (controlWardItem && (controlWardItem.count || 1) < 2)
 
     // 鞋子唯一性与升级资格校验：
@@ -752,41 +762,25 @@ export class FactFusionEngine {
       if (HEALING_CHAMPIONS.has(cleanName)) healingThreat = true
     }
 
+    const recipeEngine = new RecipeTreeEngine(RiotItemCatalog16_16_1)
+
     // 动态合成候选大件列表（优先包含针对敌方战局的自适应装备，后接流派核心装）
-    const adaptiveItems: Array<{
-      id: number
-      name: string
-      cost: number
-      components: Array<{ id: number; name: string; cost: number }>
-      reason: string
-    }> = []
+    const candidateTargetItems: Array<{ id: number; reason: string }> = []
 
     if (healingThreat) {
       if (role === 'fighter' || role === 'marksman' || role === 'assassin') {
-        adaptiveItems.push({
-          id: 3123, // 处刑人的重击 (800g: 1036 长剑 350g)
-          name: '处刑人的重击',
-          cost: 800,
-          components: [{ id: 1036, name: '长剑', cost: 350 }],
+        candidateTargetItems.push({
+          id: 3123, // 处刑人的重击 (800g)
           reason: '敌方存在高回复/吸血英雄，自适应优先提供重伤克制'
         })
       } else if (role === 'mage' || role === 'support') {
-        adaptiveItems.push({
-          id: 3916, // 湮灭宝珠 (800g: 1052 增幅典籍 400g)
-          name: '湮灭宝珠',
-          cost: 800,
-          components: [{ id: 1052, name: '增幅典籍', cost: 400 }],
+        candidateTargetItems.push({
+          id: 3916, // 湮灭宝珠 (800g)
           reason: '敌方存在高回复英雄，法系自适应优先提供重伤克制'
         })
       } else if (role === 'tank') {
-        adaptiveItems.push({
-          id: 3076, // 棘刺背心 (800g: 1029 布甲 300g, 1029 布甲 300g)
-          name: '棘刺背心',
-          cost: 800,
-          components: [
-            { id: 1029, name: '布甲', cost: 300 },
-            { id: 1029, name: '布甲', cost: 300 }
-          ],
+        candidateTargetItems.push({
+          id: 3076, // 棘刺背心 (800g)
           reason: '敌方高回复/普攻英雄，坦克自适应优先提供反伤重伤'
         })
       }
@@ -794,42 +788,26 @@ export class FactFusionEngine {
 
     if (apCount >= 2) {
       if (role === 'fighter' || role === 'assassin') {
-        adaptiveItems.push({
-          id: 3156, // 玛莫提乌斯之噬 (3100g)
-          name: '玛莫提乌斯之噬',
-          cost: 3100,
-          components: [
-            { id: 3155, name: '海克斯饮魔刀', cost: 1300 },
-            { id: 1037, name: '十字镐', cost: 1025 }
-          ],
+        candidateTargetItems.push({
+          id: 3156, // 玛莫提乌斯之噬 (3100g, 3155+3133)
           reason: '敌方法系伤害较高，自适应提供魔抗与救主灵刃护盾'
         })
       } else if (role === 'mage') {
-        adaptiveItems.push({
-          id: 3102, // 女妖面纱 (3000g)
-          name: '女妖面纱',
-          cost: 3000,
-          components: [
-            { id: 1058, name: '无用大棒', cost: 1200 },
-            { id: 4632, name: '翠绿屏障', cost: 1800 }
-          ],
+        candidateTargetItems.push({
+          id: 3102, // 女妖面纱 (3000g, 1058+4632)
           reason: '敌方法系爆发较高，自适应提供魔抗与法术护盾'
         })
       } else if (role === 'tank') {
-        adaptiveItems.push({
-          id: 2504, // 败魔 (2900g)
-          name: '败魔',
-          cost: 2900,
-          components: [
-            { id: 3211, name: '幽魂斗篷', cost: 1250 },
-            { id: 1057, name: '负极斗篷', cost: 850 }
-          ],
+        candidateTargetItems.push({
+          id: 2504, // 败魔 (2900g, 3211+1057)
           reason: '敌方法系伤害主导，自适应提供高额魔抗与魔法护盾'
         })
       }
     }
 
-    const targetCoreItems = [...adaptiveItems, ...buildDef.coreItems]
+    for (const core of buildDef.coreItems) {
+      candidateTargetItems.push({ id: core.id, reason: core.reason })
+    }
 
     // 1. 创建并持久化金币与装备 Evidence
     const goldEvidenceId = `evi_gold_inv_${now}`
@@ -851,82 +829,88 @@ export class FactFusionEngine {
       }
     })
 
-    // 2. 找到尚未完成的第一个核心/自适应大件
-    const uncompletedCore =
-      targetCoreItems.find((item) => !inventoryItemIds.includes(item.id)) || targetCoreItems[0]
+    // 2. 找到尚未完成的第一个核心/自适应大件并进行递归多重集合抵扣计算
+    let chosenTarget = candidateTargetItems[0]
+    let deductionResult = recipeEngine.calculateNetCost(chosenTarget.id, playerItems, currentGold)
 
-    // 检查已拥有的组件并抵扣总花费（支持重复组件如狂徒铠甲的 2 个巨人腰带 1011）
-    let netCost = uncompletedCore.cost
-    const remainingInventoryItemIds = [...inventoryItemIds]
-    const ownedComponents: Array<{ id: number; name: string; cost: number }> = []
-    const missingComponents: Array<{ id: number; name: string; cost: number }> = []
-
-    for (const comp of uncompletedCore.components) {
-      const idx = remainingInventoryItemIds.indexOf(comp.id)
-      if (idx !== -1) {
-        remainingInventoryItemIds.splice(idx, 1)
-        ownedComponents.push(comp)
-        netCost -= comp.cost
-      } else {
-        missingComponents.push(comp)
+    for (const cand of candidateTargetItems) {
+      const res = recipeEngine.calculateNetCost(cand.id, playerItems, currentGold)
+      if (!res.isCompleted) {
+        chosenTarget = cand
+        deductionResult = res
+        break
       }
     }
-    netCost = Math.max(0, netCost)
+
+    const netCost = deductionResult.netCost
+    const targetItemName = deductionResult.targetItemName
 
     // 3. 构建购买方案
     let primaryPlan: ItemPurchasePlan
-    if (currentGold >= netCost) {
+    if (currentGold >= netCost && netCost > 0) {
       primaryPlan = {
-        itemIds: [uncompletedCore.id],
+        itemIds: [chosenTarget.id],
         totalCost: netCost,
         remainingGold: currentGold - netCost,
         missingGold: 0,
         reasonCodes: ['CORE_ITEM_COMPLETE'],
-        conditions: [`完成核心装备：${uncompletedCore.name}（${uncompletedCore.reason}）`]
+        conditions: [`完成核心装备：${targetItemName}（${chosenTarget.reason}）`]
       }
-    } else if (isInventoryFull) {
-      // 关键修复：满背包 (6/6) 时无空槽位，无法购买需要新槽位的基础散件，指导积攒金币直接购买完成整件
+    } else if (isInventoryFull && !deductionResult.isCompleted) {
+      // 满背包 (6/6) 时无空槽位，无法购买需要新槽位的基础散件，指导积攒金币直接购买完成整件
       primaryPlan = {
-        itemIds: [uncompletedCore.id],
+        itemIds: [chosenTarget.id],
         totalCost: netCost,
         remainingGold: 0,
         missingGold: Math.max(0, netCost - currentGold),
         reasonCodes: ['INVENTORY_FULL_SAVE_GOLD'],
-        conditions: [
-          `装备栏已满（6/6）无空位，建议积攒金币直接购买完成整件：${uncompletedCore.name}`
-        ]
+        conditions: [`装备栏已满（6/6）无空位，建议积攒金币直接购买完成整件：${targetItemName}`]
+      }
+    } else if (deductionResult.isCompleted) {
+      primaryPlan = {
+        itemIds: [chosenTarget.id],
+        totalCost: 0,
+        remainingGold: currentGold,
+        missingGold: 0,
+        reasonCodes: ['CORE_ITEM_COMPLETE'],
+        conditions: [`已完成核心装备：${targetItemName}`]
       }
     } else {
-      // 检查是否有玩家买得起的未拥有组件
-      const affordableUnownedComp = missingComponents.find((comp) => currentGold >= comp.cost)
+      // 检查是否有玩家买得起的未拥有组件（优先推荐买得起的组件）
+      const nextCompId = deductionResult.nextPurchasableItemIds[0] || chosenTarget.id
+      const nextCompDef = recipeEngine.getItem(nextCompId)
+      const nextCompName = nextCompDef ? nextCompDef.name : `Item_${nextCompId}`
+      const nextCompCost = nextCompDef ? nextCompDef.totalCost : netCost
 
-      if (affordableUnownedComp) {
+      if (currentGold >= nextCompCost) {
         primaryPlan = {
-          itemIds: [affordableUnownedComp.id],
-          totalCost: affordableUnownedComp.cost,
-          remainingGold: currentGold - affordableUnownedComp.cost,
+          itemIds: [nextCompId],
+          totalCost: nextCompCost,
+          remainingGold: currentGold - nextCompCost,
           missingGold: 0,
           reasonCodes: ['CORE_COMPONENT_AFFORDABLE'],
-          conditions: [`合成 ${uncompletedCore.name} 组件：${affordableUnownedComp.name}`]
+          conditions: [`合成 ${targetItemName} 组件：${nextCompName}`]
         }
       } else {
-        const nextComp = missingComponents[0] || uncompletedCore.components[0]
         primaryPlan = {
-          itemIds: [nextComp.id],
-          totalCost: nextComp.cost,
+          itemIds: [nextCompId],
+          totalCost: nextCompCost,
           remainingGold: 0,
-          missingGold: Math.max(0, nextComp.cost - currentGold),
+          missingGold: Math.max(0, nextCompCost - currentGold),
           reasonCodes: ['CORE_COMPONENT_PROGRESSION'],
-          conditions: [`合成 ${uncompletedCore.name} 组件：${nextComp.name}`]
+          conditions: [`合成 ${targetItemName} 组件：${nextCompName}`]
         }
       }
     }
 
     const alternativePlans: ItemPurchasePlan[] = []
     if (!hasTier2Boots && canUpgradeBoots && !inventoryItemIds.includes(buildDef.boots.id)) {
-      const bootsNetCost = hasTier1Boots
-        ? Math.max(0, buildDef.boots.cost - 300)
-        : buildDef.boots.cost
+      const bootsDeduction = recipeEngine.calculateNetCost(
+        buildDef.boots.id,
+        playerItems,
+        currentGold
+      )
+      const bootsNetCost = bootsDeduction.netCost
       alternativePlans.push({
         itemIds: [buildDef.boots.id],
         totalCost: bootsNetCost,
@@ -935,8 +919,8 @@ export class FactFusionEngine {
         reasonCodes: ['BOOTS_MOBILITY'],
         conditions: [
           hasTier1Boots
-            ? `备选：原位升级为 ${buildDef.boots.name}（${buildDef.boots.reason}）`
-            : `备选：${buildDef.boots.name}（${buildDef.boots.reason}）`
+            ? `备选：原位升级为 ${bootsDeduction.targetItemName}（${buildDef.boots.reason}）`
+            : `备选：${bootsDeduction.targetItemName}（${buildDef.boots.reason}）`
         ]
       })
     }
@@ -948,7 +932,7 @@ export class FactFusionEngine {
         remainingGold: Math.max(0, currentGold - 75),
         missingGold: Math.max(0, 75 - currentGold),
         reasonCodes: ['VISION_CONTROL'],
-        conditions: ['备选：控制守卫（防御草丛视野）']
+        conditions: ['备选：控制守卫（视野控制与隐形反制）']
       })
     }
 

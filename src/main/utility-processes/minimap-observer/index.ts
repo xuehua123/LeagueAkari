@@ -43,6 +43,11 @@ let frameWidth = 250
 let frameHeight = 250
 let currentPatch = '16.16.1'
 
+const cvState = {
+  consecutiveFrozenFrames: 0,
+  lastFrameHash: 0
+}
+
 function sendMessage(msg: WorkerToMainMessage) {
   if (process.parentPort) {
     process.parentPort.postMessage(msg)
@@ -100,7 +105,8 @@ function runDetectionTick() {
         latestFrameObservedAt,
         latestPixelFormat,
         trackedEntities,
-        getNewEntityId
+        getNewEntityId,
+        cvState
       )
       health = result.health
       lastProcessedHealth = result.health

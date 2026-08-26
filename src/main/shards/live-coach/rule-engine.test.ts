@@ -964,64 +964,225 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
     expect(guidance?.primaryPlan.missingGold).toBe(0)
   })
 
-  it('correctly suppresses jungler fog alarm when an anonymous enemy is spotted in jungle or river', () => {
+  it('correctly applies laner conservation to verify jungler presence in jungle/river', () => {
     const fusion = new FactFusionEngine()
     const engine = new CoachRuleEngine()
     const now = 1700000000000
 
-    fusion.updateLiveGameSnapshot(
-      {
-        sessionId: 'sess_jg_spatial',
-        patch: '16.16.1',
-        gameTimeSeconds: 300,
-        clock: { observedAt: now, receivedAt: now, sequence: 1 },
-        activePlayer: {
-          summonerName: 'MidPlayer',
-          riotId: 'Mid#CN',
-          riotIdGameName: 'Mid',
-          riotIdTagLine: 'CN',
-          championName: 'Ahri',
-          level: 6,
-          currentGold: 1000,
-          team: 'ORDER',
-          abilities: {}
-        },
-        players: [
-          {
+    const setupLiveMatch = (enemyTopInLane: boolean, enemyMidInLane: boolean) => {
+      fusion.updateLiveGameSnapshot(
+        {
+          sessionId: 'sess_jg_laner_conservation',
+          patch: '16.16.1',
+          gameTimeSeconds: 300,
+          clock: { observedAt: now, receivedAt: now, sequence: 1 },
+          activePlayer: {
             summonerName: 'MidPlayer',
             riotId: 'Mid#CN',
             riotIdGameName: 'Mid',
             riotIdTagLine: 'CN',
             championName: 'Ahri',
-            championId: 103,
+            level: 6,
+            currentGold: 1000,
+            team: 'ORDER',
+            abilities: {}
+          },
+          players: [
+            {
+              summonerName: 'MidPlayer',
+              riotId: 'Mid#CN',
+              riotIdGameName: 'Mid',
+              riotIdTagLine: 'CN',
+              championName: 'Ahri',
+              championId: 103,
+              team: 'ORDER',
+              position: 'MIDDLE',
+              isDead: false,
+              respawnTimer: 0,
+              items: []
+            } as any,
+            {
+              summonerName: 'EnemyTop',
+              riotId: 'Darius#CN',
+              riotIdGameName: 'Darius',
+              riotIdTagLine: 'CN',
+              championName: 'Darius',
+              championId: 122,
+              team: 'CHAOS',
+              position: 'TOP',
+              isDead: false,
+              respawnTimer: 0,
+              items: []
+            } as any,
+            {
+              summonerName: 'EnemyMid',
+              riotId: 'Zed#CN',
+              riotIdGameName: 'Zed',
+              riotIdTagLine: 'CN',
+              championName: 'Zed',
+              championId: 238,
+              team: 'CHAOS',
+              position: 'MIDDLE',
+              isDead: false,
+              respawnTimer: 0,
+              items: []
+            } as any,
+            {
+              summonerName: 'EnemyJungler',
+              riotId: 'Lee#CN',
+              riotIdGameName: 'Lee',
+              riotIdTagLine: 'CN',
+              championName: 'LeeSin',
+              championId: 64,
+              team: 'CHAOS',
+              position: 'JUNGLE',
+              isDead: false,
+              respawnTimer: 0,
+              items: []
+            } as any
+          ],
+          events: [],
+          sourceHealth: []
+        },
+        now
+      )
+
+      const minimapEntities: any[] = []
+      if (enemyTopInLane) {
+        minimapEntities.push({
+          trackId: 'track_enemy_top',
+          kind: 'enemy',
+          team: 'enemy',
+          championId: null,
+          point: { x: 0.1, y: 0.2 },
+          regionId: 'top_lane',
+          confidence: 0.9,
+          lifecycle: 'confirmed',
+          firstObservedAt: now,
+          lastObservedAt: now,
+          expiresAt: now + 5000
+        })
+      }
+      if (enemyMidInLane) {
+        minimapEntities.push({
+          trackId: 'track_enemy_mid',
+          kind: 'enemy',
+          team: 'enemy',
+          championId: null,
+          point: { x: 0.5, y: 0.5 },
+          regionId: 'mid_lane',
+          confidence: 0.9,
+          lifecycle: 'confirmed',
+          firstObservedAt: now,
+          lastObservedAt: now,
+          expiresAt: now + 5000
+        })
+      }
+      // 河道出现的无名敌方实体
+      minimapEntities.push({
+        trackId: 'track_enemy_river',
+        kind: 'enemy',
+        team: 'enemy',
+        championId: null,
+        point: { x: 0.3, y: 0.3 },
+        regionId: 'top_river',
+        confidence: 0.9,
+        lifecycle: 'confirmed',
+        firstObservedAt: now,
+        lastObservedAt: now,
+        expiresAt: now + 5000
+      })
+
+      fusion.updateMinimapBatch(
+        {
+          sessionId: 'sess_jg_laner_conservation',
+          patch: '16.16.1',
+          calibrationVersion: '1.0.0',
+          modelVersions: {},
+          frame: { observedAt: now, receivedAt: now, sequence: 1, ageMs: 15 },
+          health: 'healthy',
+          entities: minimapEntities,
+          events: []
+        },
+        now
+      )
+    }
+
+    // 场景 1：敌方中单脱离中路线位，河道出现无名敌人可能是中单游走而非打野 $\to$ 守线守恒不满足，打野仍然未知，必须报警！
+    setupLiveMatch(true, false)
+    const roamingCues = engine.evaluate({
+      sessionId: 'sess_jg_laner_conservation',
+      patch: '16.16.1',
+      fusion,
+      enabledCategories: { warning: true, information: true, opportunity: true },
+      enabledCapabilities: new Set(['coach.analyze.minimap-basic']),
+      currentTime: now
+    })
+    expect(roamingCues.find((c) => c.ruleId === 'rule_basic_skills_and_tactics')).toBeDefined()
+
+    // 场景 2：敌方上单在上路、中单在中路，所有存活线上英雄均已在各自线位守线，此时河道额外多出的敌方必然为打野 $\to$ 准确抑制打野未知报警！
+    setupLiveMatch(true, true)
+    const allLanersPresentCues = engine.evaluate({
+      sessionId: 'sess_jg_laner_conservation',
+      patch: '16.16.1',
+      fusion,
+      enabledCategories: { warning: true, information: true, opportunity: true },
+      enabledCapabilities: new Set(['coach.analyze.minimap-basic']),
+      currentTime: now
+    })
+    expect(
+      allLanersPresentCues.find((c) => c.ruleId === 'rule_basic_skills_and_tactics')
+    ).toBeUndefined()
+  })
+
+  it('handles full inventory (6 slots), control ward occupancy, and adaptive item recommendations', () => {
+    const fusion = new FactFusionEngine()
+    const now = 1700000000000
+
+    // 场景 1：敌方存在高回复吸血英雄 (Aatrox)，战士亚索自适应推荐重伤装 3123 处刑人的重击 (800g)
+    fusion.updateLiveGameSnapshot(
+      {
+        sessionId: 'sess_adaptive_healing',
+        patch: '16.16.1',
+        gameTimeSeconds: 400,
+        clock: { observedAt: now, receivedAt: now, sequence: 1 },
+        activePlayer: {
+          summonerName: 'YasuoPlayer',
+          riotId: 'Yasuo#CN',
+          riotIdGameName: 'Yasuo',
+          riotIdTagLine: 'CN',
+          championName: 'Yasuo',
+          level: 6,
+          currentGold: 900,
+          team: 'ORDER',
+          abilities: {}
+        },
+        players: [
+          {
+            summonerName: 'YasuoPlayer',
+            riotId: 'Yasuo#CN',
+            riotIdGameName: 'Yasuo',
+            riotIdTagLine: 'CN',
+            championName: 'Yasuo',
+            championId: 157,
             team: 'ORDER',
             position: 'MIDDLE',
             isDead: false,
             respawnTimer: 0,
-            items: []
+            items: [
+              { itemID: 3031, count: 1 }, // 已完成无尽之刃
+              { itemID: 6672, count: 1 } // 已完成海妖杀手
+            ]
           } as any,
           {
-            summonerName: 'EnemyMid',
-            riotId: 'Zed#CN',
-            riotIdGameName: 'Zed',
+            summonerName: 'EnemyTop',
+            riotId: 'Aatrox#CN',
+            riotIdGameName: 'Aatrox',
             riotIdTagLine: 'CN',
-            championName: 'Zed',
-            championId: 238,
+            championName: 'Aatrox',
+            championId: 266,
             team: 'CHAOS',
-            position: 'MIDDLE',
-            isDead: false,
-            respawnTimer: 0,
-            items: []
-          } as any,
-          {
-            summonerName: 'EnemyJungler',
-            riotId: 'Lee#CN',
-            riotIdGameName: 'Lee',
-            riotIdTagLine: 'CN',
-            championName: 'LeeSin',
-            championId: 64,
-            team: 'CHAOS',
-            position: 'JUNGLE',
+            position: 'TOP',
             isDead: false,
             respawnTimer: 0,
             items: []
@@ -1033,89 +1194,48 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
       now
     )
 
-    // 小地图在河道区域 (top_river) 探测到匿名敌方图元（打野游走已现身），即使线上英雄消失，也应抑制打野未知警报
-    fusion.updateMinimapBatch(
-      {
-        sessionId: 'sess_jg_spatial',
-        patch: '16.16.1',
-        calibrationVersion: '1.0.0',
-        modelVersions: {},
-        frame: { observedAt: now, receivedAt: now, sequence: 1, ageMs: 15 },
-        health: 'healthy',
-        entities: [
-          {
-            trackId: 'track_enemy_1',
-            kind: 'enemy',
-            team: 'enemy',
-            championId: null, // 无显式 championId
-            point: { x: 0.3, y: 0.3 },
-            regionId: 'top_river',
-            confidence: 0.9,
-            lifecycle: 'confirmed',
-            firstObservedAt: now,
-            lastObservedAt: now,
-            expiresAt: now + 5000
-          }
-        ],
-        events: []
-      },
-      now
-    )
+    const healGuidance = fusion.getItemPurchaseGuidance(now)
+    expect(healGuidance).toBeDefined()
+    expect(healGuidance?.primaryPlan.itemIds).toEqual([3123])
+    expect(healGuidance?.primaryPlan.conditions[0]).toContain('处刑人的重击')
 
-    const cues = engine.evaluate({
-      sessionId: 'sess_jg_spatial',
-      patch: '16.16.1',
-      fusion,
-      enabledCategories: { warning: true, information: true, opportunity: true },
-      enabledCapabilities: new Set(['coach.analyze.minimap-basic']),
-      currentTime: now
-    })
-    expect(cues.find((c) => c.ruleId === 'rule_basic_skills_and_tactics')).toBeUndefined()
-  })
-
-  it('handles full inventory (6 slots) and tier 2 boots uniqueness properly in item purchase guidance', () => {
-    const fusion = new FactFusionEngine()
-    const now = 1700000000000
-
-    // 玩家背包已满 6 格（包含 2 级水银之靴 3111），且持有 1000g，目标大件 6631 挺进破坏者 (3300g)
-    // 玩家未拥有 6631 的任何组件，且背包无空位，无法购买 250g 短剑等基础散件，方案应指导攒钱购买整件 6631
-    // 且备选方案中不再推荐 2 级鞋子（因为已拥有 3111）
+    // 场景 2：背包满 6 格（包含 1 颗控制守卫 2055），因为 2055 可堆叠至 2，备选方案允许购买控制守卫
     fusion.updateLiveGameSnapshot(
       {
-        sessionId: 'sess_full_inv',
+        sessionId: 'sess_ward_stack',
         patch: '16.16.1',
-        gameTimeSeconds: 800,
+        gameTimeSeconds: 700,
         clock: { observedAt: now, receivedAt: now, sequence: 1 },
         activePlayer: {
-          summonerName: 'FighterPlayer',
-          riotId: 'Fighter#CN',
-          riotIdGameName: 'Fighter',
+          summonerName: 'YasuoPlayer',
+          riotId: 'Yasuo#CN',
+          riotIdGameName: 'Yasuo',
           riotIdTagLine: 'CN',
-          championName: 'Garen',
-          level: 9,
-          currentGold: 1000,
+          championName: 'Yasuo',
+          level: 8,
+          currentGold: 500,
           team: 'ORDER',
           abilities: {}
         },
         players: [
           {
-            summonerName: 'FighterPlayer',
-            riotId: 'Fighter#CN',
-            riotIdGameName: 'Fighter',
+            summonerName: 'YasuoPlayer',
+            riotId: 'Yasuo#CN',
+            riotIdGameName: 'Yasuo',
             riotIdTagLine: 'CN',
-            championName: 'Garen',
-            championId: 86,
+            championName: 'Yasuo',
+            championId: 157,
             team: 'ORDER',
-            position: 'TOP',
+            position: 'MIDDLE',
             isDead: false,
             respawnTimer: 0,
             items: [
-              { itemID: 3111, count: 1 }, // 2 级水银之靴
+              { itemID: 3047, count: 1 }, // 铁板靴
               { itemID: 1054, count: 1 }, // 多兰盾
               { itemID: 2003, count: 1 }, // 生命药水
               { itemID: 1082, count: 1 }, // 黑暗封印
               { itemID: 1055, count: 1 }, // 多兰之刃
-              { itemID: 1056, count: 1 } // 多兰之戒 (满 6 格)
+              { itemID: 2055, count: 1 } // 控制守卫 1 颗 (满 6 格，但 2055 可叠至 2)
             ]
           } as any
         ],
@@ -1125,13 +1245,57 @@ describe('CoachRuleEngine & Phase 1 Rules', () => {
       now
     )
 
-    const guidance = fusion.getItemPurchaseGuidance(now)
-    expect(guidance).toBeDefined()
-    expect(guidance?.championId).toBe(86)
-    // 验证背包满载时推荐目标为整件 6631，且备选方案不含鞋子
-    expect(guidance?.primaryPlan.itemIds).toEqual([6631])
-    expect(guidance?.alternativePlans.some((p) => p.reasonCodes.includes('BOOTS_MOBILITY'))).toBe(
-      false
+    const wardGuidance = fusion.getItemPurchaseGuidance(now)
+    expect(wardGuidance).toBeDefined()
+    expect(wardGuidance?.alternativePlans.some((p) => p.itemIds.includes(2055))).toBe(true)
+
+    // 场景 3：背包满 6 格且无控制守卫，无空位无法购买新控制守卫，备选方案过滤 2055
+    fusion.updateLiveGameSnapshot(
+      {
+        sessionId: 'sess_ward_no_slot',
+        patch: '16.16.1',
+        gameTimeSeconds: 800,
+        clock: { observedAt: now, receivedAt: now, sequence: 1 },
+        activePlayer: {
+          summonerName: 'YasuoPlayer',
+          riotId: 'Yasuo#CN',
+          riotIdGameName: 'Yasuo',
+          riotIdTagLine: 'CN',
+          championName: 'Yasuo',
+          level: 9,
+          currentGold: 500,
+          team: 'ORDER',
+          abilities: {}
+        },
+        players: [
+          {
+            summonerName: 'YasuoPlayer',
+            riotId: 'Yasuo#CN',
+            riotIdGameName: 'Yasuo',
+            riotIdTagLine: 'CN',
+            championName: 'Yasuo',
+            championId: 157,
+            team: 'ORDER',
+            position: 'MIDDLE',
+            isDead: false,
+            respawnTimer: 0,
+            items: [
+              { itemID: 3047, count: 1 },
+              { itemID: 1054, count: 1 },
+              { itemID: 2003, count: 1 },
+              { itemID: 1082, count: 1 },
+              { itemID: 1055, count: 1 },
+              { itemID: 1056, count: 1 } // 无 2055 且满 6 格
+            ]
+          } as any
+        ],
+        events: [],
+        sourceHealth: []
+      },
+      now
     )
+
+    const noWardGuidance = fusion.getItemPurchaseGuidance(now)
+    expect(noWardGuidance?.alternativePlans.some((p) => p.itemIds.includes(2055))).toBe(false)
   })
 })

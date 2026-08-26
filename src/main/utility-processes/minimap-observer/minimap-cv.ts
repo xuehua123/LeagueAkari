@@ -161,20 +161,32 @@ export function extractConnectedComponents(
 /**
  * 图像连通域提取与实体追踪状态机
  */
+export interface MinimapCvState {
+  consecutiveFrozenFrames: number
+  lastFrameHash: number
+}
+
+export function computeFrameHash(buffer: Uint8Array): number {
+  let hash = 0
+  const step = Math.max(4, Math.floor(buffer.length / 128))
+  for (let i = 0; i < buffer.length; i += step) {
+    hash = (hash * 31 + buffer[i]) | 0
+  }
+  return hash
+}
+
 export function processMinimapFrameWithState(
-  buffer: Uint8Array | null,
+  buffer: Uint8Array,
   width: number,
   height: number,
   observedAt: number,
   pixelFormat: 'bgra' | 'rgba',
   trackedEntities: Map<string, TrackedEntity>,
-  getNewEntityId: (team: string) => string
-): {
-  health: 'healthy' | 'degraded' | 'unknown'
-  entities: MinimapEntityObservation[]
-} {
-  // 1. 无真实画面缓冲时，返回 unknown 状态
-  if (!buffer || buffer.length === 0) {
+  getNewEntityId: (team: string) => string,
+  cvState?: MinimapCvState
+): { health: 'healthy' | 'degraded' | 'unknown'; entities: MinimapEntityObservation[] } {
+  // 1. 基础尺寸与有效性校验
+  if (!buffer || buffer.length === 0 || width <= 0 || height <= 0) {
     return { health: 'unknown', entities: [] }
   }
 
@@ -208,6 +220,21 @@ export function processMinimapFrameWithState(
   // 纯黑、纯白、纯灰遮挡或低方差空白/静止死帧一律判定为 degraded
   if (variance < 2.5 || meanLuma < 3.0 || meanLuma > 252.0) {
     return { health: 'degraded', entities: [] }
+  }
+
+  // 2.2 纹理画面静止/冻结死帧检测 (Frame Content Freeze Detection)
+  // 即使主进程单调递增 sequence，若物理画面像素连续 15 帧完全不变，说明采集流已挂起或游戏画面卡死
+  if (cvState) {
+    const currentHash = computeFrameHash(buffer)
+    if (currentHash === cvState.lastFrameHash) {
+      cvState.consecutiveFrozenFrames++
+      if (cvState.consecutiveFrozenFrames >= 15) {
+        return { health: 'degraded', entities: [] }
+      }
+    } else {
+      cvState.consecutiveFrozenFrames = 1
+      cvState.lastFrameHash = currentHash
+    }
   }
 
   // 3. 运行连通域聚类算法 (CCL)

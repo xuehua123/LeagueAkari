@@ -320,6 +320,14 @@ const CHAMPION_ROLES_MAP: Record<
   zilean: 'support'
 }
 
+function normalizeTeamName(rawTeam: unknown): 'ORDER' | 'CHAOS' | 'UNKNOWN' {
+  if (typeof rawTeam !== 'string') return 'UNKNOWN'
+  const upper = rawTeam.toUpperCase()
+  if (upper.includes('ORDER') || upper === '100' || upper === 'BLUE') return 'ORDER'
+  if (upper.includes('CHAOS') || upper === '200' || upper === 'RED') return 'CHAOS'
+  return 'UNKNOWN'
+}
+
 export class FactFusionEngine {
   private readonly _evidences = new Map<string, CoachEvidence>()
   private readonly _fogInferences = new Map<string, FogInference>()
@@ -673,14 +681,155 @@ export class FactFusionEngine {
     const buildDef = CHAMPION_BUILDS[role] || CHAMPION_BUILDS.fighter
     const inventoryItemIds = (matchingPlayer?.items ?? []).map((i) => i.itemID)
 
-    // 装备栏容量校验：计算非饰品/守卫道具数量（召唤师峡谷主装备栏最大 6 格）
-    const TRINKET_IDS = new Set([3340, 3363, 3364, 2055])
+    // 装备栏容量校验：计算非饰品道具数量（召唤师峡谷主装备栏最大 6 格，Slot 7 为饰品栏 3340/3363/3364，控制守卫 2055 正常占用 1-6 格）
+    const TRINKET_IDS = new Set([3340, 3363, 3364])
     const normalItems = (matchingPlayer?.items ?? []).filter((i) => !TRINKET_IDS.has(i.itemID))
-    const isInventoryFull = normalItems.length >= 6
+    const normalItemsCount = normalItems.reduce(
+      (acc, item) => acc + (item.itemID === 2055 ? 1 : item.count || 1),
+      0
+    )
+    const freeSlots = Math.max(0, 6 - normalItemsCount)
+    const isInventoryFull = freeSlots === 0
+
+    // 控制守卫购买资格：有空位，或已有未叠满的控制守卫 (最大堆叠 2)
+    const controlWardItem = (matchingPlayer?.items ?? []).find((i) => i.itemID === 2055)
+    const canBuyControlWard = freeSlots > 0 || (controlWardItem && (controlWardItem.count || 1) < 2)
 
     // 2级鞋唯一性校验：若已拥有任意 2 级鞋，则不重复推荐鞋子
     const TIER2_BOOTS = new Set([3047, 3111, 3006, 3020, 3158, 3009, 3117])
     const hasTier2Boots = inventoryItemIds.some((id) => TIER2_BOOTS.has(id))
+
+    // 分析敌方阵容威胁（AP 法系伤害、重伤需求）并进行战局自适应出装微调
+    const myTeam = normalizeTeamName(active.team)
+    const enemyTeam = myTeam === 'ORDER' ? 'CHAOS' : 'ORDER'
+    const enemyPlayers = (snapshot.players || []).filter((p) => p.team === enemyTeam)
+
+    const HEALING_CHAMPIONS = new Set([
+      'soraka',
+      'yuumi',
+      'aatrox',
+      'warwick',
+      'vladimir',
+      'sylas',
+      'briar',
+      'swain',
+      'kayn',
+      'drmundo',
+      'mundo',
+      'illaoi',
+      'volibear',
+      'fiora',
+      'irelia'
+    ])
+    const HEAVY_AP_CHAMPIONS = new Set([
+      'ahri',
+      'syndra',
+      'leblanc',
+      'veigar',
+      'viktor',
+      'lux',
+      'xerath',
+      'kassadin',
+      'katarina',
+      'fizz',
+      'ekko',
+      'evelynn',
+      'elise',
+      'nidalee',
+      'karthus',
+      'brand',
+      'zyra',
+      'velkoz'
+    ])
+
+    let apCount = 0
+    let healingThreat = false
+
+    for (const ep of enemyPlayers) {
+      const cleanName = (ep.championName || '').toLowerCase().replace(/[^a-z]/g, '')
+      if (HEAVY_AP_CHAMPIONS.has(cleanName)) apCount++
+      if (HEALING_CHAMPIONS.has(cleanName)) healingThreat = true
+    }
+
+    // 动态合成候选大件列表（优先包含针对敌方战局的自适应装备，后接流派核心装）
+    const adaptiveItems: Array<{
+      id: number
+      name: string
+      cost: number
+      components: Array<{ id: number; name: string; cost: number }>
+      reason: string
+    }> = []
+
+    if (healingThreat) {
+      if (role === 'fighter' || role === 'marksman' || role === 'assassin') {
+        adaptiveItems.push({
+          id: 3123, // 处刑人的重击 (800g: 1036 长剑 350g)
+          name: '处刑人的重击',
+          cost: 800,
+          components: [{ id: 1036, name: '长剑', cost: 350 }],
+          reason: '敌方存在高回复/吸血英雄，自适应优先提供重伤克制'
+        })
+      } else if (role === 'mage' || role === 'support') {
+        adaptiveItems.push({
+          id: 3916, // 湮灭宝珠 (800g: 1052 增幅典籍 400g)
+          name: '湮灭宝珠',
+          cost: 800,
+          components: [{ id: 1052, name: '增幅典籍', cost: 400 }],
+          reason: '敌方存在高回复英雄，法系自适应优先提供重伤克制'
+        })
+      } else if (role === 'tank') {
+        adaptiveItems.push({
+          id: 3076, // 棘刺背心 (800g: 1029 布甲 300g, 1029 布甲 300g)
+          name: '棘刺背心',
+          cost: 800,
+          components: [
+            { id: 1029, name: '布甲', cost: 300 },
+            { id: 1029, name: '布甲', cost: 300 }
+          ],
+          reason: '敌方高回复/普攻英雄，坦克自适应优先提供反伤重伤'
+        })
+      }
+    }
+
+    if (apCount >= 2) {
+      if (role === 'fighter' || role === 'assassin') {
+        adaptiveItems.push({
+          id: 3155, // 玛莫提乌斯之噬 (3100g)
+          name: '玛莫提乌斯之噬',
+          cost: 3100,
+          components: [
+            { id: 3134, name: '锯齿短匕', cost: 1000 },
+            { id: 1033, name: '抗魔斗篷', cost: 400 },
+            { id: 1036, name: '长剑', cost: 350 }
+          ],
+          reason: '敌方法系伤害较高，自适应提供魔抗与救主灵刃护盾'
+        })
+      } else if (role === 'mage') {
+        adaptiveItems.push({
+          id: 3102, // 女妖面纱 (3000g)
+          name: '女妖面纱',
+          cost: 3000,
+          components: [
+            { id: 3145, name: '海克斯科技发电机', cost: 1100 },
+            { id: 1057, name: '负极斗篷', cost: 900 }
+          ],
+          reason: '敌方法系爆发较高，自适应提供魔抗与法术护盾'
+        })
+      } else if (role === 'tank') {
+        adaptiveItems.push({
+          id: 6665, // 败魔 (2900g)
+          name: '败魔',
+          cost: 2900,
+          components: [
+            { id: 3211, name: '幽魂斗篷', cost: 1250 },
+            { id: 1057, name: '负极斗篷', cost: 900 }
+          ],
+          reason: '敌方法系伤害主导，自适应提供高额魔抗与魔法护盾'
+        })
+      }
+    }
+
+    const targetCoreItems = [...adaptiveItems, ...buildDef.coreItems]
 
     // 1. 创建并持久化金币与装备 Evidence
     const goldEvidenceId = `evi_gold_inv_${now}`
@@ -702,10 +851,9 @@ export class FactFusionEngine {
       }
     })
 
-    // 2. 找到尚未完成的第一个核心大件
+    // 2. 找到尚未完成的第一个核心/自适应大件
     const uncompletedCore =
-      buildDef.coreItems.find((item) => !inventoryItemIds.includes(item.id)) ||
-      buildDef.coreItems[0]
+      targetCoreItems.find((item) => !inventoryItemIds.includes(item.id)) || targetCoreItems[0]
 
     // 检查已拥有的组件并抵扣总花费（支持重复组件如狂徒铠甲的 2 个巨人腰带 1011）
     let netCost = uncompletedCore.cost
@@ -736,11 +884,23 @@ export class FactFusionEngine {
         reasonCodes: ['CORE_ITEM_COMPLETE'],
         conditions: [`完成核心装备：${uncompletedCore.name}（${uncompletedCore.reason}）`]
       }
+    } else if (isInventoryFull) {
+      // 关键修复：满背包 (6/6) 时无空槽位，无法购买需要新槽位的基础散件，指导积攒金币直接购买完成整件
+      primaryPlan = {
+        itemIds: [uncompletedCore.id],
+        totalCost: netCost,
+        remainingGold: 0,
+        missingGold: Math.max(0, netCost - currentGold),
+        reasonCodes: ['INVENTORY_FULL_SAVE_GOLD'],
+        conditions: [
+          `装备栏已满（6/6）无空位，建议积攒金币直接购买完成整件：${uncompletedCore.name}`
+        ]
+      }
     } else {
-      // 检查是否有玩家买得起的未拥有组件（从缺失组件列表查找，且背包未满或已持有组件可升级）
+      // 检查是否有玩家买得起的未拥有组件
       const affordableUnownedComp = missingComponents.find((comp) => currentGold >= comp.cost)
 
-      if (affordableUnownedComp && (!isInventoryFull || ownedComponents.length > 0)) {
+      if (affordableUnownedComp) {
         primaryPlan = {
           itemIds: [affordableUnownedComp.id],
           totalCost: affordableUnownedComp.cost,
@@ -750,24 +910,14 @@ export class FactFusionEngine {
           conditions: [`合成 ${uncompletedCore.name} 组件：${affordableUnownedComp.name}`]
         }
       } else {
-        const nextComp =
-          isInventoryFull && ownedComponents.length === 0
-            ? uncompletedCore
-            : missingComponents[0] || uncompletedCore.components[0]
+        const nextComp = missingComponents[0] || uncompletedCore.components[0]
         primaryPlan = {
           itemIds: [nextComp.id],
           totalCost: nextComp.cost,
           remainingGold: 0,
           missingGold: Math.max(0, nextComp.cost - currentGold),
-          reasonCodes:
-            isInventoryFull && ownedComponents.length === 0
-              ? ['CORE_ITEM_PROGRESSION']
-              : ['CORE_COMPONENT_PROGRESSION'],
-          conditions: [
-            isInventoryFull && ownedComponents.length === 0
-              ? `装备栏已满，建议攒金币直接购买：${uncompletedCore.name}`
-              : `合成 ${uncompletedCore.name} 组件：${nextComp.name}`
-          ]
+          reasonCodes: ['CORE_COMPONENT_PROGRESSION'],
+          conditions: [`合成 ${uncompletedCore.name} 组件：${nextComp.name}`]
         }
       }
     }
@@ -784,14 +934,16 @@ export class FactFusionEngine {
       })
     }
 
-    alternativePlans.push({
-      itemIds: [2055], // 控制守卫
-      totalCost: 75,
-      remainingGold: Math.max(0, currentGold - 75),
-      missingGold: Math.max(0, 75 - currentGold),
-      reasonCodes: ['VISION_CONTROL'],
-      conditions: ['备选：控制守卫（防御草丛视野）']
-    })
+    if (canBuyControlWard) {
+      alternativePlans.push({
+        itemIds: [2055], // 控制守卫
+        totalCost: 75,
+        remainingGold: Math.max(0, currentGold - 75),
+        missingGold: Math.max(0, 75 - currentGold),
+        reasonCodes: ['VISION_CONTROL'],
+        conditions: ['备选：控制守卫（防御草丛视野）']
+      })
+    }
 
     const guidance: ItemPurchaseGuidance = {
       id: `item_guidance_${now}`,

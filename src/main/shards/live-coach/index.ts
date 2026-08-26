@@ -2,6 +2,7 @@ import { IAkariShardInitDispose, Shard } from '@shared/akari-shard'
 import { app } from 'electron'
 import { z } from 'zod'
 
+import { FeatureGatingMain } from '../feature-gating'
 import { GameClientMain } from '../game-client'
 import { AkariIpcMain } from '../ipc'
 import { LeagueClientMain } from '../league-client'
@@ -45,7 +46,8 @@ export class LiveCoachMain implements IAkariShardInitDispose {
     private readonly _mobxUtils: MobxUtilsMain,
     private readonly _leagueClient: LeagueClientMain,
     private readonly _gameClient: GameClientMain,
-    private readonly _liveGameData: LiveGameDataMain
+    private readonly _liveGameData: LiveGameDataMain,
+    private readonly _featureGating: FeatureGatingMain
   ) {
     this._logger = _loggerFactory.create(LiveCoachMain.id)
 
@@ -167,7 +169,22 @@ export class LiveCoachMain implements IAkariShardInitDispose {
 
     const buildChannel = app.isPackaged ? 'public' : 'internal'
     this._capabilityController.setBuildChannel(buildChannel)
-    this._capabilityController.setGates(true, true)
+
+    if (buildChannel === 'internal') {
+      this._capabilityController.setGates(true, true)
+    } else {
+      const gateB = this._featureGating.isEnabled('live-coach.capture', false)
+      this._capabilityController.setGates(false, gateB)
+    }
+
+    this._mobxUtils.reaction(
+      () => this._featureGating.isEnabled('live-coach.capture', false),
+      (enabled) => {
+        if (buildChannel === 'public') {
+          this._capabilityController.setGates(false, enabled)
+        }
+      }
+    )
 
     this._ipcHandlers.register()
     this._cueScheduler.init()

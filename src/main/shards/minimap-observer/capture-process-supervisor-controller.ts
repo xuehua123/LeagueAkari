@@ -78,12 +78,15 @@ export class CaptureProcessSupervisorController {
   private _targetHwnd: number | null = null
 
   private _getEffectiveBackend(): 'wgc' | 'dda' | 'desktopCapturer' {
+    // 检查是否存在已加载的原生 WGC/DDA C++ 模块 (IGraphicsCaptureItemInterop / DXGI Duplication)
+    const hasNativeWgc = false // 当前环境未挂载编译的原生 WGC 驱动时，如实上报 desktopCapturer
     const configured = this._context.liveCoach.settings.captureBackend
-    if (process.platform === 'win32') {
-      if (configured === 'wgc') return 'wgc'
+
+    if (process.platform === 'win32' && hasNativeWgc) {
       if (configured === 'dda') return 'dda'
-      return 'wgc' // 'auto' 模式在 Windows 下优先使用 WGC
+      return 'wgc'
     }
+    // 如实报告当前活跃的真实采集后端为 desktopCapturer，严禁在状态中虚假伪报 wgc
     return 'desktopCapturer'
   }
 
@@ -127,13 +130,6 @@ export class CaptureProcessSupervisorController {
     this._consecutiveCrashes = 0
     this._currentCalibration = calibration
 
-    this._context.logger.info(
-      `Starting MinimapObserver capture supervisor for session: ${sessionId}, backend: ${backend}`
-    )
-    this._context.state.setIsCapturing(true)
-    this._context.state.setBackend(backend)
-    this._context.state.setFps(15)
-
     // 查找英雄联盟游戏客户端进程 PID 与 HWND
     try {
       if (process.platform === 'win32') {
@@ -160,6 +156,13 @@ export class CaptureProcessSupervisorController {
     } catch {
       // 忽略未找到进程错误
     }
+
+    this._context.logger.info(
+      `Starting MinimapObserver capture supervisor for session: ${sessionId}, backend: ${backend}, targetPid: ${this._targetPid}, targetHwnd: ${this._targetHwnd}`
+    )
+    this._context.state.setIsCapturing(true)
+    this._context.state.setBackend(backend)
+    this._context.state.setFps(15)
 
     try {
       this._spawnWorker(sessionId, calibration)

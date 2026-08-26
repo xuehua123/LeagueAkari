@@ -167,4 +167,56 @@ describe('Minimap Observer CV & Tracking Algorithms (minimap-cv)', () => {
       ).health
     ).toBe('degraded')
   })
+
+  it('detects frozen texture frames when pixel contents remain identical for 15+ consecutive ticks', () => {
+    const width = 100
+    const height = 100
+    const buffer = new Uint8Array(width * height * 4)
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 4
+        const val = ((x * 7 + y * 13) % 60) + 30
+        buffer[idx] = val
+        buffer[idx + 1] = val
+        buffer[idx + 2] = val
+        buffer[idx + 3] = 255
+      }
+    }
+
+    const trackedEntities = new Map<string, TrackedEntity>()
+    const getNewEntityId = (team: string) => `track_${team}_1`
+    const cvState = {
+      consecutiveFrozenFrames: 0,
+      lastFrameHash: 0
+    }
+
+    // 前 14 帧为 healthy
+    for (let i = 0; i < 14; i++) {
+      const res = processMinimapFrameWithState(
+        buffer,
+        width,
+        height,
+        Date.now() + i * 66,
+        'bgra',
+        trackedEntities,
+        getNewEntityId,
+        cvState
+      )
+      expect(res.health).toBe('healthy')
+    }
+
+    // 第 15 帧完全静止，判定为 degraded
+    const frozenRes = processMinimapFrameWithState(
+      buffer,
+      width,
+      height,
+      Date.now() + 15 * 66,
+      'bgra',
+      trackedEntities,
+      getNewEntityId,
+      cvState
+    )
+    expect(frozenRes.health).toBe('degraded')
+    expect(frozenRes.entities).toEqual([])
+  })
 })

@@ -33,12 +33,44 @@ export class LiveGameDataPollingController {
         phase: this._context.leagueClient.data.gameflow.phase,
         session: this._context.leagueClient.data.gameflow.session
       }),
-      ({ phase, session }) => {
+      async ({ phase, session }) => {
         if (phase === 'InProgress') {
           const sessionId = session?.gameData?.gameId
             ? String(session.gameData.gameId)
             : `sess_${Date.now()}`
-          const patch = (session?.gameData as any)?.patch || '14.15.1'
+
+          let patch = ''
+          const rawVersion =
+            (session?.gameData as any)?.gameVersion || (session?.gameData as any)?.patch
+
+          if (rawVersion) {
+            const parts = String(rawVersion).split('.')
+            if (parts.length >= 2) {
+              patch = `${parts[0]}.${parts[1]}.1`
+            }
+          }
+
+          if (!patch) {
+            try {
+              const res = await this._context.leagueClient.http.request<{ version?: string }>({
+                url: '/system/v1/builds',
+                method: 'GET'
+              })
+              if (res.data?.version) {
+                const parts = res.data.version.split('.')
+                if (parts.length >= 2) {
+                  patch = `${parts[0]}.${parts[1]}.1`
+                }
+              }
+            } catch {
+              // ignore
+            }
+          }
+
+          if (!patch) {
+            patch = '16.16.1' // 默认权威补丁版本
+          }
+
           this.startPolling(sessionId, patch)
         } else {
           this.stopPolling()

@@ -498,8 +498,28 @@ export class RuleBasicSkillsAndTactics implements CoachRule {
           e.trackId === enemyJungler.summonerName
       )
 
-      // 2. 野区/河道空间图元直接观测判定：对线期若在野区或河道区域探测到敌方图元，代表打野/游走目标已被捕获
-      const isSeenInJungleOrRiver = visibleEnemyEntities.some((e) => {
+      // 2. 全局对线完全覆盖（鸽巢原理）：若场上存活的所有敌方英雄均在小地图上可见，则打野必然在场
+      const livingEnemies = players.filter((p) => p.team === enemyTeam && !p.isDead)
+      const areAllLivingEnemiesVisible =
+        livingEnemies.length > 0 && visibleEnemyEntities.length >= livingEnemies.length
+
+      // 3. 线上英雄守线守恒定律：
+      // 仅当敌方所有存活的线上英雄（上单在上路、中单在中路、下路组在下路）均在各自线位被观测到时，
+      // 野区/河道额外多出的敌方图元才可确认为打野。若有任意线上英雄脱离线位，野区图元可能为游走线上英雄，不能判定打野在场！
+      const livingTop = livingEnemies.filter((p) => p.position === 'TOP').length
+      const livingMid = livingEnemies.filter((p) => p.position === 'MIDDLE').length
+      const livingBot = livingEnemies.filter(
+        (p) => p.position === 'BOTTOM' || p.position === 'UTILITY'
+      ).length
+
+      const visibleTop = visibleEnemyEntities.filter((e) => e.regionId === 'top_lane').length
+      const visibleMid = visibleEnemyEntities.filter((e) => e.regionId === 'mid_lane').length
+      const visibleBot = visibleEnemyEntities.filter((e) => e.regionId === 'bot_lane').length
+
+      const areAllLanersInLane =
+        visibleTop >= livingTop && visibleMid >= livingMid && visibleBot >= livingBot
+
+      const hasExtraEntityInJungleOrRiver = visibleEnemyEntities.some((e) => {
         const region = e.regionId || ''
         return (
           region === 'top_jungle' ||
@@ -511,13 +531,10 @@ export class RuleBasicSkillsAndTactics implements CoachRule {
         )
       })
 
-      // 3. 全局对线完全覆盖：若场上存活的所有敌方英雄均已在小地图上可见，则打野必然已被捕获
-      const livingEnemies = players.filter((p) => p.team === enemyTeam && !p.isDead)
-      const areAllLivingEnemiesVisible =
-        livingEnemies.length > 0 && visibleEnemyEntities.length >= livingEnemies.length
+      const isJunglerInJungleOrRiver = areAllLanersInLane && hasExtraEntityInJungleOrRiver
 
       const isEnemyJunglerSeen =
-        isExplicitlySeen || isSeenInJungleOrRiver || areAllLivingEnemiesVisible
+        isExplicitlySeen || areAllLivingEnemiesVisible || isJunglerInJungleOrRiver
 
       // 当敌方打野处于迷雾中时，触发控线与防抓提醒
       if (!isEnemyJunglerSeen) {

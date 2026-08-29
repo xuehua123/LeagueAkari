@@ -1,3 +1,5 @@
+import type { LiveCoachCapabilityEnvelope } from '../../types/live-coach/capability'
+
 export const DEFAULT_AKARI_API_BASE_URL = 'https://akari-api.yuru-yuri.com'
 export const DEFAULT_AKARI_STATIC_BASE_URL = 'https://akari-static.yuru-yuri.com'
 
@@ -139,6 +141,7 @@ export interface AkariSupportedQueuesConfig extends AkariConfigMetadata {
 export interface AkariApiConfigResourceMap {
   'app/feature-gates': AkariFeatureGateSnapshot
   'auto-select/groups': AkariAutoSelectGroupsConfig
+  'live-coach/capabilities': LiveCoachCapabilityEnvelope
   'sgp/league-servers': AkariLeagueServersConfig
   'sgp/supported-queues': AkariSupportedQueuesConfig
 }

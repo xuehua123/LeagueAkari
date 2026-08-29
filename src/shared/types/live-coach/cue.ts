@@ -44,6 +44,7 @@ export interface CoachCuePublicDto {
   createdAt: number
   expiresAt: number
   status: CoachCueStatus
+  cancellationReason?: string | null
 }
 
 export const coachCueCategorySchema = z.enum([
@@ -109,5 +110,6 @@ export const coachCuePublicDtoSchema = z.object({
   spokenText: z.string(),
   createdAt: z.number(),
   expiresAt: z.number(),
-  status: coachCueStatusSchema
+  status: coachCueStatusSchema,
+  cancellationReason: z.string().nullable().optional()
 })

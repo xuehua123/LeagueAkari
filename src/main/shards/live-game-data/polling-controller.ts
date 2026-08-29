@@ -1,5 +1,6 @@
 import { LiveGameDomain, LiveGameSnapshot } from '@shared/types/live-game-data'
 import { formatError } from '@shared/utils/errors'
+import { resolveLiveGameSessionId } from '@shared/utils/live-game-session'
 
 import type { LiveGameDataMainContext } from './context'
 import { LiveClientDataLoader } from './live-client-data-loader'
@@ -22,6 +23,7 @@ export class LiveGameDataPollingController {
   private _currentPatch = ''
   private _phaseLookupGeneration = 0
   private _pollingGeneration = 0
+  private _patchLookupAbortController: AbortController | null = null
   private _abortController: AbortController | null = null
   private _gameflowDisposer: (() => void) | null = null
 
@@ -39,10 +41,18 @@ export class LiveGameDataPollingController {
       async ({ phase, session }) => {
         const generation = ++this._phaseLookupGeneration
 
+        // 取消前一个正在进行的补丁请求
+        if (this._patchLookupAbortController) {
+          try {
+            this._patchLookupAbortController.abort()
+          } catch {
+            // ignore
+          }
+          this._patchLookupAbortController = null
+        }
+
         if (phase === 'InProgress') {
-          const sessionId = session?.gameData?.gameId
-            ? String(session.gameData.gameId)
-            : `sess_${Date.now()}`
+          const sessionId = resolveLiveGameSessionId(session?.gameData?.gameId)
 
           let patch = ''
           const rawVersion =
@@ -56,13 +66,16 @@ export class LiveGameDataPollingController {
           }
 
           if (!patch) {
+            const patchController = new AbortController()
+            this._patchLookupAbortController = patchController
             try {
-              // 使用已有正确 LCU 端点 /lol-patch/v1/game-version
+              // 使用已有正确 LCU 端点 /lol-patch/v1/game-version 并传入 signal
               const res = await this._context.leagueClient.http.request<
                 string | { version?: string; gameVersion?: string }
               >({
                 url: '/lol-patch/v1/game-version',
-                method: 'GET'
+                method: 'GET',
+                signal: patchController.signal
               })
               const versionStr =
                 typeof res.data === 'string'
@@ -76,6 +89,10 @@ export class LiveGameDataPollingController {
               }
             } catch {
               // ignore
+            } finally {
+              if (this._patchLookupAbortController === patchController) {
+                this._patchLookupAbortController = null
+              }
             }
           }
 
@@ -104,6 +121,14 @@ export class LiveGameDataPollingController {
   public dispose(): void {
     this._phaseLookupGeneration++
     this._pollingGeneration++
+    if (this._patchLookupAbortController) {
+      try {
+        this._patchLookupAbortController.abort()
+      } catch {
+        // ignore
+      }
+      this._patchLookupAbortController = null
+    }
     this.stopPolling()
     if (this._gameflowDisposer) {
       this._gameflowDisposer()
@@ -149,6 +174,15 @@ export class LiveGameDataPollingController {
 
     this._pollingGeneration++
     this._isPollingActive = false
+
+    if (this._patchLookupAbortController) {
+      try {
+        this._patchLookupAbortController.abort()
+      } catch {
+        // ignore
+      }
+      this._patchLookupAbortController = null
+    }
 
     if (this._abortController) {
       try {
@@ -202,12 +236,15 @@ export class LiveGameDataPollingController {
 
       // 如果当前补丁处于 unknown 状态，尝试在轮询期间异步重试获取最新游戏补丁
       if (this._currentPatch === 'unknown' || !this._currentPatch) {
+        const patchController = new AbortController()
+        this._patchLookupAbortController = patchController
         try {
           const res = await this._context.leagueClient.http.request<
             string | { version?: string; gameVersion?: string }
           >({
             url: '/lol-patch/v1/game-version',
-            method: 'GET'
+            method: 'GET',
+            signal: patchController.signal
           })
 
           // 异步等待后二次校验代数与会话
@@ -237,6 +274,10 @@ export class LiveGameDataPollingController {
           }
         } catch {
           // ignore
+        } finally {
+          if (this._patchLookupAbortController === patchController) {
+            this._patchLookupAbortController = null
+          }
         }
       }
 
@@ -249,10 +290,14 @@ export class LiveGameDataPollingController {
         return
       }
 
+      const abortController = new AbortController()
+      this._abortController = abortController
+
       try {
         const snapshot = await this._loader.fetchSnapshot(
           this._currentSessionId,
-          this._currentPatch
+          this._currentPatch,
+          abortController.signal
         )
 
         // 异步等待返回后三次严格校验代数与会话：严禁跨局脏写！
@@ -269,10 +314,27 @@ export class LiveGameDataPollingController {
           this._notifyAllSubscribers(snapshot)
           this._scheduleNextPoll(1000)
         } else {
+          // Publish health-only degradation while retaining the last payload for diagnostics.
+          // Consumers must inspect sourceHealth and must not treat the retained payload as current.
+          const now = Date.now()
+          const previous = this._context.state.snapshot
+          const healthSnapshot: LiveGameSnapshot = {
+            ...previous,
+            sessionId: this._currentSessionId,
+            patch: this._currentPatch,
+            sourceHealth: this._loader.getSourceHealth(),
+            clock: {
+              observedAt: previous.clock.observedAt,
+              receivedAt: now,
+              sequence: previous.clock.sequence + 1
+            }
+          }
+          this._context.state.setSnapshot(healthSnapshot)
+          this._notifyAllSubscribers(healthSnapshot)
           // Poll failed or empty, backoff 3s
           this._scheduleNextPoll(3000)
         }
-      } catch (err) {
+      } catch (err: any) {
         if (
           !this._isPollingActive ||
           this._pollingGeneration !== currentPollingGen ||
@@ -280,8 +342,15 @@ export class LiveGameDataPollingController {
         ) {
           return
         }
+        if (abortController.signal.aborted || err?.name === 'CanceledError') {
+          return
+        }
         this._context.logger.warn(`Error during LiveGameData poll tick: ${formatError(err)}`)
         this._scheduleNextPoll(3000)
+      } finally {
+        if (this._abortController === abortController) {
+          this._abortController = null
+        }
       }
     }, delayMs)
   }

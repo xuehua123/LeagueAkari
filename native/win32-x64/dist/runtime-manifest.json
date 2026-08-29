@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "component": "league-akari-native-win32",
+  "version": "0.0.0",
+  "liveCoachProtocolVersion": "1.0.0",
+  "platform": "win32-x64",
+  "license": "MIT",
+  "files": [
+    {
+      "path": "addons/akari-capture-win64.node",
+      "size": 207872,
+      "sha256": "6dc50081b0bcf8a935bdd65e788e6a64d358807cdab3a5cb14b29a53d1f33a27"
+    },
+    {
+      "path": "addons/akari-input-win64.node",
+      "size": 173568,
+      "sha256": "04a15eebe041f35005fe82460fbd47e4b95a5d1b734bfcaee87c46c4a7ff9bd5"
+    },
+    {
+      "path": "addons/akari-speech-win64.node",
+      "size": 309248,
+      "sha256": "aa248c083bdb98ecad16aaa8e23bbf87456814a5d28b28134f67015fc115d1d4"
+    },
+    {
+      "path": "addons/akari-tools-win64.node",
+      "size": 286720,
+      "sha256": "ef5f2c659526ad13a462b988c289ba9afd36c4afa671d50d735273b8bec081df"
+    },
+    {
+      "path": "dist/addon-binding.js",
+      "size": 1024,
+      "sha256": "503f89339c0793f095a387a07062b4e9ed1bfe0321f961c32b2934464f591fb0"
+    },
+    {
+      "path": "dist/bindings.js",
+      "size": 77,
+      "sha256": "d43aa81f5bc89faa359e0f97c814ba25155591ff078fbb9bfd40f8c7c9683230"
+    },
+    {
+      "path": "dist/capture/index.js",
+      "size": 1163,
+      "sha256": "c075be435fb2656c81fce7c4059554878f692eb98df469af4b917ee6e769c3bd"
+    },
+    {
+      "path": "dist/errors.js",
+      "size": 674,
+      "sha256": "ffc509dc57b85742c7de665cb6195c04a056eb5b30716ce216077114f68dc1fd"
+    },
+    {
+      "path": "dist/index.js",
+      "size": 2139,
+      "sha256": "56f35f342a0092310c3a056198346750f5ea138f0df5c898d4217d4b3a289a9d"
+    },
+    {
+      "path": "dist/input/definitions.js",
+      "size": 21127,
+      "sha256": "895fedfe27b1213caa9f78fb9c7daa6ce0defd1afea574a01f9392d7cdf7dae4"
+    },
+    {
+      "path": "dist/input/index.js",
+      "size": 3488,
+      "sha256": "ae5dbcaaba9043df9c5a737ac8055f27744d9f9eee357269eb29cd701e99bcaa"
+    },
+    {
+      "path": "dist/speech/index.js",
+      "size": 1342,
+      "sha256": "03a25267c4ebfb95fe96e7dca7d90dd0c893e47182b70c64c0745e8c7b06d546"
+    },
+    {
+      "path": "dist/tools/index.js",
+      "size": 1242,
+      "sha256": "cf6cb8923613ad361fe994ef984b7c0fc4279215b27a73de2c187d0f131a0067"
+    },
+    {
+      "path": "package.json",
+      "size": 1296,
+      "sha256": "2ae2ae2717f52659086887f1ebd914df962caec5b078960af717582704e04163"
+    }
+  ]
+}

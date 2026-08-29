@@ -2,11 +2,13 @@ import { IAkariShardInitDispose, Shard } from '@shared/akari-shard'
 
 import { GameClientMain } from '../game-client'
 import { AkariIpcMain } from '../ipc'
+import { KeyboardShortcutsMain } from '../keyboard-shortcuts'
 import { LeagueClientMain } from '../league-client'
 import { LiveCoachMain } from '../live-coach'
 import { AkariLogger, LoggerFactoryMain } from '../logger-factory'
 import { MobxUtilsMain } from '../mobx-utils'
 import { MinimapCalibrationController } from './calibration-controller'
+import { MinimapCalibrationShortcutController } from './calibration-shortcut-controller'
 import { CaptureProcessSupervisorController } from './capture-process-supervisor-controller'
 import { MINIMAP_OBSERVER_MAIN_NAMESPACE, type MinimapObserverMainContext } from './context'
 import { MinimapObserverIpcHandlers } from './ipc-handlers'
@@ -28,7 +30,9 @@ export class MinimapObserverMain implements IAkariShardInitDispose {
   private readonly _calibrationController: MinimapCalibrationController
   private readonly _observationController: MinimapObservationController
   private readonly _supervisorController: CaptureProcessSupervisorController
+  private readonly _calibrationShortcutController: MinimapCalibrationShortcutController
   private readonly _ipcHandlers: MinimapObserverIpcHandlers
+  private _calibrationSettingDisposer: (() => void) | null = null
 
   constructor(
     private readonly _ipc: AkariIpcMain,
@@ -36,7 +40,8 @@ export class MinimapObserverMain implements IAkariShardInitDispose {
     private readonly _mobxUtils: MobxUtilsMain,
     private readonly _leagueClient: LeagueClientMain,
     private readonly _gameClient: GameClientMain,
-    private readonly _liveCoach: LiveCoachMain
+    private readonly _liveCoach: LiveCoachMain,
+    private readonly _keyboardShortcuts: KeyboardShortcutsMain
   ) {
     this._logger = _loggerFactory.create(MinimapObserverMain.id)
 
@@ -58,7 +63,17 @@ export class MinimapObserverMain implements IAkariShardInitDispose {
       this._calibrationController,
       this._observationController
     )
-    this._ipcHandlers = new MinimapObserverIpcHandlers(this._context, this._calibrationController)
+    this._calibrationShortcutController = new MinimapCalibrationShortcutController(
+      this._context,
+      this._calibrationController,
+      this._supervisorController,
+      this._keyboardShortcuts
+    )
+    this._ipcHandlers = new MinimapObserverIpcHandlers(
+      this._context,
+      this._calibrationController,
+      this._supervisorController
+    )
   }
 
   public async onInit(): Promise<void> {
@@ -69,15 +84,30 @@ export class MinimapObserverMain implements IAkariShardInitDispose {
       'backend',
       'fps',
       'frameAgeMs',
-      'roiHealth'
+      'roiHealth',
+      'currentCalibration'
     ])
 
     this._ipcHandlers.register()
+    this._calibrationShortcutController.init()
     this._supervisorController.init()
+    this._calibrationSettingDisposer = this._mobxUtils.reaction(
+      () => this._liveCoach.settings.manualCalibration,
+      (calibration, previousCalibration) => {
+        if (calibration !== null || previousCalibration === null) return
+        this.state.setCurrentCalibration(null)
+        this._supervisorController.applyCalibration(
+          this._calibrationController.getOrCreateCalibration()
+        )
+      }
+    )
   }
 
   public async onDispose(): Promise<void> {
     this._logger.info('Disposing MinimapObserverMain')
+    this._calibrationSettingDisposer?.()
+    this._calibrationSettingDisposer = null
+    this._calibrationShortcutController.dispose()
     this._supervisorController.dispose()
   }
 }

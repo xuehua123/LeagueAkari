@@ -17,6 +17,7 @@ import {
   Map24Regular as MapIcon,
   Navigation24Regular as NavigationIcon,
   PersonSettings20Regular as SettingsIcon,
+  QuestionCircle24Regular as HelpIcon,
   Shield24Regular as ShieldIcon
 } from '@vicons/fluent'
 import { useTranslation } from 'i18next-vue'
@@ -27,6 +28,7 @@ import TabbedPage, { TabConfig } from '@main-window/components/TabbedPage.vue'
 import Calibration from './Calibration.vue'
 import CoachSettings from './CoachSettings.vue'
 import Diagnostics from './Diagnostics.vue'
+import Help from './Help.vue'
 import Overview from './Overview.vue'
 import Privacy from './Privacy.vue'
 import Reviews from './Reviews.vue'
@@ -76,6 +78,12 @@ const tabs = computed<TabConfig[]>(() => [
     name: t('liveCoach.tabs.diagnostics', '运行诊断'),
     icon: ActivityIcon,
     component: Diagnostics
+  },
+  {
+    key: 'help',
+    name: t('liveCoach.tabs.help', '帮助与快速上手'),
+    icon: HelpIcon,
+    component: Help
   }
 ])
 </script>

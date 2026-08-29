@@ -114,4 +114,32 @@ describe('DelayedTaskScheduler', () => {
 
     expect(calls).toEqual(['first-start', 'first-end', 'third'])
   })
+
+  it('cancels a pending replacement and waits for the running task on the same key', async () => {
+    const scheduler = new DelayedTaskScheduler()
+    const firstCompletion = deferred()
+    const first = vi.fn(() => firstCompletion.promise)
+    const replacement = vi.fn()
+
+    scheduler.add('setting-key', first, 1000)
+    await vi.advanceTimersByTimeAsync(1000)
+    scheduler.add('setting-key', replacement, 1000)
+
+    let cancellationCompleted = false
+    const cancellation = scheduler.cancelAndWait('setting-key').then(() => {
+      cancellationCompleted = true
+    })
+    await vi.advanceTimersByTimeAsync(0)
+
+    expect(first).toHaveBeenCalledTimes(1)
+    expect(replacement).not.toHaveBeenCalled()
+    expect(cancellationCompleted).toBe(false)
+
+    firstCompletion.resolve()
+    await cancellation
+    await vi.advanceTimersByTimeAsync(1000)
+
+    expect(cancellationCompleted).toBe(true)
+    expect(replacement).not.toHaveBeenCalled()
+  })
 })

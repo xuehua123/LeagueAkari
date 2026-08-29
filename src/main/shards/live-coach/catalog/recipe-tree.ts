@@ -1,4 +1,5 @@
-import { RiotItemCatalog, RiotItemCatalog16_16_1 } from './items-16-16-1'
+import { CURRENT_RIOT_ITEM_CATALOG } from './current'
+import type { RiotItemCatalog } from './items-16-17-1'
 
 export interface PurchasableItemOption {
   itemId: number
@@ -36,7 +37,7 @@ export interface RecipeTreeNode {
 export class RecipeTreeEngine {
   private _catalog: RiotItemCatalog
 
-  constructor(catalog: RiotItemCatalog = RiotItemCatalog16_16_1) {
+  constructor(catalog: RiotItemCatalog = CURRENT_RIOT_ITEM_CATALOG) {
     this._catalog = catalog
   }
 

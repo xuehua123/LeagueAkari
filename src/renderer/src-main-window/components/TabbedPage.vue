@@ -1,11 +1,14 @@
 <template>
   <div class="flex h-full flex-col">
-    <div class="flex items-end border-b border-black/10 px-6 dark:border-white/10">
-      <div class="mr-6 mb-1 flex shrink-0 items-center gap-2 text-black/80 dark:text-white/80">
+    <div class="flex min-w-0 items-end border-b border-black/10 px-6 dark:border-white/10">
+      <div
+        class="mr-6 mb-1 hidden shrink-0 items-center gap-2 text-black/80 lg:flex dark:text-white/80"
+      >
         <NIcon class="text-2xl" :component="icon" />
         <span class="text-base font-bold">{{ title }}</span>
       </div>
       <NTabs
+        class="w-0 min-w-0 flex-1"
         v-model:value="currentTab"
         :theme-overrides="{ tabGapMediumBar: '18px' }"
         size="medium"
@@ -99,13 +102,17 @@ const route = useRoute()
 const router = useRouter()
 
 onActivated(() => {
-  router.replace({ name: props.routeName, params: { section: currentTab.value } })
+  router.replace({
+    name: props.routeName,
+    params: { section: currentTab.value },
+    query: route.query
+  })
 })
 
 watch(
   () => currentTab.value,
   (cur) => {
-    router.replace({ name: props.routeName, params: { section: cur } })
+    router.replace({ name: props.routeName, params: { section: cur }, query: route.query })
   },
   { immediate: true }
 )
@@ -118,7 +125,10 @@ watch(
       return
     }
 
-    currentTab.value = section as string
+    const sectionKey = section as string
+    currentTab.value = props.tabs.some((tab) => tab.key === sectionKey)
+      ? sectionKey
+      : (props.defaultTab ?? props.tabs[0]?.key ?? '')
   },
   { immediate: true }
 )

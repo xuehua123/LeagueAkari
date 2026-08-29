@@ -1,5 +1,6 @@
 import { CoachCue, CoachReplaySession } from '@shared/types/live-coach'
 
+import { CURRENT_LIVE_COACH_PATCH } from './catalog/current'
 import { CueSchedulerController } from './cue-scheduler-controller'
 import { FactFusionEngine } from './fact-fusion'
 import { CoachRuleEngine } from './rule-engine'
@@ -60,6 +61,7 @@ export class CoachReplaySimulator {
       const cues = this._ruleEngine.evaluate({
         sessionId: session.metadata.sessionId,
         patch: session.metadata.patch,
+        queueId: session.metadata.queueId,
         fusion: this._fusion,
         enabledCategories: {
           information: true,
@@ -93,7 +95,7 @@ export class CoachReplaySimulator {
       version: '1.0.0',
       sessionId: session.metadata.sessionId,
       gameDurationSeconds: session.metadata.durationSeconds || 1200,
-      patch: session.metadata.patch || '16.16.1',
+      patch: session.metadata.patch || 'unknown',
       totalCues: cues.length,
       timeline: cues.map((c) => {
         const totalSec = Math.floor((c.createdAt - session.metadata.recordedAt) / 1000)
@@ -110,7 +112,11 @@ export class CoachReplaySimulator {
         }
       }),
       evidencesSummary: {
-        totalEvidences: this._fusion.getActiveEvidences().length
+        totalEvidences: this._fusion.getActiveEvidences(
+          session.frames.length > 0
+            ? session.frames[session.frames.length - 1].timestamp
+            : session.metadata.recordedAt
+        ).length
       }
     }
   }
@@ -145,7 +151,7 @@ export class CoachReplaySimulator {
         sessionId: `replay_sample_${now}`,
         mapId: 11,
         queueId: 420,
-        patch: '16.16.1',
+        patch: CURRENT_LIVE_COACH_PATCH,
         recordedAt,
         durationSeconds: 900
       },
@@ -155,7 +161,7 @@ export class CoachReplaySimulator {
           timestamp: recordedAt + 270000,
           liveData: {
             sessionId: `replay_sample_${now}`,
-            patch: '16.16.1',
+            patch: CURRENT_LIVE_COACH_PATCH,
             gameTimeSeconds: 270,
             clock: {
               observedAt: recordedAt + 270000,
@@ -215,7 +221,7 @@ export class CoachReplaySimulator {
           timestamp: recordedAt + 435000,
           minimap: {
             sessionId: `replay_sample_${now}`,
-            patch: '16.16.1',
+            patch: CURRENT_LIVE_COACH_PATCH,
             calibrationVersion: '1.0.0',
             modelVersions: {},
             frame: {
@@ -248,7 +254,7 @@ export class CoachReplaySimulator {
           timestamp: recordedAt + 445000,
           liveData: {
             sessionId: `replay_sample_${now}`,
-            patch: '16.16.1',
+            patch: CURRENT_LIVE_COACH_PATCH,
             gameTimeSeconds: 445,
             clock: {
               observedAt: recordedAt + 445000,
@@ -272,7 +278,7 @@ export class CoachReplaySimulator {
           },
           minimap: {
             sessionId: `replay_sample_${now}`,
-            patch: '16.16.1',
+            patch: CURRENT_LIVE_COACH_PATCH,
             calibrationVersion: '1.0.0',
             modelVersions: {},
             frame: {
@@ -291,7 +297,7 @@ export class CoachReplaySimulator {
           timestamp: recordedAt + 820000,
           liveData: {
             sessionId: `replay_sample_${now}`,
-            patch: '16.16.1',
+            patch: CURRENT_LIVE_COACH_PATCH,
             gameTimeSeconds: 820,
             clock: {
               observedAt: recordedAt + 820000,
@@ -319,7 +325,7 @@ export class CoachReplaySimulator {
           timestamp: recordedAt + 850000,
           liveData: {
             sessionId: `replay_sample_${now}`,
-            patch: '16.16.1',
+            patch: CURRENT_LIVE_COACH_PATCH,
             gameTimeSeconds: 850,
             clock: {
               observedAt: recordedAt + 850000,
@@ -343,7 +349,7 @@ export class CoachReplaySimulator {
           },
           minimap: {
             sessionId: `replay_sample_${now}`,
-            patch: '16.16.1',
+            patch: CURRENT_LIVE_COACH_PATCH,
             calibrationVersion: '1.0.0',
             modelVersions: {},
             frame: {

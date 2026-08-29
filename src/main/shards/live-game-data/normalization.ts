@@ -3,6 +3,7 @@ import {
   LiveGameSnapshot,
   LiveGameSourceHealth,
   NormalizedActivePlayer,
+  NormalizedActivePlayerAbility,
   NormalizedGameEvent,
   NormalizedPlayer,
   NormalizedPlayerItem,
@@ -116,7 +117,7 @@ export function normalizeActivePlayer(rawActivePlayer: any): NormalizedActivePla
     riotIdTagLine = tag
   }
 
-  const abilities: Record<string, { abilityLevel: number; displayName?: string; id?: string }> = {}
+  const abilities: Record<string, NormalizedActivePlayerAbility> = {}
   if (rawActivePlayer.abilities && typeof rawActivePlayer.abilities === 'object') {
     for (const [key, val] of Object.entries(rawActivePlayer.abilities)) {
       if (val && typeof val === 'object') {
@@ -124,7 +125,9 @@ export function normalizeActivePlayer(rawActivePlayer: any): NormalizedActivePla
         abilities[key] = {
           abilityLevel: typeof v.abilityLevel === 'number' ? v.abilityLevel : 0,
           displayName: typeof v.displayName === 'string' ? v.displayName : undefined,
-          id: typeof v.id === 'string' ? v.id : undefined
+          id: typeof v.id === 'string' ? v.id : undefined,
+          rawDescription: typeof v.rawDescription === 'string' ? v.rawDescription : undefined,
+          rawDisplayName: typeof v.rawDisplayName === 'string' ? v.rawDisplayName : undefined
         }
       }
     }

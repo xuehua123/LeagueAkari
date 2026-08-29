@@ -11,6 +11,7 @@ const MAIN_EXTERNALS = [
   'electron',
   'typeorm',
   'better-sqlite3',
+  /^onnxruntime-node(?:\/.*)?$/,
   /^league-akari-native-win32(?:\/.*)?$/
 ]
 
@@ -49,81 +50,98 @@ const LC_CUSTOM_TAGS = new Set([
   'keywordMajor' // 关键词护卫
 ])
 
-export default defineConfig({
-  main: {
-    plugins: [swcPlugin(), yaml()],
-    // Vite 8 uses Oxc for its default transform. Keep SWC as the sole transform for
-    // legacy decorators and emitDecoratorMetadata until swcPlugin disables Oxc itself.
-    oxc: false,
-    build: {
-      minify,
-      rollupOptions: {
-        input: {
-          main: resolve('src/main/main.ts'),
-          'minimap-observer-worker': resolve('src/main/utility-processes/minimap-observer/index.ts')
-        },
-        external: MAIN_EXTERNALS
+function resolveLiveCoachBuildChannel(command: 'build' | 'serve') {
+  const requested = process.env.LIVE_COACH_BUILD_CHANNEL
+  if (requested !== undefined && requested !== 'internal' && requested !== 'public') {
+    throw new Error(`Invalid LIVE_COACH_BUILD_CHANNEL: ${requested}`)
+  }
+  return requested ?? (command === 'serve' ? 'internal' : 'public')
+}
+
+export default defineConfig(({ command }) => {
+  const liveCoachBuildChannel = resolveLiveCoachBuildChannel(command)
+
+  return {
+    main: {
+      define: {
+        __LIVE_COACH_BUILD_CHANNEL__: JSON.stringify(liveCoachBuildChannel)
+      },
+      plugins: [swcPlugin(), yaml()],
+      // Vite 8 uses Oxc for its default transform. Keep SWC as the sole transform for
+      // legacy decorators and emitDecoratorMetadata until swcPlugin disables Oxc itself.
+      oxc: false,
+      build: {
+        minify,
+        rollupOptions: {
+          input: {
+            main: resolve('src/main/main.ts'),
+            'minimap-observer-worker': resolve(
+              'src/main/utility-processes/minimap-observer/index.ts'
+            )
+          },
+          external: MAIN_EXTERNALS
+        }
+      },
+      resolve: {
+        alias: {
+          '@shared': resolve('src/shared'),
+          '@main': resolve('src/main'),
+          '@resources': resolve('resources')
+        }
       }
     },
-    resolve: {
-      alias: {
-        '@shared': resolve('src/shared'),
-        '@main': resolve('src/main'),
-        '@resources': resolve('resources')
-      }
-    }
-  },
-  preload: {
-    plugins: [swcPlugin()],
-    oxc: false,
-    build: {
-      minify,
-      rollupOptions: {
-        external: ['electron']
-      }
-    },
-    resolve: {
-      alias: {
-        '@shared': resolve('src/shared'),
-        '@renderer-shared': resolve('src/renderer-shared')
-      }
-    }
-  },
-  renderer: {
-    resolve: {
-      alias: {
-        '@main-window': resolve('src/renderer/src-main-window'),
-        '@aux-window': resolve('src/renderer/src-aux-window'),
-        '@opgg-window': resolve('src/renderer/src-opgg-window'),
-        '@ongoing-game-window': resolve('src/renderer/src-ongoing-game-window'),
-        '@cd-timer-window': resolve('src/renderer/src-cd-timer-window'),
-        '@coach-overlay-window': resolve('src/renderer/src-coach-overlay-window'),
-        '@shared': resolve('src/shared'),
-        '@renderer-shared': resolve('src/renderer-shared')
+    preload: {
+      plugins: [swcPlugin()],
+      oxc: false,
+      build: {
+        minify,
+        rollupOptions: {
+          external: ['electron']
+        }
+      },
+      resolve: {
+        alias: {
+          '@shared': resolve('src/shared'),
+          '@renderer-shared': resolve('src/renderer-shared')
+        }
       }
     },
-    plugins: [
-      yaml(),
-      vue({
-        template: { compilerOptions: { isCustomElement: (tag) => LC_CUSTOM_TAGS.has(tag) } }
-      }),
-      tailwindcss(),
-      vueDevTools(),
-      vueJsx({
-        tsTransform: 'built-in',
-        babelPlugins: [['@babel/plugin-syntax-decorators', { legacy: true }]]
-      })
-    ],
-    build: {
-      minify,
-      rollupOptions: {
-        input: {
-          mainWindow: resolve(__dirname, 'src/renderer/main-window.html'),
-          auxWindow: resolve(__dirname, 'src/renderer/aux-window.html'),
-          opggWindow: resolve(__dirname, 'src/renderer/opgg-window.html'),
-          ongoingGameWindow: resolve(__dirname, 'src/renderer/ongoing-game-window.html'),
-          cdTimerWindow: resolve(__dirname, 'src/renderer/cd-timer-window.html'),
-          coachOverlayWindow: resolve(__dirname, 'src/renderer/coach-overlay-window.html')
+    renderer: {
+      resolve: {
+        alias: {
+          '@main-window': resolve('src/renderer/src-main-window'),
+          '@aux-window': resolve('src/renderer/src-aux-window'),
+          '@opgg-window': resolve('src/renderer/src-opgg-window'),
+          '@ongoing-game-window': resolve('src/renderer/src-ongoing-game-window'),
+          '@cd-timer-window': resolve('src/renderer/src-cd-timer-window'),
+          '@coach-overlay-window': resolve('src/renderer/src-coach-overlay-window'),
+          '@shared': resolve('src/shared'),
+          '@renderer-shared': resolve('src/renderer-shared')
+        }
+      },
+      plugins: [
+        yaml(),
+        vue({
+          template: { compilerOptions: { isCustomElement: (tag) => LC_CUSTOM_TAGS.has(tag) } }
+        }),
+        tailwindcss(),
+        vueDevTools(),
+        vueJsx({
+          tsTransform: 'built-in',
+          babelPlugins: [['@babel/plugin-syntax-decorators', { legacy: true }]]
+        })
+      ],
+      build: {
+        minify,
+        rollupOptions: {
+          input: {
+            mainWindow: resolve(__dirname, 'src/renderer/main-window.html'),
+            auxWindow: resolve(__dirname, 'src/renderer/aux-window.html'),
+            opggWindow: resolve(__dirname, 'src/renderer/opgg-window.html'),
+            ongoingGameWindow: resolve(__dirname, 'src/renderer/ongoing-game-window.html'),
+            cdTimerWindow: resolve(__dirname, 'src/renderer/cd-timer-window.html'),
+            coachOverlayWindow: resolve(__dirname, 'src/renderer/coach-overlay-window.html')
+          }
         }
       }
     }

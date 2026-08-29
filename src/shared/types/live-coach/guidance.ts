@@ -1,5 +1,9 @@
 import { z } from 'zod'
 
+export type ItemGuidanceMode = 'system' | 'common' | 'adaptive' | 'custom'
+
+export type CustomItemBuilds = Record<string, number[]>
+
 export interface FogInference {
   id: string
   sessionId: string
@@ -33,6 +37,7 @@ export interface ItemPurchaseGuidance {
   sessionId: string
   patch: string
   championId: number
+  mode: ItemGuidanceMode
   currentGold: number
   inventoryItemIds: number[]
   primaryPlan: ItemPurchasePlan
@@ -96,6 +101,7 @@ export const itemPurchaseGuidanceSchema = z.object({
   sessionId: z.string(),
   patch: z.string(),
   championId: z.number(),
+  mode: z.enum(['system', 'common', 'adaptive', 'custom']),
   currentGold: z.number().min(0),
   inventoryItemIds: z.array(z.number()),
   primaryPlan: itemPurchasePlanSchema,

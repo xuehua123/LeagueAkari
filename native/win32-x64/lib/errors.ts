@@ -1,4 +1,4 @@
-export type NativeAddonFeature = 'input' | 'tools'
+export type NativeAddonFeature = 'input' | 'tools' | 'capture' | 'speech'
 
 export class AddonLoadError extends Error {
   public readonly feature: NativeAddonFeature

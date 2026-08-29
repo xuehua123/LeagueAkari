@@ -38,6 +38,17 @@ export class DelayedTaskScheduler {
     return false
   }
 
+  /**
+   * 取消尚未开始的任务，并等待同一键上已经开始的任务结束。
+   *
+   * 需要立即写入的调用方必须先经过这里，避免旧的延迟任务在新值落盘后才结束，
+   * 从而把持久化状态覆盖回旧值。
+   */
+  async cancelAndWait(key: string) {
+    this.remove(key)
+    await this._drains.get(key)
+  }
+
   clear() {
     for (const task of this._tasks.values()) {
       clearTimeout(task.timerId)

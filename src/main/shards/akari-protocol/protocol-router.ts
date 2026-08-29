@@ -72,7 +72,7 @@ export class AkariProtocolRouter {
         }
       }
 
-      return new Response(`No handler for ${req.url}`, {
+      return new Response('Resource unavailable', {
         statusText: 'Not Found',
         headers: { 'Content-Type': 'text/plain' },
         status: 404

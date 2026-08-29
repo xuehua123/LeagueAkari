@@ -39,8 +39,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.tools = exports.input = void 0;
+exports.tools = exports.speech = exports.input = exports.capture = void 0;
 const tools_1 = __importDefault(require("./tools"));
 exports.tools = tools_1.default;
+exports.capture = __importStar(require("./capture"));
 exports.input = __importStar(require("./input"));
+exports.speech = __importStar(require("./speech"));
 __exportStar(require("./errors"), exports);

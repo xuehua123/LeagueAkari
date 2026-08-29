@@ -26,6 +26,16 @@
       "require": "./dist/input/index.js",
       "default": "./dist/input/index.js"
     },
+    "./capture": {
+      "types": "./dist/capture/index.d.ts",
+      "require": "./dist/capture/index.js",
+      "default": "./dist/capture/index.js"
+    },
+    "./speech": {
+      "types": "./dist/speech/index.d.ts",
+      "require": "./dist/speech/index.js",
+      "default": "./dist/speech/index.js"
+    },
     "./tools": {
       "types": "./dist/tools/index.d.ts",
       "require": "./dist/tools/index.js",

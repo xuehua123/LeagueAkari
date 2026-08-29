@@ -2,7 +2,20 @@ import { describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 
 import type { SettingPath, SettingSchema } from '.'
+import { DelayedTaskScheduler } from './delayed-task-scheduler'
 import { SetterSettingService } from './setter-setting-service'
+
+function deferred<T = void>() {
+  let resolve!: (value: T | PromiseLike<T>) => void
+  let reject!: (reason?: unknown) => void
+
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+
+  return { promise, resolve, reject }
+}
 
 function createService<T extends object>(
   schema: SettingSchema<T>,
@@ -12,7 +25,8 @@ function createService<T extends object>(
   const settingFactory = {
     _delayed: {
       add: vi.fn(),
-      remove: vi.fn()
+      remove: vi.fn(),
+      cancelAndWait: vi.fn(async () => undefined)
     },
     _getFromStorage: vi.fn(
       async (_namespace: string, key: SettingPath<T>, defaultValue: unknown) =>
@@ -203,7 +217,9 @@ describe('SetterSettingService', () => {
       obj,
       { enabled: 'invalid' }
     )
-    settingFactory._removeFromStorage.mockRejectedValueOnce(new Error('storage unavailable'))
+    settingFactory._removeFromStorage.mockRejectedValueOnce(
+      new Error('D:\\Users\\private\\LeagueAkari.db Authorization=secret')
+    )
 
     await service.applyToState()
 
@@ -211,9 +227,10 @@ describe('SetterSettingService', () => {
     expect(logger.warn).toHaveBeenCalledTimes(2)
     expect(logger.warn).toHaveBeenLastCalledWith(
       'Failed to remove invalid setting value',
-      expect.objectContaining({ namespace: 'test-main', key: 'enabled' }),
-      expect.any(Error)
+      expect.objectContaining({ namespace: 'test-main', key: 'enabled' })
     )
+    expect(JSON.stringify(logger.warn.mock.calls)).not.toContain('private')
+    expect(JSON.stringify(logger.warn.mock.calls)).not.toContain('secret')
   })
 
   it('uses explicit restore output before applying storage values to state', async () => {
@@ -473,12 +490,200 @@ describe('SetterSettingService', () => {
     await service._saveToStorage('trackedBounds', delayedBounds, { delay: 1000 })
     await service._saveToStorage('trackedBounds', immediateBounds)
 
-    expect(settingFactory._delayed.remove).toHaveBeenCalledWith('test-main/trackedBounds')
+    expect(settingFactory._delayed.cancelAndWait).toHaveBeenCalledWith('test-main/trackedBounds')
     expect(settingFactory._saveToStorage).toHaveBeenCalledWith(
       'test-main',
       'trackedBounds',
       immediateBounds
     )
     expect(await service._getFromStorage('trackedBounds')).toEqual(immediateBounds)
+  })
+
+  it('waits for an in-flight delayed write before persisting the durable replacement', async () => {
+    vi.useFakeTimers()
+    try {
+      const obj = { enabled: true }
+      const storageValues: Partial<Record<string, unknown>> = { enabled: true }
+      const staleWriteStarted = deferred()
+      const staleWriteCompletion = deferred()
+      const { service, settingFactory } = createService(
+        {
+          enabled: {
+            default: true,
+            schema: z.boolean()
+          }
+        },
+        obj,
+        storageValues
+      )
+      ;(settingFactory as any)._delayed = new DelayedTaskScheduler()
+      settingFactory._saveToStorage.mockImplementation(
+        async (_namespace: string, key: string, value: unknown) => {
+          if (value === true) {
+            staleWriteStarted.resolve()
+            await staleWriteCompletion.promise
+          }
+          storageValues[key] = value
+        }
+      )
+
+      await service._saveToStorage('enabled', true, { delay: 0 })
+      await vi.advanceTimersByTimeAsync(0)
+      await staleWriteStarted.promise
+
+      let completed = false
+      const replacement = service.setAndPersist('enabled', false).then(() => {
+        completed = true
+      })
+      await vi.advanceTimersByTimeAsync(0)
+
+      expect(obj.enabled).toBe(false)
+      expect(completed).toBe(false)
+
+      staleWriteCompletion.resolve()
+      await replacement
+
+      expect(storageValues.enabled).toBe(false)
+      expect(settingFactory._saveToStorage.mock.calls.map((call) => call[2])).toEqual([true, false])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not resolve a durable set until storage has completed', async () => {
+    const obj = { enabled: true }
+    const persistence = deferred()
+    const { service, settingFactory } = createService(
+      {
+        enabled: {
+          default: true,
+          schema: z.boolean()
+        }
+      },
+      obj,
+      { enabled: true }
+    )
+    settingFactory._saveToStorage.mockImplementationOnce(async () => persistence.promise)
+
+    let completed = false
+    const operation = service.setAndPersist('enabled', false).then(() => {
+      completed = true
+    })
+    await vi.waitFor(() => {
+      expect(settingFactory._saveToStorage).toHaveBeenCalledWith('test-main', 'enabled', false)
+    })
+
+    expect(obj.enabled).toBe(false)
+    expect(completed).toBe(false)
+    expect(settingFactory._delayed.add).not.toHaveBeenCalled()
+
+    persistence.resolve()
+    await operation
+
+    expect(completed).toBe(true)
+  })
+
+  it('serializes concurrent durable writes for the same key in commit order', async () => {
+    const obj = { enabled: true }
+    const firstPersistence = deferred()
+    const storageValues: Partial<Record<string, unknown>> = { enabled: true }
+    const { service, settingFactory } = createService(
+      {
+        enabled: {
+          default: true,
+          schema: z.boolean()
+        }
+      },
+      obj,
+      storageValues
+    )
+    settingFactory._saveToStorage.mockImplementation(
+      async (_namespace: string, key: string, value: unknown) => {
+        if (value === false) {
+          await firstPersistence.promise
+        }
+        storageValues[key] = value
+      }
+    )
+
+    const first = service.setAndPersist('enabled', false)
+    const second = service.setAndPersist('enabled', true)
+    await vi.waitFor(() => {
+      expect(settingFactory._saveToStorage).toHaveBeenCalledTimes(1)
+    })
+
+    expect(obj.enabled).toBe(true)
+    expect(settingFactory._saveToStorage.mock.calls.map((call) => call[2])).toEqual([false])
+
+    firstPersistence.resolve()
+    await Promise.all([first, second])
+
+    expect(storageValues.enabled).toBe(true)
+    expect(settingFactory._saveToStorage.mock.calls.map((call) => call[2])).toEqual([false, true])
+  })
+
+  it('rejects a durable set while keeping the in-memory state fail-closed', async () => {
+    const obj = { enabled: true }
+    const { service, settingFactory } = createService(
+      {
+        enabled: {
+          default: true,
+          schema: z.boolean()
+        }
+      },
+      obj,
+      { enabled: true }
+    )
+    settingFactory._saveToStorage.mockRejectedValueOnce(new Error('storage unavailable'))
+
+    await expect(service.setAndPersist('enabled', false)).rejects.toThrow('storage unavailable')
+
+    expect(obj.enabled).toBe(false)
+    expect(await service.get('enabled')).toBe(false)
+    expect(settingFactory._delayed.add).not.toHaveBeenCalled()
+  })
+
+  it('restores durable fail-closed consent values after a simulated restart', async () => {
+    type ConsentSettings = {
+      enabled: boolean
+      onboardingCompleted: boolean
+      privacyConsentVersion: string | null
+    }
+    const schema: SettingSchema<ConsentSettings> = {
+      enabled: { default: false, schema: z.boolean() },
+      onboardingCompleted: { default: false, schema: z.boolean() },
+      privacyConsentVersion: { default: null, schema: z.string().nullable() }
+    }
+    const storageValues: Partial<Record<string, unknown>> = {
+      enabled: true,
+      onboardingCompleted: true,
+      privacyConsentVersion: '1.0.0'
+    }
+    const runningState: ConsentSettings = {
+      enabled: true,
+      onboardingCompleted: true,
+      privacyConsentVersion: '1.0.0'
+    }
+    const { service } = createService(schema, runningState, storageValues)
+
+    await Promise.all([
+      service.setAndPersist('enabled', false),
+      service.setAndPersist('onboardingCompleted', false),
+      service.setAndPersist('privacyConsentVersion', null)
+    ])
+
+    const restartedState: ConsentSettings = {
+      enabled: true,
+      onboardingCompleted: true,
+      privacyConsentVersion: '1.0.0'
+    }
+    const { service: restartedService } = createService(schema, restartedState, storageValues)
+    await restartedService.applyToState()
+
+    expect(restartedState).toEqual({
+      enabled: false,
+      onboardingCompleted: false,
+      privacyConsentVersion: null
+    })
   })
 })

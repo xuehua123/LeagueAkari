@@ -3,3 +3,6 @@ dist
 pnpm-lock.yaml
 LICENSE.md
 .yarn
+src/main/shards/live-coach/catalog/data-dragon-*-raw.json
+src/main/shards/live-coach/catalog/champion-summary-*-raw.json
+resources/live-coach/models/champion-icons-*.json

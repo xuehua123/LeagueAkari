@@ -8,10 +8,30 @@ liveCoach:
     reviews: 战术复盘
     privacy: 隐私与授权
     diagnostics: 运行诊断
+    help: 帮助与快速上手
   overlay:
     activeTitle: AI 教练实时监测中
+    pausedTitle: AI 教练已暂停
     idleTitle: AI 教练空闲
+    pauseReason:
+      user-pause: 主页面手动暂停
+      global-shortcut: 全局快捷键暂停
+      environment-abnormal: 对局环境异常
+      feature-unavailable: 当前能力不可用
+    backendUnavailable: 采集不可用
     waiting: 等待战术时机触发...
+    recentCue: 最近
+    outputMuted: 已静音
+    outputOff: 无输出
+    output:
+      sound: 提示音
+      subtitle: 字幕
+      speech: 语音
+    roiState:
+      healthy: 正常
+      degraded: 降级
+      occluded: 遮挡
+      unknown: 未知
     optionPrefix: '建议选项:'
     rolePrimary: 首选
     roleAlternative: 备选
@@ -21,12 +41,336 @@ liveCoach:
     sessionStatus: 当前会话状态
     latestCue: 实时提示预览
     noCue: 当前暂无正在播报的战术提示
+    impactPrefix: '影响：'
+    optionPrefix: '选项：'
+    backendUnavailable: 未就绪
+    backendIdle: 等待对局
+    sessionLabel: 会话状态
+    captureLabel: 采集后端
+    speechLabel: 语音播报
+    currentCueCount: '本局已提示 {{count}} 条'
+    pauseReason:
+      user-pause: 用户从主页面暂停
+      global-shortcut: 用户通过全局快捷键暂停
+      environment-abnormal: 对局环境异常，教练已暂停
+      feature-unavailable: 所需能力不可用，教练已暂停
+    lastSessionSummary: 上一局教练摘要
+    latestReplay:
+      title: 最近离线复盘
+      label: '录像 {{fingerprint}} · 补丁 {{patch}}'
+      unknownPatch: 未知
+      open: 查看复盘历史
+      status:
+        preparing: 准备中
+        analyzing: 分析中
+        completed: 已完成
+        failed: 分析失败，可重选源文件后从头重试
+        cancelled: 已取消，可重选源文件后从头重试
+        interrupted: 应用退出时中断，可重选源文件后从头重试
+    duration: 对局时长
+    totalCues: 提示总数
+    warningCues: 风险提示
+    endReason: 结束原因
+    startManualSession: 启动教练会话
+    pauseSession: 暂停教练
+    resumeSession: 恢复教练
+    stopSession: 结束当前会话
+    testSpeech: 测试语音播报
+    manualSessionStarted: 已根据当前真实对局启动教练。
+    manualSessionFailed: '启动失败：{{error}}'
+    sessionPaused: 教练已暂停，实时采集与播报均已停止。
+    sessionResumed: 教练已恢复，只处理恢复后的新观察。
+    sessionControlFailed: '操作失败：{{error}}'
+    testSpeechText: 实时语音 AI 教练测试成功，音量与语速正常。
+    testSpeechFailed: '播报失败：{{error}}'
+    fogTitle: 迷雾敌方动向推断
+    noFogInference: 当前未检测到迷雾中敌方英雄动向
+    enemyTrack: '敌方目标 {{id}}'
+    confidence: '总体置信度 {{value}}'
+    expiresIn: '{{seconds}} 秒后失效'
+    likelyRoute: '可能路线：'
+    likelyIntent: '可能意图：'
+    itemGuidanceTitle: 当前装备购买指导
+    noItemGuidance: 进入召唤师峡谷对局后自动分析出装与组件
+    currentGold: '当前金币：{{gold}}g'
+    primaryPurchase: 首选购买
+    alternativePurchase: 备选购买
+    missingGold: '还差 {{gold}}g'
+    purchaseAffordable: '可购买：花费 {{cost}}g，预计剩余 {{remaining}}g'
+    cooldownTitle: 技能、资源与眼位计时
+    noCooldowns: 当前暂无进行中的技能与资源计时
+    recordCooldown: 记录计时
+    cancelCooldown: 取消
+    cooldownRecorded: 已记录这条用户确认计时
+    cooldownCancelled: 已取消这条计时
+    cooldownLabelPlaceholder: 例如：敌方闪现
+    cooldownReady: 已就绪
+    cooldownSeconds: '{{seconds}} 秒后就绪'
+    cooldownRange: '预计 {{earliest}}–{{latest}} 秒后就绪'
+    secondsUnit: 秒
+    cooldownDisclaimer: 手动记录仅用于标记已确认的敌方技能冷却与野区资源刷新时间。
+    confirmCommunication: 确认沟通
+    communicationCopied: 沟通短语已复制，请在游戏内自行粘贴发送。
+    communicationRateLimited: 操作过于频繁，请稍后再确认。
+    communicationBlocked: 当前建议已失效或沟通能力不可用。
+    resolutionUnknown: 未采集分辨率
+    patchAndModel: '补丁版本：'
+    patchLabel: '补丁版本：'
+    patchUnconfirmed: 待确认
+    observationConfidence: '观察置信度：'
+    unknownValue: 未知
+    modelUnavailable: 未加载
+    cueStatus:
+      pending: 等待中
+      speaking: 正在输出
+      spoken: 已输出
+      cancelled: 已取消
+      expired: 已过期
+      suppressed: 已抑制
+    cueCancellationReason:
+      priority-below-current-mode: 当前模式优先级不足，未输出
+      queue-delay-exceeded: 等待过久，已错过提示时机
+      queue-overflow: 提示队列已满，被更高优先级内容替代
+      interrupted-by-higher-priority: 被更高优先级提醒打断
+      category-disabled: 该提醒类别已关闭
+      evidence-invalidated: 依据已经失效
+      feature-disabled: 依赖能力已经关闭
+      coach-mode-changed: 教练模式变化后不再满足输出条件
+      shadow-mode: 静默影子模式仅记录，不输出
+      pacing-settings-changed: 提醒频率设置变化后不再满足输出条件
+      suppressed/output-gated: 当前没有可用的输出渠道
+      output-delivery-failed: 已尝试输出，但声音、语音和字幕均未成功送达
+      muted: 静音时停止了当前音频
+      speech-output-disabled: 语音输出已关闭
+      expired: 提醒已经过期
+    roiState:
+      healthy: 标定正常
+      degraded: 标定降级
+      occluded: 小地图被遮挡
+      unknown: 标定未知
+    cooldownKind:
+      ability: 普通技能
+      summoner-spell: 召唤师技能
+      ultimate: 大招
+      ward: 眼位
+      jungle-camp: 野怪
+      objective: 中立资源
+    cooldownSource:
+      official-api: 官方本地数据
+      visible-screen: 屏幕可见记录
+      user-recorded: 用户确认
+      model-estimate: 模型估计
+    cooldownOwner:
+      self: 本人
+      ally: 友方
+      enemy: 敌方
+      neutral: 中立
+      unknown: 未知
+    region:
+      top_lane: 上路
+      mid_lane: 中路
+      bot_lane: 下路
+      top_river: 上半河道
+      bot_river: 下半河道
+      top_jungle: 上半野区
+      bot_jungle: 下半野区
+      dragon_pit: 小龙坑
+      baron_pit: 纳什男爵坑
+      base_recall: 回城
+    intent:
+      roam: 游走
+      recall: 回城
+      ambush: 埋伏
+      flank: 绕后
+      objective: 争夺资源
+      lane-swap: 换线
+      unknown: 未知
     state:
       idle: 空闲中（等待进入召唤师峡谷）
+      awaiting-game: 等待进入对局
+      starting: 正在启动
+      calibrating: 正在标定小地图
+      shadow: 静默分析中
       active: 对局活跃中
       paused: 已暂停
+      degraded: 正在恢复或等待环境就绪
+      recovering: 正在恢复
+      ending: 正在结束
+      completed: 已完成
       unsupported: 当前对局地图或环境不受支持
       disabled: 功能已关闭
+    liveDataState:
+      idle: 空闲
+      connecting: 正在连接
+      healthy: 正常
+      degraded: 已降级
+      unavailable: 不可用
+    speechState:
+      idle: 空闲
+      speaking: 正在播报
+      paused: 已暂停
+      muted: 已静音
+      unavailable: 不可用
+  onboarding:
+    title: 首次启用实时 AI 教练
+    steps:
+      scope: 使用方式
+      environment: 准备环境
+      prepare: 控制与数据
+      consent: 确认摘要
+    scopeTitle: 先了解能力边界
+    capabilities: 功能会读取本机 Riot 官方 Live Client Data，并只分析当前游戏窗口中的小地图区域，用于实时字幕、提示音、语音和确定性建议。
+    support: 首期支持 Windows 10/11、召唤师峡谷、窗口化或无边框模式；不支持时会停止相关输出。
+    privacy: 默认不上传或落盘原始画面，不申请麦克风权限；结构化反馈保存在本机且可导出、撤销和删除。
+    risk: 迷雾位置、路线和意图属于概率预测，不是直接看到的事实；低置信度或证据失效时系统应保持安静或撤销提示。
+    controls: 请在“提醒策略”页设置暂停、静音、重新标定和悬浮窗调整快捷键，避免对局中无法快速控制。
+    test: 建议先在“运行诊断”页完成环境、TTS 和游戏采集测试。
+    pathTitle: 第一次想从哪里开始？
+    pathRealtime: 实时教练
+    pathOffline: 离线录像分析
+    pathRealtimeDesc: 继续检查本机环境、小地图位置、输出和局内控制；最后确认后才启用实时处理。
+    pathOfflineDesc: 直接分析本机结构化 JSON 或 MP4、MKV、WebM 录像，不会启用实时屏幕采集。
+    environmentTitle: 环境与输出检查
+    environmentDescription: 检查 Windows 采集后端、本地音色、快捷键支持，并可分别测试 TTS 和游戏窗口采集。
+    openDiagnostics: 打开运行诊断
+    calibrationTitle: 小地图位置检查
+    calibrationDescription: 进入对局后请求一次预览，确认系统框选的是完整小地图；预览会在 10 秒后清除。
+    openCalibration: 打开小地图标定
+    offlineTitle: 离线分析无需启用实时教练
+    offlineDescription: 原生 .rofl 文件不能直接导入。请使用结构化 JSON，或先准备 MP4、MKV、WebM 录像；缺少 Sidecar 时只执行小地图能力。
+    controlsTitle: 局内控制与试听
+    openControls: 设置快捷键与输出
+    testSpeech: 试听当前本地语音
+    privacyTitle: 数据范围与撤回
+    openPrivacy: 查看隐私与数据控制
+    replayTitle: 先用离线回放熟悉输出
+    replayDescription: 回放页提供明确标记的标准演示，也支持导入本机录像；模拟结果不会冒充真实对局。
+    openReplay: 打开战术复盘
+    consentTitle: 检查摘要后再确认
+    consentDescription: 选择实时教练会授权当前说明中的本机实时处理；选择离线分析不会启用实时屏幕采集。你可以返回前面修改或以后继续未完成的检查。
+    summaryPath: 首次使用方式
+    summaryCalibration: 当前小地图状态
+    summaryOutput: 当前输出方式
+    summaryShortcuts: 暂停、静音、重标定快捷键
+    summaryShortcutCount: 已设置 {{count}} / 3 项
+    summaryNone: 未启用输出
+    reopenHint: 以后可从“帮助与快速上手”重新查看本向导，或在“隐私与授权”撤回实时处理授权。
+    acknowledge: 我已了解支持范围、隐私处理、预测不确定性和关闭方式。
+    cancel: 暂不启用
+    previous: 上一步
+    next: 下一步
+    enable: 确认并启用
+    done: 完成查看
+    startOffline: 前往离线分析
+  help:
+    title: 帮助与快速上手
+    phaseTitle: 先完成准备，再进入真实对局
+    phaseDescription: 本页提供准备顺序和故障排查入口；是否真正可用以“运行诊断”和当前能力状态为准，打开帮助本身不代表环境已经通过。
+    steps:
+      environment:
+        title: 1. 检查运行环境
+        description: 检查采集后端、本地音色和快捷键支持；进入对局后再测试一次游戏窗口采集。
+        action: 打开运行诊断
+      calibration:
+        title: 2. 确认小地图区域
+        description: 请求一次性预览，确认框线完整覆盖小地图；置信度不足时手动调整并保存。
+        action: 打开小地图标定
+      controls:
+        title: 3. 设置局内控制
+        description: 配置暂停、静音、重复提示、重新标定和悬浮窗调整快捷键，并选择字幕、声音或语音输出。
+        action: 打开提醒策略
+      replay:
+        title: 4. 先体验离线复盘
+        description: 加载明确标记的标准演示，或导入本机 JSON、MP4、MKV、WebM 文件熟悉时间线和提示状态。
+        action: 打开战术复盘
+      privacy:
+        title: 5. 查看数据边界
+        description: 查看画面、小地图 ROI、结构化数据和诊断信息如何处理，并了解授权撤回、导出和删除的实际范围。
+        action: 打开隐私与授权
+    boundariesTitle: 使用时记住这些边界
+    boundaryObservation: 小地图当前可见内容是直接观测；迷雾区域、路线和意图只是带有效期的概率推断。
+    boundaryControl: 教练不会点击、购买、施法或自动向游戏发送输入；沟通短语也需要你逐次确认并自行粘贴。
+    boundaryReplay: 标准演示和离线分析始终是示例或复盘，不代表当前真实对局状态。
+    boundaryPrivacy: 一期不申请麦克风权限，也不监听队伍语音或系统声音；默认不保存、上传完整游戏画面。
+    topicsTitle: 教程与故障排查
+    topics:
+      gettingStarted:
+        title: 重新查看首次使用教程
+        description: 重新选择离线或实时路径，并回顾能力、支持范围、准备步骤与确认摘要。查看已完成授权时不会自动改变总开关。
+        action: 打开首次使用向导
+      calibration:
+        title: 小地图定位不准
+        description: 使用窗口化或无边框模式进入召唤师峡谷，确认游戏内小地图左右位置，再请求一次预览。框线不完整或置信度不足时手动调整并保存。
+        action: 前往标定
+      capture:
+        title: 游戏窗口未找到、黑屏或采集停滞
+        description: 保持英雄联盟游戏窗口位于当前 Windows 桌面，使用窗口化或无边框模式，然后重跑完整环境检查。一次性预览成功不代表实时 WGC/DDA 后端已经可用。
+        action: 重新检查采集
+      permission:
+        title: 屏幕采集权限不可用
+        description: 在 Windows 隐私或安全设置中允许 League Akari 采集游戏窗口，随后重启应用并重跑完整环境检查。无法获得权限结果时不会记为通过。
+        action: 重新检查权限
+      patch:
+        title: 当前游戏补丁未知或不受支持
+        description: 更新英雄联盟与 League Akari，进入受支持对局以读取补丁，再查看能力门禁原因。补丁门禁关闭时不要强行启用实时教练。
+        action: 检查补丁状态
+      platform:
+        title: 平台或原生运行时不受支持
+        description: 一期实时采集和原生快捷键要求受支持的 Windows 构建及正常的原生运行时。实时平台门禁关闭时仍可使用离线复盘。
+        action: 检查平台状态
+      consent:
+        title: 实时处理授权缺失或已过期
+        description: 在“隐私与授权”查看当前隐私说明和处理用途，再明确确认当前授权版本。打开帮助或完成环境检查都不会自动授予授权。
+        action: 查看隐私与授权
+      liveData:
+        title: Live Client Data 不可用
+        description: 保持英雄联盟客户端和游戏运行，等待局内 Live Client Data 端点恢复健康后重跑诊断。地图空间结论仍必须有健康的小地图证据。
+        action: 检查实时数据
+      noSound:
+        title: 没有提示音或语音
+        description: 检查输出方式包含“声音”或“语音”、教练未静音、本地语音已启用且选中了可用输出设备；随后执行 TTS 测试。
+        action: 检查语音设置
+      overlay:
+        title: 悬浮字幕没有显示
+        description: 检查输出方式包含“字幕”、悬浮窗已启用且不透明度可见。需要调整位置时，确认悬浮窗未锁定并使用对应快捷键。
+        action: 检查提醒策略
+      automaticPause:
+        title: 教练为什么自动暂停
+        description: 不支持的地图、队列、地区或补丁，采集目标丢失、黑屏或停滞，小地图未标定或被遮挡，以及 Live Data 中断都可能让教练暂停或降级。诊断页会显示当前原因代码。
+        action: 查看运行诊断
+      replay:
+        title: 离线录像支持什么格式
+        description: 支持项目结构化 JSON，以及 MP4、MKV、WebM 录像；不直接读取原生 .rofl。可把同名 .sidecar.json 放在录像旁补充结构化事件。
+        action: 打开战术复盘
+      privacy:
+        title: 如何撤回、导出或删除数据
+        description: 撤回实时授权会先关闭实时教练，但不会自动删除既有本机数据；删除会清理反馈、提示、计时、沟通记录、验收证据、离线复盘历史与内部结果，以及手动标定，不会删除源录像、Sidecar 或另存的导出文件。
+        action: 打开隐私与授权
+      unsupported:
+        title: 当前环境不受支持
+        description: 一期实时能力仅面向 Windows 10/11、召唤师峡谷和窗口化或无边框模式，并受地区、队列、补丁与能力开关限制。离线复盘仍可独立使用。
+        action: 检查具体原因
+      reportIssue:
+        title: 提交问题需要哪些信息
+        description: 当前可先生成脱敏诊断报告，再通过项目现有支持渠道手动提供。报告不含原始画面、录像、完整路径、召唤师名、自定义沟通内容或令牌；本页不会自动上传报告。
+        action: 生成诊断报告
+    openGuide: 重新打开首次使用向导
+    backToOverview: 返回概览
+  feedback:
+    prompt: 这条提示怎么样？
+    type:
+      useful: 有用
+      not-useful: 没用
+      incorrect: 错误
+      late: 太晚
+      too-frequent: 太频繁
+    withdraw: 撤销
+    delete: 删除
+    saved: 反馈已保存在本机。
+    withdrawn: 反馈已撤销。
+    deleted: 反馈已删除。
+    loadFailed: 无法读取本机提示反馈。
+    saveFailed: 无法保存提示反馈。
   calibration:
     title: 小地图 ROI 标定与环境指纹
     desc: 为了确保小地图视觉观察的准确性，系统会自动检测游戏窗口分辨率与小地图位置。你也可以在右侧或左侧小地图布局中进行手动微调。
@@ -40,18 +384,121 @@ liveCoach:
     backendAuto: '自动 (Auto)'
     backendWgc: 'WGC (推荐)'
     backendDda: 'DXGI DDA'
+    previewTitle: 小地图预览与手动框选
+    previewDesc: 仅在你点击后读取一次英雄联盟游戏窗口预览；图像最长边不超过 512 像素，并在 10 秒后从页面清除。
+    showImage: 显示图像
+    requestPreview: 获取一次预览
+    previewAlt: 英雄联盟游戏窗口的一次性小地图标定预览
+    previewHidden: 预览图像已隐藏，可继续调整框线。
+    previewEmpty: 进入对局后点击“获取一次预览”。
+    roiAriaLabel: 可拖动和缩放的小地图区域
+    sourceResolution: '目标窗口：'
+    sourceResolutionUnknown: 未能从目标窗口读取
+    calibrationSource: '标定来源：'
+    confidence: '置信度：'
+    detectedSide: '小地图侧：'
+    detectionUncertain: 自动检测未能可靠确认小地图位置。请在预览中拖动并调整框选范围，然后手动保存；未确认前不会把候选框显示为标定成功。
+    reset: 重置自动标定
+    confirm: 保存手动标定
+    saved: 小地图手动标定已保存并立即应用。
+    resetDone: 已恢复自动标定。
   settings:
     title: 教练模式与提醒策略
+    featureSwitchesTitle: 独立教练能力
+    autoStartSwitch: 进入支持的对局后自动开始
+    autoStartSwitchDesc: 关闭后只会在你点击“手动开始教练”时启动，不影响已经运行的当前会话。
+    fogInferenceSwitch: 战争迷雾概率推断
+    fogInferenceSwitchDesc: 基于小地图最后可见信息显示概率区域、路线和意图；关闭后立即撤销相关预测与提醒。
+    fogInferenceDetail:
+      region: 仅概率区域
+      route: 区域与路线
+      intent: 完整意图预测
+    itemGuidanceSwitch: 购买装备指导
+    itemGuidanceSwitchDesc: 仅生成购买建议，不打开商店、不点击，也不自动购买。
+    cooldownTrackingSwitch: 基础计时
+    cooldownTrackingSwitchDesc: 启用官方事件计时和用户主动确认的技能、眼位与资源计时。
+    communicationAssistSwitch: Ping 与沟通辅助
+    communicationAssistSwitchDesc: 默认关闭；启用后仍需逐次确认，且只复制消息，不自动控制游戏。
+    itemGuidanceTitle: 购买装备指导
+    itemGuidanceModeTitle: 推荐方案来源
+    itemGuidanceMode:
+      system: 游戏客户端推荐
+      common: 常用出装
+      adaptive: 战局自适应（推荐）
+      custom: 自定义出装
+    itemGuidanceModeDesc:
+      system: 直接使用当前英雄在本机英雄联盟客户端中的系统推荐装备。
+      common: 使用经过版本校验的英雄常用核心装备，不根据敌方阵容改变顺序。
+      adaptive: 在常用出装基础上，根据敌方回复能力和法术威胁优先插入克制装备。
+      custom: 严格按照你为当前英雄设置的装备顺序进行购买指导。
+    customBuildTitle: 自定义英雄出装
+    customBuildDesc: 输入英雄数字 ID 和按购买顺序排列的装备数字 ID；无有效配置时不会生成推荐。
+    championIdPlaceholder: 英雄 ID
+    itemIdsPlaceholder: 装备 ID，例如 6655, 3020, 4645
+    saveCustomBuild: 保存
+    removeCustomBuild: 删除
+    customBuildRow: '英雄 {{championId}}：{{itemIds}}'
+    customBuildChampionRequired: 请输入有效的英雄 ID。
+    customBuildItemsRequired: 请至少输入一个有效的装备 ID。
+    customBuildSaved: 自定义出装已保存。
+    communicationTitle: 确认式报点与沟通模板
+    communicationDesc: 系统只会在你点击或按下确认快捷键后复制建议短语，不会自动发送、模拟按键或控制游戏。请在游戏内自行粘贴发送。
+    communicationKind:
+      missing: 敌方失踪
+      resource: 资源争夺
+      retreat: 撤退
+      push: 推线
+      group: 集合
+      danger: 危险
+    communicationCooldownTitle: 确认冷却
+    communicationCooldownDesc: 限制连续确认频率，避免重复沟通。
+    saveCommunication: 保存沟通设置
+    communicationTemplateRequired: 每种沟通模板都必须填写。
+    communicationCooldownRequired: 请输入 3 至 60 秒的确认冷却。
+    communicationSaved: 沟通模板与冷却已保存。
     coachModeTitle: 教练提醒模式
     modeMinimal: 极简模式（仅高危预警）
     modeBalanced: 平衡模式（推荐）
     modeTraining: 教学强化模式
     outputModeTitle: 提示输出方式
+    outputModeDesc: 可组合选择提示音、悬浮字幕和本地短语音；全部取消时不输出任何提醒，临时静音也可使用下方开关或快捷键。
+    outputSound: 提示音
     outputSpeech: 本地语音播报
     outputSubtitle: 独立悬浮字幕
+    coachModeDesc: 控制局内提示的触发频率与详细程度。
+    shadowModeTitle: 静默影子模式
+    shadowModeDesc: 完整运行采集、识别和规则，只记录本应触发的提示，不播放声音或显示字幕；用于真实对局验收。
+    cueDensityTitle: 提醒密度
+    cueDensity:
+      low: 低频
+      standard: 标准
+      high: 高频训练
+    minimumCueIntervalTitle: 最短提醒间隔
+    categoriesTitle: 关注的提示类别
+    category:
+      information: 信息
+      warning: 危险
+      resource: 资源
+      opportunity: 机会
+      system: 系统状态
+      review: 复盘
     overlaySwitchTitle: 启用独立透明置顶悬浮窗
     overlaySwitchDesc: 在游戏画面上方展示半透明提示卡片，支持鼠标点击穿透
     opacityTitle: 悬浮窗不透明度
+    opacityDesc: 调节悬浮窗在游戏顶层的可见透明度。
+    shortcutsTitle: 局内控制与全局快捷键
+    muteTitle: 静音教练音频
+    muteDesc: 关闭语音和提示音，但保留实时字幕。
+    pauseShortcut: 暂停 / 继续教练
+    muteShortcut: 静音 / 恢复音频
+    repeatShortcut: 重复显示上一条字幕
+    recalibrateShortcut: 重新自动标定小地图
+    overlayShortcut: 按住后调整悬浮窗
+    overlayShortcutDesc: 按住快捷键时临时允许鼠标操作、拖动和缩放悬浮窗。
+    communicationConfirmShortcut: 确认最新沟通建议
+    communicationConfirmShortcutDesc: 仅复制最新有效建议的短语，不会自动向游戏发送输入。
+    overlayLockedTitle: 锁定悬浮窗位置与大小
+    overlayLockedDesc: 开启后按住调整快捷键也不会移动或缩放窗口。
   voice:
     title: 语音播报与 TTS 设置
     enableSwitch: 启用本地语音播报
@@ -59,35 +506,531 @@ liveCoach:
     voiceSelectTitle: 系统 SAPI 语音包选择
     voiceSelectDesc: 选择用于播报的系统本地语音
     defaultVoice: 跟随系统默认语音
+    outputDeviceTitle: 语音输出设备
+    outputDeviceDesc: 选择 SAPI 播报使用的扬声器或耳机
+    defaultOutputDevice: 跟随系统默认输出设备
     volumeTitle: 播报音量
     volumeDesc: 设置 TTS 语音输出音量
     rateTitle: 语速调节
     rateDesc: 0.5x ~ 1.5x 倍速
     testBtn: 测试当前语音输出
+    cancelBtn: 立即停止播报
+    testSucceeded: 语音测试播放完成
+    testFailed: 语音测试未能播放，请检查语音包和输出设备
+    testText: 实时语音 AI 教练测试播报，音量与语速正常。
+    testError: '语音测试失败：{{error}}'
+    loadFailed: 无法读取本机 SAPI 语音或输出设备
   reviews:
     title: 战术复盘与离线录像分析
     desc: 离线分析对局回放与录像数据，回溯战术关键决策点与小地图事实证据链。
+    importGuideTitle: 导入前先确认格式与能力边界
+    importFormats: 支持项目结构化 JSON，以及 MP4、MKV、WebM 录像；不直接读取英雄联盟客户端的原生 .rofl 文件。
+    sidecarGuide: 视频旁若存在“录像文件名.sidecar.json”或“同名.sidecar.json”，系统会自动校验并读取；没有 Sidecar 时只执行小地图分析，依赖等级、装备、死亡和资源事件的规则保持关闭。
+    sourceBoundary: 分析全部在本机进行，不修改或复制源文件；历史仅保存脱敏结构化结果，不保存录像、完整路径、文件名、预览或原始帧。你另存到其他目录的报告由你自行管理。
+    history:
+      title: 本机复盘历史
+      refresh: 刷新
+      clearAll: 删除全部复盘
+      empty: 暂无持久化复盘记录
+      open: 打开
+      retryFromStart: 重选并从头重试
+      delete: 删除
+      sourceUnavailable: 为保护隐私，应用不会保存源录像路径。历史时间轴可直接查看；若需同步播放原录像，请通过上方导入按钮重新选择同一文件，重复检测会直接打开已有结果并仅在当前会话关联源文件。
+      resultUnavailable: 该复盘结果不存在或已损坏。
+      itemLabel: '{{kind}} {{fingerprint}} · 补丁 {{patch}}'
+      unknownPatch: 未知
+      kind:
+        json: 结构化回放
+        video: 本地录像
+      status:
+        preparing: 准备中
+        analyzing: 分析中
+        completed: 已完成
+        failed: 失败
+        cancelled: 已取消
+        interrupted: 应用退出时中断
+      retryingFromStart: 正在校验重新选择的源文件并从头分析；这不是断点续传。
+      retryCompleted: 从头重试已完成。
+      duplicateOpened: 同一录像、配置、模型和规则版本已有结果，已直接打开。
+      clearConfirmTitle: 删除全部复盘历史？
+      clearConfirmContent: 这会删除应用内部的脱敏结果、任务记录、缓存和临时内容，不会删除源录像或你另存到其他目录的报告。
+      deleteConfirmTitle: 删除这条复盘？
+      deleteConfirmContent: 这会永久删除应用内部的结果和临时内容，不会删除源录像或外部导出。
+      confirm: 确认删除
+      cancel: 取消
+      deleted: 复盘结果与内部临时内容已删除。
+      cleared: '已删除 {{count}} 条复盘记录及其内部结果。'
+    importReplayBtn: 导入录像 / 回放文件
     loadDemoBtn: 加载标准对局演示
-    exportSidecarBtn: 导出 Sidecar JSON
+    exportAnalysisJsonBtn: 导出分析结果 JSON
     exportMarkdownBtn: 导出 Markdown 报告
+    processing: 正在处理...
+    cancelImportBtn: 取消导入
+    sessionId: 对局 ID
+    patch: 游戏版本
+    totalCues: 关键战术提示总数
+    cueCount: '{{count}} 条'
+    offlineReviewBadge: 离线复盘
+    timelineTitle: 战术关键时刻时间轴
+    spokenText: '播报内容：“{{text}}”'
+    option: '建议：{{option}}'
+    evidenceIds: '证据链：{{ids}}'
     emptyText: 暂无复盘数据，可点击上方「加载标准对局演示」体验离线录像与战术时间轴生成
+    calibrationTitle: 确认录像小地图区域
+    calibrationDesc: 系统已从录像抽取一次性预览并自动定位小地图。请拖动框线、调整左上角或右下角大小，确认无误后开始分析。
+    calibrationPreviewAlt: 录像小地图标定预览
+    calibrationPreviewExpired: 录像预览已过期，框线仍可调整；如需重新查看请取消后重新导入。
+    calibrationRoiAriaLabel: 录像中可拖动和缩放的小地图区域
+    calibrationRequired: 自动定位置信度不足，必须手动把框线调整到完整小地图区域。
+    sidecarStatus: 'Sidecar：'
+    sidecarFound: 已发现并校验
+    sidecarMissing: 未提供，仅执行纯小地图分析
+    cancelCalibration: 取消
+    startAnalysis: 确认区域并开始分析
+    preparingCalibration: 正在读取录像元数据并生成小地图标定预览...
+    startingAnalysis: 正在启动录像分析...
+    importCompleted: 录像导入与复盘分析已完成。
+    deleteAnalysis: 删除当前分析
+    analysisDeleted: 当前演示结果已从页面内存中删除。
+    startPlayback: 播放时间线
+    pausePlayback: 暂停播放
+    previousFrame: 上一帧
+    nextFrame: 下一帧
+    currentObservation: '当前观察：'
+    noCurrentObservation: 当前时刻尚无结构化观察
+    observationSummary: '小地图实体 {{minimap}} 个，Live Data：{{liveData}}'
+    videoFrameSummary: '已定位到分析帧 {{current}} / {{total}}'
+    available: 可用
+    unavailable: 不可用
+    jumpToMoment: 跳转到此时刻
+    simulateSpeech: 模拟教练语音
+    listSeparator: '、'
+    metadata:
+      patch: 游戏补丁
+      patchPlaceholder: 例如 16.17.1
+      mapId: 地图 ID
+      queueId: 队列 / 模式 ID
+      selfTeam: 本人阵营
+      minimapSide: 小地图侧
+      selfChampionId: 本人英雄 ID
+      gameStartOffset: 游戏开始偏移（秒）
+      blueRoster: 蓝方英雄 ID（逗号分隔）
+      redRoster: 红方英雄 ID（逗号分隔）
+      blueRosterPlaceholder: 例如 86,64,103,22,40
+      redRosterPlaceholder: 不知道可留空
+      unknown: 未知
+      blueTeam: 蓝方
+      redTeam: 红方
+      leftSide: 左侧
+      rightSide: 右侧
+      fields:
+        patch: 游戏补丁
+        mapId: 地图
+        selfTeam: 本人阵营
+        selfChampionId: 本人英雄
+        roster: 双方阵容
+        videoGameStartMs: 游戏开始偏移
+    capability:
+      missingTitle: 缺失信息
+      missingDescription: '缺失：{{fields}}。未知项可以留空，相关能力会关闭。'
+      available: '可用：{{capabilities}}'
+      disabled: '关闭 {{capability}}：{{reason}}'
+      names:
+        minimap-basic: 基础小地图分析
+        region-change: 地图区域变化
+        visible-grouping: 可见敌人聚集
+        champion-identity-candidate: 英雄身份候选
+        champion-identity: 英雄身份识别
+        approaching-player-candidate: 接近玩家候选
+        approaching-player: 接近玩家识别
+        sidecar-events: Sidecar 结构化事件
+        sidecar-dependent-rules: Sidecar 依赖规则
+      reasons:
+        requires-summoners-rift-and-team: 需要确认召唤师峡谷地图和玩家阵营
+        requires-patch-team-roster-and-validated-model: 需要确认补丁、玩家阵营和双方阵容，且对应模型必须通过校验
+        requires-self-champion-team-roster-and-position: 需要确认本人英雄、玩家阵营和阵容，并成功识别本人位置
+        requires-structured-sidecar: 未提供结构化 Sidecar，等级、装备、死亡和目标事件规则关闭
+        requires-sidecar-time-alignment: Sidecar 事件没有游戏时间，且尚未设置录像与游戏时间的对齐偏移
+        validated-model-unavailable-for-patch: 当前补丁没有通过完整性校验且成功加载的身份模型
+    errors:
+      invalidRoster: '{{team}}阵容包含无效英雄 ID。'
+      rosterTooLarge: 双方阵容最多填写 10 个英雄。
+    readingFile: 正在读取文件...
+    importFileCompleted: '已完成复盘分析：{{file}}'
+    importFailed: '导入录像文件失败：{{error}}'
+    importCancelled: 已取消录像导入任务。
+    loadingDemo: 正在加载演示数据...
+    demoLoaded: 已加载标准对局回放并生成战术关键时刻时间轴。
+    demoFailed: '加载回放演示失败：{{error}}'
+    demoResultTitle: 标准演示数据
+    demoResultDescription: 这是内置的确定性示例，只用于熟悉时间线与提示交互，不代表真实对局，也不会计入一期离线回放验收。
+    analysisJsonExported: 复盘分析结果 JSON 已导出；它不是可回导的录像 Sidecar。
+    markdownExported: Markdown 复盘报告已导出。
+    exportFailed: '导出复盘失败：{{error}}'
+    progress:
+      json-parsing: 正在解析 JSON 会话回放数据...
+      json-completed: JSON 回放解析完成。
+      video-probing: 正在探测视频编码与规格...
+      video-extracting: '正在以 5 FPS 流式提取小地图像素（{{width}}×{{height}}，时长 {{duration}} 秒）...'
+      video-analyzing: '正在流式分析视频帧（{{current}}/{{total}}）...'
+      video-completed: 视频录像分析完成。
   privacy:
     title: 隐私保护与数据授权
     localComputeTitle: 纯本地运算保障
-    localComputeDesc: 所有 Live Client Data 与小地图视觉帧分析均在本地隔离子进程中完成，不上传任何游戏画面至云端。
+    localComputeDesc: 所有教练处理均在本机完成；小地图视觉分析运行在隔离子进程中，原始画面不会上传云端。第一期不申请麦克风权限，也不监听队伍语音或系统声音。
     noAntiCheatTitle: 反作弊合规基线
-    noAntiCheatDesc: 仅读取 Riot 官方 2999 端口与小地图公开信息，不进行内存读写或游戏注入，严格遵守 Riot 第三方应用开发者协议。
+    noAntiCheatDesc: 仅使用 Riot Live Client Data（2999 端口）与屏幕采集，不读取游戏内存、不注入或操控游戏进程；公开发布仍受 Riot 审核与远程能力开关控制。
+    dataScopeTitle: 各类本机数据如何使用
+    screenDataTitle: 游戏窗口画面
+    screenDataDesc: 只在实时采集或你主动请求预览时读取；默认不保存完整画面、不上传原始画面，预览会在页面中自动清除。
+    roiDataTitle: 小地图 ROI
+    roiDataDesc: 仅截取小地图区域交给隔离子进程分析；手动框选的位置参数保存在本机，重置或删除本机数据时清除。
+    structuredDataTitle: 结构化对局数据
+    structuredDataDesc: Riot 本机 Live Data、提示、计时、沟通确认和反馈只用于生成教练结果、复盘与一期本机验收证据。
+    diagnosticsDataTitle: 诊断信息
+    diagnosticsDataDesc: 运行环境、能力状态、性能和错误代码用于本机排障；只有你主动导出时才写入报告，且默认移除原始画面、完整路径和召唤师名。
+    dataImprovementTitle: 数据改进分享尚未开放
+    dataImprovementDesc: 当前构建没有匿名指标、诊断日志或小地图样本上传通道，这些分享类别均保持关闭。本机导出完全由你主动触发，也不会自动发送。
+    consentTitle: 实时处理授权
+    consentGranted: 已确认
+    consentWithdrawn: 未确认
+    consentGrantedDesc: 当前授权只覆盖本页说明的本机实时处理，不包含数据改进上传。你可随时重看向导，或撤回授权并停止当前及后续实时会话。
+    consentWithdrawnDesc: 实时教练保持关闭；标准演示仍可使用，重新导入本机录像前需要再次确认当前隐私说明。撤回授权不会自动删除之前保存在本机的数据。
+    reviewGuide: 重新查看首次向导
+    withdrawConsent: 撤回并重新确认
+    withdrawConsentConfirm: 将先关闭实时教练并结束当前会话，再撤回确认状态；现有本机数据不会因此删除。继续吗？
+    withdrawConsentDone: 实时处理授权已撤回，实时教练已关闭。
+    withdrawConsentFailed: 无法完整撤回实时处理授权。
+    localDataTitle: 本机教练数据
+    localDataDesc: 提示反馈最长保留 180 天。导出包含当前结构化会话、最近提示、计时、沟通确认、反馈、手动标定、一期验收证据，以及脱敏的离线复盘任务与结果；不含原始画面、源录像、完整源路径或麦克风音频。删除不会重置教练偏好或授权状态，也不会移除源录像、Sidecar 和另存到其他位置的导出文件。
+    export: 导出本机教练数据
+    delete: 删除本机教练数据
+    deleteConfirm: 将结束当前教练会话，并删除本机反馈、当前与最近提示、计时、沟通记录、一期验收证据、离线复盘历史与内部结果/临时内容，以及手动标定；不会删除源录像、Sidecar、另存的导出文件、教练偏好或授权状态。确定继续吗？
+    exported: 本机教练数据已导出。
+    exportFailed: 无法导出本机教练数据。
+    deleted: 本机教练数据已删除。
+    deleteFailed: 无法完整删除本机教练数据。
   diagnostics:
     title: 运行诊断与状态监控
     matrixTitle: 系统支持矩阵与能力检查
+    environment:
+      description: 每项都基于当前 renderer 状态和明确触发的本机探针；未知或仅部分确认的项目绝不会算作通过。
+      runAll: 运行完整检查
+      retryUnready: 只重检未就绪项
+      checkedAt: 上次检查于 {{time}}
+      fixLabel: 建议处理：
+      openHelp: 查看排查
+      probeFailureTitle: 部分本机探针执行失败；依赖它们的项目会保持未知，不会被当作通过。
+      storeOnlyNotice: 地图、队列、地区和补丁没有 renderer 直连探针；本次仅依据最新会话和能力状态重新判断。
+      probeGroups:
+        capture: 采集后端与权限
+        preview: 一次性游戏窗口与标定预览
+        voices: 本地语音音色
+        audio: 音频输出设备
+      probeErrors:
+        capture: 采集后端与权限探针执行失败。
+        preview: 当前没有可用于一次性预览的受支持游戏窗口。
+        previewConsentRequired: 未读取游戏窗口：请先确认当前隐私说明。其余非画面探针已继续执行。
+        voices: 本地语音运行时未返回音色列表。
+        audio: 本地音频运行时未返回输出设备。
+      status:
+        available: 可用
+        partial: 部分确认
+        unavailable: 不可用
+        unknown: 未知
+      summary:
+        available: 当前全部必要环境项目均已确认。
+        partial: 至少有一项仅完成部分确认，本次环境检查未完整通过。
+        unavailable: 至少有一项必要能力不可用，本次环境检查未通过。
+        unknown: 至少有一项必要能力仍无法确认，本次环境检查不算通过。
+      items:
+        platform: 操作系统
+        capture: 实时后端与采集权限
+        resolution: 显示分辨率
+        dpi: 显示缩放
+        hdr: HDR / SDR
+        windowMode: 游戏窗口模式
+        roi: 小地图 ROI
+        map: 地图
+        queue: 队列
+        region: 地区与远端策略
+        patch: 游戏补丁
+        liveData: Live Client Data
+        voice: 本地语音音色
+        audioOutput: 音频输出设备
+        nativeShortcuts: 原生全局快捷键
+      values:
+        platformWindows: Windows
+        platformUnknown: 未报告运行平台
+        platformOther: '{{platform}}'
+        captureBackend: '{{backend}}（运行中）'
+        probeFailed: 探针失败
+        notChecked: 尚未检查
+        permissionDenied: 权限被拒绝
+        captureBackends: '{{backends}}'
+        previewOnly: 仅一次性预览
+        unavailable: 不可用
+        resolution: '{{width}} × {{height}}'
+        waitingForGame: 等待进入对局
+        dpi: '{{percent}}%'
+        sdr: SDR
+        hdr: HDR
+        hdrNotConfirmed: 当前无法检测 HDR/SDR
+        windowModeUnknown: 当前无法检测
+        windowed: 窗口化
+        borderless: 无边框
+        exclusiveFullscreen: 独占全屏
+        roiConfidence: 置信度 {{confidence}}%
+        roiNotLocated: 未定位
+        roiHealthy: 当前会话健康
+        roiDegraded: 当前会话降级
+        roiUnsupported: 当前会话不支持
+        previewFailed: 预览不可用
+        waitingForCalibration: 等待标定
+        mapId: 地图 ID {{id}}
+        queueId: 队列 ID {{id}}
+        regionRejected: 地区门禁已拒绝
+        regionNotExposed: 本页未暴露地区身份
+        patchVersion: '{{patch}}'
+        patchUnknown: 等待补丁检测
+        liveDataUnavailable: 不可用或已降级
+        liveDataHealthy: 健康
+        noVoices: 没有本地音色
+        selectedVoiceMissing: 已选音色不存在
+        selectedVoice: '{{name}}'
+        voiceCount_one: '{{count}} 个本地音色'
+        voiceCount_other: '{{count}} 个本地音色'
+        noAudioOutputs: 没有输出设备
+        selectedAudioOutputMissing: 已选设备不存在
+        selectedAudioOutput: '{{name}}'
+        shortcutsConfigured_one: 已配置 {{count}} 个快捷键
+        shortcutsConfigured_other: 已配置 {{count}} 个快捷键
+        elevationRequired: 需要管理员权限
+        initializationFailed: 原生运行时初始化失败
+      reasons:
+        platformSupported: 一期实时处理面向 Windows。
+        platformUnknown: 应用尚未报告受支持的操作系统。
+        platformUnsupported: 一期实时采集不支持当前平台。
+        captureRunning: 原生实时采集后端正在运行。
+        captureProbeFailed: 后端或权限探针没有返回可信结果。
+        runCheck: 使用本项前需要先运行完整检查。
+        capturePermissionDenied: 本机探针报告未授予采集权限。
+        capturePermissionUnknown: 已检测到原生后端，但当前 API 无法在未启动真实采集时确认游戏窗口权限；本项不会自动通过。
+        nativeCaptureAvailable: 至少一个原生 WGC/DDA 实时后端及采集权限可用。
+        realtimeBackendMissing: 一次性桌面预览可用，但没有发现原生实时采集后端。
+        captureUnsupported: 当前没有可用的受支持游戏窗口采集路径。
+        resolutionUnknown: 需要正在运行的游戏窗口预览或实时采集状态才能确认分辨率。
+        resolutionSupported: 当前分辨率位于一期冻结的 16:9 支持矩阵内。
+        resolutionUnsupported: 一期仅验证 1920×1080 和 2560×1440。
+        dpiUnknown: 需要当前环境指纹才能确认显示缩放。
+        dpiSupported: 当前显示缩放位于一期 100%–150% 范围内。
+        dpiUnsupported: 当前显示缩放超出一期 100%–150% 范围。
+        hdrUnknown: 尚未确认当前游戏环境的 HDR/SDR 状态。
+        hdrNotDetectable: 当前环境指纹 API 不能可靠检测 Windows HDR 是否开启，因此看似 SDR 的值也不能自动通过。
+        sdrSupported: 当前环境指纹报告为 SDR。
+        hdrNotReleaseValidated: 后端报告支持 HDR，但 HDR 尚未进入一期发布验证矩阵。
+        hdrBackendUnsupported: 当前环境报告为 HDR，但没有经过确认的 HDR 采集后端。
+        windowModeNotDetectable: 当前原生目标窗口检查无法可靠区分无边框与独占全屏，因此本项不能自动通过。
+        windowModeSupported: 窗口化和无边框是一期受支持模式。
+        exclusiveFullscreenUnsupported: 独占全屏尚未进入一期发布验证矩阵。
+        roiLocated: 一次性预览以足够置信度定位到小地图。
+        roiLowConfidence: 已找到小地图候选区域，但置信度低于自动通过门槛。
+        roiNotLocated: 一次性预览未能可靠定位小地图。
+        roiHealthy: 实时采集管道当前报告小地图区域健康。
+        roiDegraded: 实时采集管道报告小地图证据降级。
+        roiUnsupported: 实时采集管道报告小地图区域不受支持。
+        previewUnavailable: 游戏窗口预览失败；这不能证明 ROI 健康。
+        roiUnknown: 当前没有标定预览或健康会话证据。
+        mapUnsupported: 当前地图被一期能力门禁拒绝。
+        mapUnknown: 只有客户端报告当前对局后才能确认地图。
+        mapSupported: 召唤师峡谷已通过当前地图门禁。
+        queueUnsupported: 当前队列被能力策略拒绝。
+        queueUnknown: 只有客户端报告当前对局后才能确认队列。
+        queueGatePassed: 当前会话队列已通过能力门禁。
+        regionUnsupported: 当前地区被能力策略拒绝。
+        regionNotExposed: renderer 没有地区身份或远端策略细节可独立核验；未出现拒绝原因不等于通过。
+        patchUnsupported: 检测到的补丁被当前能力策略拒绝。
+        patchUnknown: 只有客户端报告当前对局后才能确认补丁。
+        patchGatePassed: 检测到的补丁已通过当前能力门禁。
+        liveDataUnavailable: Live Client Data 已降级或被当前能力状态拒绝。
+        liveDataHealthy: 当前会话已有成功的 Live Client Data 心跳。
+        liveDataUnknown: 只有受支持对局运行后才能确认 Live Client Data。
+        voiceProbeFailed: 本地语音运行时未返回音色列表。
+        voiceUnavailable: 当前没有可用的本地语音音色。
+        selectedVoiceMissing: 已配置的语音音色已不存在。
+        voiceAvailable: 当前存在可选择的本地语音音色。
+        audioProbeFailed: 本地音频运行时未返回输出设备。
+        audioOutputUnavailable: 当前没有可用的音频输出设备。
+        selectedAudioOutputMissing: 已配置的输出设备已断开或不存在。
+        audioOutputAvailable: 当前存在可用的本地输出设备。
+        nativeShortcutsAvailable: Windows 原生输入运行时可用于全局快捷键。
+        shortcutElevationRequired: 应用未提权，原生全局快捷键不可用。
+        shortcutPlatformUnsupported: 当前平台不支持原生全局快捷键。
+        shortcutInitializationFailed: Windows 原生输入运行时未成功初始化。
+      fixes:
+        restartApp: 重启 League Akari；若状态仍未知，改用离线复盘并导出诊断报告。
+        useWindows: 实时教练请使用受支持的 Windows 构建，或继续使用离线复盘。
+        rerunCheck: 重新检查失败项；若仍失败，保持实时教练关闭并导出诊断报告。
+        grantCapturePermission: 授予本机屏幕采集权限，重启应用后重新检查。
+        verifyCaptureInGame: 完成当前隐私确认后进入受支持对局；只有 WGC/DDA 实际运行时才确认采集权限。
+        installNativeCapture: 修复或重新安装 Windows 原生运行时；桌面预览只用于诊断。
+        useSupportedCaptureEnvironment: 使用受支持的 Windows 游戏窗口环境，或改用离线复盘。
+        enterGameAndRerun: 进入受支持对局并保持游戏窗口可见，再重检未就绪项。
+        useSupportedResolution: 标定前把游戏或显示器切换为 1920×1080 或 2560×1440。
+        useSupportedDpi: 把 Windows 显示缩放设为 100%–150%，随后重新标定。
+        preferSdr: 一期发布验证请使用 SDR；HDR 目前只完成部分确认。
+        confirmSdrManually: 实时教练启动前请自行确认 Windows HDR 已关闭；当前构建无法自动验证该设置。
+        disableHdr: 启动实时教练前关闭 HDR。
+        useWindowedOrBorderless: 在英雄联盟中选择窗口化或无边框，再重跑采集和标定。
+        manualCalibration: 打开标定页检查预览，只有框线完整覆盖小地图时才保存手动 ROI。
+        rerunCalibration: 保持小地图可见并重新标定；恢复健康前暂停地图提示。
+        enterGameAndCalibrate: 进入受支持对局并完成一次小地图标定。
+        useSummonersRift: 使用受支持的召唤师峡谷队列，或离线分析本局。
+        enterSupportedGame: 进入受支持对局，等待客户端报告地图与队列。
+        useSupportedQueue: 切换到当前能力策略允许的队列，或使用离线复盘。
+        useSupportedRegionOrOffline: 使用已开放地区或继续离线复盘，不要绕过地区门禁。
+        waitForRegionGate: 进入对局并查看明确的地区原因；当前 renderer 无法独立确认地区策略。
+        updateAndWaitForPatch: 更新英雄联盟和 League Akari，等待当前补丁能力开放。
+        enterGameForPatch: 进入受支持对局，让客户端报告游戏补丁。
+        restoreLiveData: 保持英雄联盟客户端和游戏运行，等待本地端点恢复，再重跑诊断。
+        enterGameForLiveData: 进入受支持对局，等待本地 Live Client Data 端点恢复健康。
+        checkSpeechRuntime: 修复本地语音支持，再重跑音色探针和 TTS 测试。
+        installLocalVoice: 安装本地系统音色并在语音设置中选择。
+        selectAvailableVoice: 在语音设置中选择当前仍存在的音色。
+        checkAudioDevices: 连接或启用输出设备，然后重跑音频探针。
+        connectAudioOutput: 连接或启用本地音频输出设备。
+        selectAvailableAudioOutput: 选择当前已连接的输出设备。
+        configureShortcuts: 原生支持可用；请在真实对局前配置需要的快捷键。
+        restartElevated: 如需使用原生全局快捷键，请以管理员身份重启 League Akari。
     metricsTitle: 实时性能指标与管道状态
+    captureLatency: 采集延迟：
+    inferenceLatency: 推断延迟：
+    dropCount: 丢帧累计：
+    queueDepth: 工作进程队列深度：
+    workerHeartbeat: 工作进程心跳：
+    workerRestartCount: 工作进程重启次数：
+    detectorVersions: 检测器版本：
+    liveDataHeartbeat: 2999 汇总心跳：
+    liveDataDomainsTitle: 2999 分域健康
+    liveDataDomains:
+      game-stats: 对局统计
+      players: 玩家列表
+      events: 对局事件
+      active-player: 当前玩家
+    windowsPlatform: Windows（支持）
+    unsupportedPlatform: 非 Windows（实时能力不支持）
+    noneValue: 无
+    availableValue: 可用
+    disconnectedValue: 未连接
+    unknownValue: 未知
+    heartbeatAge_one: '{{count}} 秒前'
+    heartbeatAge_other: '{{count}} 秒前'
+    hoursUnit: 小时
     platform: '运行平台:'
+    buildChannel: 构建渠道：
     backend: '采集后端:'
     features: '已启用能力特性:'
     unavailable: '不可用原因:'
+    unavailableReasons:
+      unsupported-platform: 当前平台不受支持
+      unsupported-map: 当前地图不受支持
+      unsupported-queue: 当前队列不受支持
+      unsupported-region: 当前地区不受支持
+      unsupported-patch: 当前游戏版本未知或暂不支持
+      capability-disabled: 能力开关未启用
+      consent-required: 尚未完成用户授权
+      capture-target-not-found: 未找到游戏采集目标
+      capture-permission-denied: 屏幕采集权限被拒绝
+      capture-black-frame: 游戏采集画面为黑屏
+      capture-stalled: 游戏采集已停止更新
+      calibration-required: 需要完成小地图标定
+      roi-occluded: 小地图区域尚未标定或当前不可见
+      live-data-unavailable: 尚未连接对局实时数据
+      speech-unavailable: 本地语音不可用
+      internal-error: 内部管道错误
     sampling: '视觉采样:'
     latency: '帧延迟:'
     roi: 'ROI 标定状态:'
     session: '会话状态:'
     speechState: '语音状态:'
     heartbeat: '数据源心跳:'
+    lastErrorTitle: 最近一次管道错误
+    openErrorHelp: 查看对应排查说明
+    secondsAgo: '{{seconds}} 秒前'
+    selfTestTitle: 本地能力自检
+    selfTestDesc: 完整环境检查会先运行非画面探针；仅在已确认当前隐私说明后读取一次游戏窗口缩略图，用于分辨率、显示环境和 ROI 检查，图像不会保留。TTS 测试会立即播放一条本地语音。
+    systemTest: 检查环境
+    speechTest: 测试 TTS
+    captureTest: 测试游戏采集
+    exportReport: 生成问题报告
+    exportReportConfirm: 报告包含运行环境、能力状态、性能指标和错误代码；不包含原始画面、录像、完整路径、召唤师名、自定义沟通内容或令牌。确认导出吗？
+    exportReportDone: 诊断报告已导出。
+    exportReportFailed: 无法导出诊断报告。
+    systemTestResult: '采集后端：{{capture}}；本地音色：{{voices}} 个；全局快捷键：{{shortcuts}}。'
+    diagnosticOnly: 仅支持标定预览，实时采集不可用
+    unavailableValue: 不可用
+    speechTestText: 实时语音 AI 教练本地语音自检通过。
+    speechTestPassed: 本地 TTS 播放成功。
+    speechTestUnavailable: 本地 TTS 未能播放，请检查中文音色和输出设备。
+    captureTestPassed: '游戏窗口采集成功：{{width}}×{{height}}，小地图标定置信度 {{confidence}}%。'
+    captureTestPassedUnknownSize: '游戏窗口预览成功，但未能可靠读取目标窗口分辨率；小地图标定置信度 {{confidence}}%。'
+    captureTestFailed: 游戏窗口采集失败，请确认已进入对局、使用窗口化或无边框模式，并检查采集后端。
+    captureTestConsentRequired: 未读取游戏窗口：请先确认当前隐私说明。
+    acceptanceTitle: 第一期验收进度
+    acceptanceDesc: 自动累计脱敏的真实会话、Shadow、离线回放、提示审计和进程性能证据；不会保存原始画面、录像、召唤师名或完整路径。
+    acceptanceRefresh: 刷新
+    acceptanceExport: 导出验收报告
+    acceptanceClear: 清空记录
+    acceptanceClearConfirm: 只删除一期验收统计，不删除回放源文件。当前实时会话必须先结束。确认清空吗？
+    acceptanceLoadFailed: 无法读取一期验收记录。
+    acceptanceExportDone: 一期验收报告已导出。
+    acceptanceExportFailed: 无法导出一期验收报告。
+    acceptanceClearDone: 一期验收记录已清空。
+    acceptanceClearFailed: 无法清空一期验收记录。
+    shadowMatches: 有效真实 Shadow 对局
+    offlineReplays: 唯一离线回放
+    shadowHours: Shadow 稳定性时长
+    cueLabels: 已人工反馈提示
+    acceptanceStatus:
+      passed: 已通过
+      failed: 未通过
+      pending: 待积累
+    acceptanceCriteria:
+      shadow-match-count: 真实 Shadow 对局数量
+      offline-replay-count: 离线回放数量
+      soak-hours: 稳定性运行时长
+      roi-startup-success: ROI 启动成功率
+      cue-traceability: 提示证据可追踪性
+      cue-error-rate: 高优先级错误提示率
+      visual-accuracy: 小地图视觉准确率
+      false-healthy: 灾难性错框
+      paired-performance: 配对性能基准
+      game-fps-impact: 游戏 FPS 影响
+    acceptanceTargets:
+      shadow-match-count: 至少 50 局
+      offline-replay-count: 至少 100 个唯一回放
+      soak-hours: 至少 100 小时
+      roi-startup-success: 至少 50 个独立 episode，成功率点估计及按对局聚类的 95% 下界均不低于 99%
+      cue-traceability: 100%
+      cue-error-rate: 人工标注覆盖率至少 95%，且每 30 分钟不超过 0.5 条
+      visual-accuracy: Precision 95% 下界不低于 98%，Recall 95% 下界不低于 85%
+      false-healthy: 经确认事件为 0
+      paired-performance: CPU、GPU、内存和显存增量均达到门槛
+      game-fps-impact: 1% low FPS 降幅低于 5%
+    acceptanceReasons:
+      requires-more-real-shadow-matches: 需要继续完成真实 Shadow 对局
+      requires-more-unique-offline-replays: 需要继续导入不同的真实回放
+      requires-more-real-shadow-hours: 需要继续累计真实 Shadow 运行时长
+      requires-more-eligible-roi-sessions: 需要更多使用 WGC/DDA 的有效会话
+      requires-more-roi-startup-episodes: 需要更多独立的会话启动或重新标定 episode
+      roi-startup-rate-below-threshold: ROI 启动成功率低于门槛
+      requires-cluster-confidence-analysis: 点估计已达到门槛，仍需按对局聚类计算 95% 置信下界并独立复核
+      requires-cue-samples: 尚无可评估提示
+      cue-evidence-traceability-incomplete: 存在缺少规则版本、证据或过期时间的提示
+      requires-complete-cue-labels: 需要给绝大多数提示提交正确性反馈
+      cue-error-rate-above-threshold: 错误提示率超过停止线
+      requires-independent-ground-truth-annotations: 需要两人独立标注的真实事件真值
+      requires-reviewed-roi-failure-labels: 需要人工复核所有 ROI 异常样本
+      requires-paired-disabled-enabled-benchmark: 需要同一场景关闭/开启教练的配对基准
+      requires-game-frame-time-capture: 需要游戏帧时间或等价的 FPS 基准数据
+    testFailed: 本地能力自检失败。

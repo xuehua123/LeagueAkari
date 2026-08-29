@@ -1,5 +1,3 @@
-import { formatError } from '@shared/utils/errors'
-
 import type { LoggerRenderer } from '../logger'
 import { type AkariIpcRendererContext, LOGGER_SHARD_NAMESPACE } from './context'
 import type { IpcMainDataType } from './types'
@@ -29,7 +27,10 @@ export class AkariIpcRendererCallService {
       const logger = this._context.shared.manager.getInstance(
         LOGGER_SHARD_NAMESPACE
       ) as LoggerRenderer
-      logger?.warn(`ipc call: ${namespace}`, fnName, args, formatError(result.error))
+      // IPC arguments may contain access tokens, local file grants, player identifiers, or user
+      // content. The main-process handler owns stable error classification, so renderer diagnostics
+      // record only routing metadata and never serialize args or the raw error/stack.
+      logger?.warn('ipc call failed', { namespace, fnName })
     }
 
     throw result.error

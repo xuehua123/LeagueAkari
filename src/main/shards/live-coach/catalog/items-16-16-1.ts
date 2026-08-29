@@ -1,6 +1,6 @@
 /**
  * AUTO-GENERATED FILE FROM RIOT DATA DRAGON 16.16.1
- * Generated At: 2026-08-26T08:21:50.760Z
+ * Generated At: 2026-08-26T15:16:15.266Z
  * Data Dragon Source SHA-256: 257d2bb4182917d3700a46246444ab058e122c7ba97e10768cc74515790b39d7
  * DO NOT MANUALLY EDIT THIS FILE! Use scripts/generate-item-catalog-16-16-1.mjs instead.
  */

@@ -1,0 +1,63 @@
+{
+  "artifact": "ffmpeg-N-126264-g007cd1fd43-win64-lgpl-shared.zip",
+  "version": "N-126264-g007cd1fd43",
+  "platform": "win32-x64",
+  "variant": "lgpl-shared",
+  "license": "LGPL-3.0-or-later",
+  "sha256": "0f4052fe7bf63f47e6fea714b318fb6e6a28a8a82a3df37602a66438f221d9ef",
+  "downloadUrl": "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-08-25-13-06/ffmpeg-N-126264-g007cd1fd43-win64-lgpl-shared.zip",
+  "sourceOfferUrl": "https://github.com/FFmpeg/FFmpeg/tree/007cd1fd43",
+  "buildSourceUrl": "https://github.com/BtbN/FFmpeg-Builds/tree/48576f1",
+  "runtimeFiles": [
+    {
+      "path": "avcodec-63.dll",
+      "size": 71216640,
+      "sha256": "c5f2862a644c43f79b3ebc19828c6b2b26adb506b4fdefa010cc0f87d1ba424e"
+    },
+    {
+      "path": "avdevice-63.dll",
+      "size": 3923968,
+      "sha256": "5558fadce53c14da5fecd39873983e452fd74c0b3507eb734c0e8e1ac66c0743"
+    },
+    {
+      "path": "avfilter-12.dll",
+      "size": 30058496,
+      "sha256": "52e90d18dc8ce5e023b5939013d9ce2aec9a925b138162522194063ccf54ad7d"
+    },
+    {
+      "path": "avformat-63.dll",
+      "size": 22856704,
+      "sha256": "cc0219eaf05826a176335b751787b17f3f9ba55ac59a52295c6eed2e88ce5d34"
+    },
+    {
+      "path": "avutil-61.dll",
+      "size": 2953216,
+      "sha256": "1cf2d7a6b42e328e88a7532465bfe622f526f22e243e08ef24c79003d74c8fbe"
+    },
+    {
+      "path": "ffmpeg.exe",
+      "size": 548352,
+      "sha256": "d21b084692aba8d47b66de4fea61d581ee3031d0063ed8ee57f4ec1bf00ac67d"
+    },
+    {
+      "path": "ffprobe.exe",
+      "size": 227328,
+      "sha256": "63f55d8dc16092115f8f2a00bb3cf1c64624651c704176a3e2c7f70af48485de"
+    },
+    {
+      "path": "LICENSE.txt",
+      "size": 7651,
+      "sha256": "da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768"
+    },
+    {
+      "path": "swresample-7.dll",
+      "size": 725504,
+      "sha256": "a568698154c0144ec370f28934bd2fd486c90c7aba1e0b807692c65884daa199"
+    },
+    {
+      "path": "swscale-10.dll",
+      "size": 2519552,
+      "sha256": "b14608350452d997e7073078cce266d2c117f65b40d8913a14e959d134e74062"
+    }
+  ]
+}

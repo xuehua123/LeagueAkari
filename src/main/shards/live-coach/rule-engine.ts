@@ -1,10 +1,21 @@
-import { CoachCue, CoachOption } from '@shared/types/live-coach'
+import { CoachCue, CoachOption, coachCueSchema } from '@shared/types/live-coach'
 
+import { CURRENT_RIOT_ITEM_CATALOG } from './catalog/current'
+import { RuleCombatFundamentals, RuleSkillPointGuidance } from './combat-guidance-controller'
+import {
+  RuleAllyTeamMultipleDeaths,
+  RuleEnemyTeamMultipleDeaths,
+  RuleObjectiveOccurred,
+  RuleSelfDeathAndRespawn
+} from './event-guidance-controller'
 import { FactFusionEngine } from './fact-fusion'
+import { RuleHighPriorityMinimapChange } from './map-change-guidance-controller'
+import { toChineseMinimapRegionLabel } from './minimap-region-labels'
 
 export interface RuleEvaluationContext {
   sessionId: string
   patch: string
+  queueId?: number | null
   fusion: FactFusionEngine
   enabledCategories: Record<string, boolean>
   enabledCapabilities?: Set<string>
@@ -34,11 +45,15 @@ export class RuleObjectiveSpawn implements CoachRule {
 
   evaluate(ctx: RuleEvaluationContext): CoachCue | null {
     if (!ctx.enabledCategories[this.category]) return null
+    if (ctx.enabledCategories.resource === false) return null
+    if (ctx.enabledCapabilities && !ctx.enabledCapabilities.has('coach.track.cooldowns')) {
+      return null
+    }
 
     const gameTime = ctx.fusion.getGameTimeSeconds()
     if (gameTime === null) return null
 
-    const schedule = ctx.fusion.getNextObjectiveSchedule(gameTime)
+    const schedule = ctx.fusion.getNextObjectiveSchedule(gameTime, ctx.patch, ctx.queueId ?? null)
     if (!schedule) return null
 
     const timeUntilSpawn = schedule.nextSpawnGameTime - gameTime
@@ -74,16 +89,30 @@ export class RuleObjectiveSpawn implements CoachRule {
           evidenceIds: [evidenceId],
           role: 'primary',
           score: 0.9
-        },
-        {
+        }
+      ]
+      if (ctx.enabledCapabilities?.has('coach.communication.chat')) {
+        const shouldGroup = schedule.name === '峡谷先锋' || schedule.name === '纳什男爵'
+        options.push({
+          id: shouldGroup ? 'opt_chat_group' : 'opt_chat_resource',
+          label: shouldGroup ? '建议喊话：请集合' : '建议喊话：准备争夺资源',
+          condition: shouldGroup
+            ? '仅在队伍确实准备接近该资源时确认'
+            : '仅在用户明确确认后复制模板，不自动输入或发送',
+          evidenceIds: [evidenceId],
+          role: 'alternative',
+          score: shouldGroup ? 0.64 : 0.68
+        })
+      } else {
+        options.push({
           id: 'opt_obj_lanes',
           label: '留意附近对线人员集结',
           condition: null,
           evidenceIds: [evidenceId],
           role: 'alternative',
           score: 0.7
-        }
-      ]
+        })
+      }
 
       return {
         id: `cue_obj_${now}`,
@@ -123,6 +152,9 @@ export class RuleTurretPlatingFall implements CoachRule {
 
   evaluate(ctx: RuleEvaluationContext): CoachCue | null {
     if (!ctx.enabledCategories[this.category]) return null
+    if (ctx.enabledCapabilities && !ctx.enabledCapabilities.has('coach.track.cooldowns')) {
+      return null
+    }
 
     const gameTime = ctx.fusion.getGameTimeSeconds()
     if (gameTime === null) return null
@@ -207,7 +239,8 @@ export class RuleMinimapEnemyGrouping implements CoachRule {
       return null
     }
 
-    const entities = ctx.fusion.getMinimapEntities()
+    const now = ctx.currentTime ?? Date.now()
+    const entities = ctx.fusion.getMinimapEntities(now)
     const enemyEntities = entities.filter(
       (e) => (e.kind === 'enemy' || e.team === 'enemy') && e.lifecycle !== 'invalidated'
     )
@@ -239,12 +272,11 @@ export class RuleMinimapEnemyGrouping implements CoachRule {
       return null
     }
 
-    const now = ctx.currentTime ?? Date.now()
     if (now - this._lastTriggerTime >= 30000) {
       this._lastTriggerTime = now
 
       const eviIds = targetCluster
-        .map((e) => ctx.fusion.getMinimapEvidenceId(e.trackId))
+        .map((e) => ctx.fusion.getMinimapEvidenceId(e.trackId, now))
         .filter((id): id is string => Boolean(id))
 
       const options: CoachOption[] = [
@@ -317,7 +349,7 @@ export class RuleFogInference implements CoachRule {
     if (now - this._lastTriggerTime >= 25000) {
       this._lastTriggerTime = now
 
-      const topRegion = highRisk.predictedRegions[0]?.regionId || '河道'
+      const topRegion = toChineseMinimapRegionLabel(highRisk.predictedRegions[0]?.regionId)
       const fogEvidenceId = `evi_fog_${highRisk.id}`
       const eviIds = [...highRisk.basisEvidenceIds, fogEvidenceId]
 
@@ -378,9 +410,11 @@ export class RuleItemPurchaseGuidance implements CoachRule {
   version = '1.1.0'
   category = 'opportunity' as const
   private _lastTriggerTime: number = 0
+  private _announcedPlanKey: string | null = null
 
   reset(): void {
     this._lastTriggerTime = 0
+    this._announcedPlanKey = null
   }
 
   evaluate(ctx: RuleEvaluationContext): CoachCue | null {
@@ -391,33 +425,81 @@ export class RuleItemPurchaseGuidance implements CoachRule {
 
     const now = ctx.currentTime ?? Date.now()
     const guidance = ctx.fusion.getItemPurchaseGuidance(now)
-    if (!guidance) return null
+    if (!guidance) {
+      this._announcedPlanKey = null
+      return null
+    }
 
     // 关键修复：仅当玩家金币真正满足核心装备或组件的购买总额 (missingGold === 0) 时才触发建议！
     const primary = guidance.primaryPlan
+    if (!primary || primary.missingGold !== 0 || primary.totalCost <= 0) {
+      this._announcedPlanKey = null
+      return null
+    }
+
+    const planKey = [
+      guidance.sessionId,
+      guidance.championId,
+      guidance.mode,
+      primary.itemIds.join(','),
+      primary.totalCost,
+      primary.reasonCodes.join(',')
+    ].join('|')
+    if (this._announcedPlanKey === planKey) return null
+
     if (primary && primary.missingGold === 0 && primary.totalCost > 0) {
       if (now - this._lastTriggerTime >= 40000) {
         this._lastTriggerTime = now
+        this._announcedPlanKey = planKey
 
         const primaryReason = primary.conditions[0] || '核心属性提升'
+
+        // 解析首选装备中文名称
+        const primaryItemNames = primary.itemIds
+          .map((id) => CURRENT_RIOT_ITEM_CATALOG.items[id]?.name || `装备 ${id}`)
+          .join('、')
+
+        // 构造备选方案选项列表
+        const altOptions: CoachOption[] = (guidance.alternativePlans || [])
+          .slice(0, 1)
+          .map((alt, idx) => {
+            const altNames = alt.itemIds
+              .map((id) => CURRENT_RIOT_ITEM_CATALOG.items[id]?.name || `装备 ${id}`)
+              .join('、')
+            return {
+              id: `opt_item_alt_${idx + 1}`,
+              label:
+                alt.missingGold === 0
+                  ? `备选方案 ${idx + 1}：购买 ${altNames}（花费 ${alt.totalCost}g，余 ${alt.remainingGold}g）`
+                  : `备选目标 ${idx + 1}：${altNames}（还差 ${alt.missingGold}g）`,
+              condition: alt.conditions[0] || '战术替代出装',
+              evidenceIds: guidance.evidenceIds,
+              role: 'alternative' as const,
+              score: Math.max(0.6, 0.85 - idx * 0.1)
+            }
+          })
+
+        if (altOptions.length === 0) {
+          altOptions.push({
+            id: 'opt_item_alt_default',
+            label: '备选方案：优先升级靴子或补充控制守卫',
+            condition: '移速与视野防守',
+            evidenceIds: guidance.evidenceIds,
+            role: 'alternative',
+            score: 0.7
+          })
+        }
 
         const options: CoachOption[] = [
           {
             id: 'opt_item_primary',
-            label: `首选方案：更新推荐组件（花费 ${primary.totalCost}g，余 ${primary.remainingGold}g）`,
+            label: `首选方案：购买 ${primaryItemNames}（花费 ${primary.totalCost}g，余 ${primary.remainingGold}g）`,
             condition: primaryReason,
             evidenceIds: guidance.evidenceIds,
             role: 'primary',
             score: 0.95
           },
-          {
-            id: 'opt_item_alt',
-            label: `备选方案：优先更新靴子或消耗品`,
-            condition: '移速与视野防守',
-            evidenceIds: guidance.evidenceIds,
-            role: 'alternative',
-            score: 0.7
-          }
+          ...altOptions
         ]
 
         return {
@@ -427,10 +509,10 @@ export class RuleItemPurchaseGuidance implements CoachRule {
           ruleVersion: this.version,
           category: this.category,
           priority: 40,
-          observationText: `持有金币 ${guidance.currentGold}g，满足核心装备组件购买条件`,
+          observationText: `持有金币 ${guidance.currentGold}g，满足 ${primaryItemNames} 购买条件`,
           impactText: `回城更新装备可提升对线战力：${primaryReason}`,
           options,
-          spokenText: `当前金币充足，回城建议优先更新核心装备。`,
+          spokenText: `建议购买 ${primaryItemNames}，花费 ${primary.totalCost} 金币，剩余 ${primary.remainingGold} 金币。`,
           evidenceIds: guidance.evidenceIds,
           createdAt: now,
           expiresAt: now + 15000,
@@ -459,11 +541,14 @@ export class RuleBasicSkillsAndTactics implements CoachRule {
 
   evaluate(ctx: RuleEvaluationContext): CoachCue | null {
     if (!ctx.enabledCategories[this.category]) return null
-    // 关键修复：该规则严格依赖小地图基础分析能力与英雄身份识别能力（身份识别未就绪前 fail-closed，严禁断言打野在迷雾中）
+    // 该规则同时属于迷雾推断和基础指导。任一独立能力关闭时都必须
+    // fail-closed，不能借由旧规则绕过用户开关或远程 capability。
     if (
       ctx.enabledCapabilities &&
       (!ctx.enabledCapabilities.has('coach.analyze.minimap-basic') ||
-        !ctx.enabledCapabilities.has('coach.analyze.minimap-identity'))
+        !ctx.enabledCapabilities.has('coach.analyze.minimap-identity') ||
+        !ctx.enabledCapabilities.has('coach.analyze.fog-inference') ||
+        !ctx.enabledCapabilities.has('coach.guidance.micro'))
     ) {
       return null
     }
@@ -479,7 +564,7 @@ export class RuleBasicSkillsAndTactics implements CoachRule {
 
       const enemyTeam = myTeam === 'ORDER' ? 'CHAOS' : 'ORDER'
       const players = ctx.fusion.getPlayers()
-      const minimapEntities = ctx.fusion.getMinimapEntities()
+      const minimapEntities = ctx.fusion.getMinimapEntities(ctx.currentTime ?? Date.now())
 
       // 准确查找敌方阵营的打野英雄
       const enemyJungler = players.find((p) => p.team === enemyTeam && p.position === 'JUNGLE')
@@ -556,7 +641,7 @@ export class RuleBasicSkillsAndTactics implements CoachRule {
           ruleId: this.id,
           ruleVersion: this.version,
           category: this.category,
-          priority: 35,
+          priority: 45,
           observationText: '敌方打野位置在迷雾中未知',
           impactText: '注意对线期防抓与兵线安全位置',
           options,
@@ -589,40 +674,60 @@ export class RuleCommunicationPing implements CoachRule {
 
   evaluate(ctx: RuleEvaluationContext): CoachCue | null {
     if (!ctx.enabledCategories[this.category]) return null
-    if (ctx.enabledCapabilities && !ctx.enabledCapabilities.has('coach.communication.ping')) {
+    if (ctx.enabledCapabilities && !ctx.enabledCapabilities.has('coach.analyze.fog-inference')) {
+      return null
+    }
+    const pingEnabled =
+      !ctx.enabledCapabilities || ctx.enabledCapabilities.has('coach.communication.ping')
+    const chatEnabled =
+      !ctx.enabledCapabilities || ctx.enabledCapabilities.has('coach.communication.chat')
+    if (!pingEnabled && !chatEnabled) {
       return null
     }
 
-    const inferences = ctx.fusion.getFogInferences()
+    const now = ctx.currentTime ?? Date.now()
+    const inferences = ctx.fusion.getFogInferences(now)
     const roamingEnemy = inferences.find((f) =>
       f.intents.some((i) => i.kind === 'roam' && i.probability > 0.5)
     )
 
     if (!roamingEnemy) return null
 
-    const now = ctx.currentTime ?? Date.now()
     if (now - this._lastTriggerTime >= 30000) {
       this._lastTriggerTime = now
 
       const eviIds = [...roamingEnemy.basisEvidenceIds]
-      const options: CoachOption[] = [
-        {
+      const options: CoachOption[] = []
+      if (pingEnabled) {
+        options.push({
           id: 'opt_ping_danger',
           label: '建议发送：给队友发送危险 (Danger) 警示信号',
           condition: null,
           evidenceIds: eviIds,
           role: 'primary',
           score: 0.95
-        },
-        {
-          id: 'opt_ping_missing',
-          label: '建议发送：发送对线敌人失踪 (Missing) 信号',
-          condition: null,
-          evidenceIds: eviIds,
-          role: 'alternative',
-          score: 0.85
+        })
+        if (!chatEnabled) {
+          options.push({
+            id: 'opt_ping_missing',
+            label: '建议发送：发送对线敌人失踪 (Missing) 信号',
+            condition: null,
+            evidenceIds: eviIds,
+            role: 'alternative',
+            score: 0.85
+          })
         }
-      ]
+      }
+      if (chatEnabled) {
+        options.push({
+          id: 'opt_chat_missing',
+          label: '建议喊话：敌方失踪，请注意',
+          condition: '仅在用户明确确认后复制模板，不自动输入或发送',
+          evidenceIds: eviIds,
+          role: pingEnabled ? 'alternative' : 'primary',
+          score: 0.78
+        })
+      }
 
       return {
         id: `cue_ping_${now}`,
@@ -651,6 +756,12 @@ export class CoachRuleEngine {
   private readonly _rules: CoachRule[] = []
 
   constructor() {
+    this._rules.push(new RuleSelfDeathAndRespawn())
+    this._rules.push(new RuleAllyTeamMultipleDeaths())
+    this._rules.push(new RuleEnemyTeamMultipleDeaths())
+    this._rules.push(new RuleObjectiveOccurred())
+    this._rules.push(new RuleSkillPointGuidance())
+    this._rules.push(new RuleCombatFundamentals())
     this._rules.push(new RuleObjectiveSpawn())
     this._rules.push(new RuleTurretPlatingFall())
     this._rules.push(new RuleMinimapEnemyGrouping())
@@ -658,6 +769,7 @@ export class CoachRuleEngine {
     this._rules.push(new RuleItemPurchaseGuidance())
     this._rules.push(new RuleBasicSkillsAndTactics())
     this._rules.push(new RuleCommunicationPing())
+    this._rules.push(new RuleHighPriorityMinimapChange())
   }
 
   public reset(): void {
@@ -668,12 +780,26 @@ export class CoachRuleEngine {
 
   public evaluate(context: RuleEvaluationContext): CoachCue[] {
     const cues: CoachCue[] = []
+    const now = context.currentTime ?? Date.now()
 
     for (const rule of this._rules) {
       const cue = rule.evaluate(context)
-      if (cue) {
-        cues.push(cue)
+      if (!cue || !coachCueSchema.safeParse(cue).success) continue
+      if (cue.sessionId !== context.sessionId || cue.evidenceIds.length === 0) continue
+      if (cue.evidenceIds.some((evidenceId) => !context.fusion.getEvidence(evidenceId, now))) {
+        continue
       }
+      const cueEvidenceIds = new Set(cue.evidenceIds)
+      if (
+        cue.options.some(
+          (option) =>
+            option.evidenceIds.length === 0 ||
+            option.evidenceIds.some((evidenceId) => !cueEvidenceIds.has(evidenceId))
+        )
+      ) {
+        continue
+      }
+      cues.push(cue)
     }
 
     return cues

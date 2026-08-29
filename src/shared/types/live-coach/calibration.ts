@@ -1,13 +1,15 @@
 import { z } from 'zod'
 
 export interface CaptureEnvironmentFingerprint {
-  displayId: string
-  width: number
-  height: number
-  dpiScale: number
-  hdr: boolean
+  /** Native monitor device id for the display that currently owns the game window. */
+  displayId: string | null
+  /** Game client-area size in physical pixels, never a desktopCapturer thumbnail size. */
+  width: number | null
+  height: number | null
+  dpiScale: number | null
+  hdr: boolean | null
   windowMode: 'windowed' | 'borderless' | 'exclusive-fullscreen' | 'unknown'
-  backend: 'wgc' | 'dda'
+  backend: 'auto' | 'wgc' | 'dda' | 'desktopCapturer' | 'unavailable'
   minimapSide: 'left' | 'right'
 }
 
@@ -23,13 +25,13 @@ export interface MinimapCalibration {
 }
 
 export const captureEnvironmentFingerprintSchema = z.object({
-  displayId: z.string(),
-  width: z.number(),
-  height: z.number(),
-  dpiScale: z.number(),
-  hdr: z.boolean(),
+  displayId: z.string().min(1).nullable(),
+  width: z.number().int().positive().nullable(),
+  height: z.number().int().positive().nullable(),
+  dpiScale: z.number().positive().nullable(),
+  hdr: z.boolean().nullable(),
   windowMode: z.enum(['windowed', 'borderless', 'exclusive-fullscreen', 'unknown']),
-  backend: z.enum(['wgc', 'dda']),
+  backend: z.enum(['auto', 'wgc', 'dda', 'desktopCapturer', 'unavailable']),
   minimapSide: z.enum(['left', 'right'])
 })
 

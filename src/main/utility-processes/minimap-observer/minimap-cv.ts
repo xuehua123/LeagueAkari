@@ -1,4 +1,5 @@
 import {
+  MinimapDerivedEvent,
   MinimapEntityKind,
   MinimapEntityObservation,
   ObservationLifecycle
@@ -26,6 +27,190 @@ export interface ComponentDetection {
   y: number
   team: 'enemy' | 'ally'
   pixelCount: number
+}
+
+export interface TeamChampionCandidates {
+  ally: number[]
+  enemy: number[]
+  selfChampionId: number | null
+}
+
+function isVisibleEnemy(entity: MinimapEntityObservation): boolean {
+  return (entity.kind === 'enemy' || entity.team === 'enemy') && entity.lifecycle === 'confirmed'
+}
+
+/**
+ * 从相邻的已去抖追踪快照中提取一期需要的高优先级地图变化。
+ * 这里只生成直接可见事实事件，不推断不可见敌人的意图。
+ */
+export function deriveMinimapEvents(
+  previous: MinimapEntityObservation[],
+  current: MinimapEntityObservation[],
+  timestamp: number
+): MinimapDerivedEvent[] {
+  const events: MinimapDerivedEvent[] = []
+  const previousById = new Map(previous.map((entity) => [entity.trackId, entity]))
+  const previousEnemies = previous.filter(isVisibleEnemy)
+  const currentEnemies = current.filter(isVisibleEnemy)
+
+  const countDelta = currentEnemies.length - previousEnemies.length
+  if (countDelta >= 2) {
+    events.push({
+      eventId: `map-event-enemy-count-${timestamp}`,
+      kind: 'enemy-visible-count-increased',
+      timestamp,
+      payload: {
+        previousCount: previousEnemies.length,
+        currentCount: currentEnemies.length,
+        delta: countDelta
+      }
+    })
+  }
+
+  for (const entity of currentEnemies) {
+    const prior = previousById.get(entity.trackId)
+    if (
+      prior?.regionId &&
+      entity.regionId &&
+      prior.regionId !== entity.regionId &&
+      prior.lifecycle === 'confirmed'
+    ) {
+      events.push({
+        eventId: `map-event-region-${entity.trackId}-${timestamp}`,
+        kind: 'enemy-region-changed',
+        timestamp,
+        payload: {
+          trackId: entity.trackId,
+          fromRegionId: prior.regionId,
+          toRegionId: entity.regionId
+        }
+      })
+    }
+  }
+
+  const countByRegion = (entities: MinimapEntityObservation[]) => {
+    const counts = new Map<string, number>()
+    for (const entity of entities) {
+      if (!entity.regionId) continue
+      counts.set(entity.regionId, (counts.get(entity.regionId) ?? 0) + 1)
+    }
+    return counts
+  }
+  const previousRegionCounts = countByRegion(previousEnemies)
+  const currentRegionCounts = countByRegion(currentEnemies)
+  for (const [regionId, count] of currentRegionCounts.entries()) {
+    if (count >= 3 && (previousRegionCounts.get(regionId) ?? 0) < 3) {
+      events.push({
+        eventId: `map-event-group-${regionId}-${timestamp}`,
+        kind: 'enemy-grouping-started',
+        timestamp,
+        payload: { regionId, count }
+      })
+    }
+  }
+
+  const currentSelf = current.find(
+    (entity) => entity.kind === 'self' && entity.lifecycle === 'confirmed'
+  )
+  if (currentSelf) {
+    const previousSelf = previousById.get(currentSelf.trackId) ?? currentSelf
+    const approaching = currentEnemies.flatMap((entity) => {
+      const prior = previousById.get(entity.trackId)
+      if (!prior || prior.lifecycle !== 'confirmed') return []
+      const previousDistance = Math.hypot(
+        prior.point.x - previousSelf.point.x,
+        prior.point.y - previousSelf.point.y
+      )
+      const currentDistance = Math.hypot(
+        entity.point.x - currentSelf.point.x,
+        entity.point.y - currentSelf.point.y
+      )
+      const movementDistance = Math.hypot(
+        entity.point.x - prior.point.x,
+        entity.point.y - prior.point.y
+      )
+      const distanceDelta = previousDistance - currentDistance
+      return movementDistance >= 0.008 && distanceDelta >= 0.006 ? [{ entity, distanceDelta }] : []
+    })
+
+    if (approaching.length >= 2) {
+      const averageDistanceDelta =
+        approaching.reduce((sum, item) => sum + item.distanceDelta, 0) / approaching.length
+      events.push({
+        eventId: `map-event-approach-${timestamp}`,
+        kind: 'enemy-approaching-player-region',
+        timestamp,
+        payload: {
+          count: approaching.length,
+          regionId: currentSelf.regionId,
+          trackIds: approaching.map((item) => item.entity.trackId),
+          averageDistanceDelta,
+          confidence: Math.min(0.98, 0.78 + approaching.length * 0.05)
+        }
+      })
+
+      let widestDirectionSeparation = 1
+      for (let leftIndex = 0; leftIndex < approaching.length; leftIndex++) {
+        const left = approaching[leftIndex].entity.point
+        const leftLength = Math.max(
+          1e-6,
+          Math.hypot(left.x - currentSelf.point.x, left.y - currentSelf.point.y)
+        )
+        for (let rightIndex = leftIndex + 1; rightIndex < approaching.length; rightIndex++) {
+          const right = approaching[rightIndex].entity.point
+          const rightLength = Math.max(
+            1e-6,
+            Math.hypot(right.x - currentSelf.point.x, right.y - currentSelf.point.y)
+          )
+          const directionDot =
+            ((left.x - currentSelf.point.x) * (right.x - currentSelf.point.x) +
+              (left.y - currentSelf.point.y) * (right.y - currentSelf.point.y)) /
+            (leftLength * rightLength)
+          widestDirectionSeparation = Math.min(widestDirectionSeparation, directionDot)
+        }
+      }
+      if (widestDirectionSeparation <= 0.5) {
+        events.push({
+          eventId: `map-event-pincer-${timestamp}`,
+          kind: 'visible-pincer-approach-predicted',
+          timestamp,
+          payload: {
+            count: approaching.length,
+            regionId: currentSelf.regionId,
+            trackIds: approaching.map((item) => item.entity.trackId),
+            directionSeparation: widestDirectionSeparation,
+            confidence: Math.min(0.95, 0.76 + (1 - widestDirectionSeparation) * 0.1),
+            counterEvidence: '任一目标停止靠近、离开视野或出现新的直接观察时撤销'
+          }
+        })
+      }
+    }
+  }
+
+  const arrivalsByRegion = new Map<string, MinimapEntityObservation[]>()
+  for (const entity of currentEnemies) {
+    const prior = previousById.get(entity.trackId)
+    if (!entity.regionId || !prior?.regionId || entity.regionId === prior.regionId) continue
+    const arrivals = arrivalsByRegion.get(entity.regionId) ?? []
+    arrivals.push(entity)
+    arrivalsByRegion.set(entity.regionId, arrivals)
+  }
+  for (const [regionId, arrivals] of arrivalsByRegion.entries()) {
+    if (arrivals.length < 2) continue
+    events.push({
+      eventId: `map-event-converge-${regionId}-${timestamp}`,
+      kind: 'enemy-converging-region',
+      timestamp,
+      payload: {
+        regionId,
+        count: arrivals.length,
+        trackIds: arrivals.map((entity) => entity.trackId),
+        confidence: Math.min(0.96, 0.8 + arrivals.length * 0.04)
+      }
+    })
+  }
+
+  return events
 }
 
 /**
@@ -194,65 +379,106 @@ export function computeFrameHash(buffer: Uint8Array): number {
 }
 
 /**
- * 小地图英雄图标局部 Patch 特征分类器
+ * ONNX 模型清单与规范契约
  */
-export function classifyChampionPatch(
+export interface OnnxModelManifest {
+  modelName: string
+  version: string
+  sha256: string
+  inputShape: [number, number, number, number]
+  confidenceThreshold: number
+  top2MarginThreshold?: number
+  nmsIouThreshold?: number
+  classes: string[]
+  opset?: number
+  executionProvider?: 'dml' | 'cpu'
+  runtimeVersion?: string
+}
+
+export interface ChampionIconClassifier {
+  isReady(): boolean
+  getManifest(): OnnxModelManifest | null
+  classifyIconPatch(
+    patchBuffer: Uint8Array,
+    width: number,
+    height: number,
+    candidateChampionIds: number[]
+  ):
+    | Promise<{ championId: number; confidence: number; top2Margin: number } | null>
+    | { championId: number; confidence: number; top2Margin: number }
+    | null
+}
+
+/**
+ * 英雄图标分类接口（真实模型加载未就绪前 fail-closed 返回 null，已就绪时执行局部 Patch 裁剪与推理）
+ */
+export async function classifyChampionPatch(
   buffer: Uint8Array,
   width: number,
   height: number,
   normX: number,
   normY: number,
   pixelFormat: 'bgra' | 'rgba',
-  knownChampionCandidates?: number[]
-): { championId: number; confidence: number } | null {
-  if (!knownChampionCandidates || knownChampionCandidates.length === 0) return null
+  knownChampionCandidates?: number[],
+  classifier?: ChampionIconClassifier | null
+): Promise<{ championId: number; confidence: number } | null> {
+  if (!classifier || !classifier.isReady()) {
+    return null
+  }
+  if (!knownChampionCandidates || knownChampionCandidates.length === 0) {
+    return null
+  }
 
   // 提取以 (normX, normY) 为中心的小地图图标 16x16 局部 Patch
   const px = Math.round(normX * width)
   const py = Math.round(normY * height)
-  const radius = 8
-  const startX = Math.max(0, px - radius)
-  const endX = Math.min(width, px + radius)
-  const startY = Math.max(0, py - radius)
-  const endY = Math.min(height, py + radius)
+  const patchSize = 16
+  const half = Math.floor(patchSize / 2)
+  const patchBuffer = new Uint8Array(patchSize * patchSize * 4)
 
-  let rSum = 0
-  let gSum = 0
-  let bSum = 0
-  let count = 0
   const isBgra = pixelFormat === 'bgra'
 
-  for (let y = startY; y < endY; y++) {
-    for (let x = startX; x < endX; x++) {
-      const idx = (y * width + x) * 4
-      const b = buffer[idx]
-      const g = buffer[idx + 1]
-      const r = buffer[idx + 2]
-      rSum += isBgra ? r : b
-      gSum += g
-      bSum += isBgra ? b : r
-      count++
+  for (let dy = 0; dy < patchSize; dy++) {
+    const srcY = Math.min(Math.max(0, py - half + dy), height - 1)
+    for (let dx = 0; dx < patchSize; dx++) {
+      const srcX = Math.min(Math.max(0, px - half + dx), width - 1)
+      const srcIdx = (srcY * width + srcX) * 4
+      const dstIdx = (dy * patchSize + dx) * 4
+
+      // 归一化输出 RGBA
+      patchBuffer[dstIdx] = isBgra ? buffer[srcIdx + 2] : buffer[srcIdx] // R
+      patchBuffer[dstIdx + 1] = buffer[srcIdx + 1] // G
+      patchBuffer[dstIdx + 2] = isBgra ? buffer[srcIdx] : buffer[srcIdx + 2] // B
+      patchBuffer[dstIdx + 3] = buffer[srcIdx + 3] // A
     }
   }
 
-  if (count === 0) return null
+  const result = await classifier.classifyIconPatch(
+    patchBuffer,
+    patchSize,
+    patchSize,
+    knownChampionCandidates
+  )
+  if (!result) return null
+  // 分类器只能在本局已知阵容候选中作答。即使模型适配器实现有误，也不能让
+  // 任意类别越过阵容约束进入事实链。
+  if (!knownChampionCandidates.includes(result.championId)) return null
 
-  // 局部特征指纹
-  const avgR = rSum / count
-  const avgG = gSum / count
-  const avgB = bSum / count
-  const hash = Math.floor(avgR * 31 + avgG * 17 + avgB * 7)
-
-  // 针对已知候选英雄进行指纹投票匹配
-  const candidateIndex = Math.abs(hash) % knownChampionCandidates.length
-  const matchedChampionId = knownChampionCandidates[candidateIndex]
-  return {
-    championId: matchedChampionId,
-    confidence: 0.88
+  // 严格校验置信度与 top2 margin
+  const manifest = classifier.getManifest()
+  if (
+    result.confidence >= (manifest?.confidenceThreshold ?? 0.75) &&
+    result.top2Margin >= (manifest?.top2MarginThreshold ?? 0.15)
+  ) {
+    return {
+      championId: result.championId,
+      confidence: result.confidence
+    }
   }
+  return null
 }
 
-export function processMinimapFrameWithState(
+export async function processMinimapFrameWithState(
   buffer: Uint8Array,
   width: number,
   height: number,
@@ -261,10 +487,23 @@ export function processMinimapFrameWithState(
   trackedEntities: Map<string, TrackedEntity>,
   getNewEntityId: (team: string) => string,
   cvState?: MinimapCvState,
-  knownChampionCandidates?: number[]
-): { health: 'healthy' | 'degraded' | 'unknown'; entities: MinimapEntityObservation[] } {
+  knownChampionCandidates?: number[],
+  championClassifier?: ChampionIconClassifier | null,
+  teamChampionCandidates?: TeamChampionCandidates
+): Promise<{
+  health: 'healthy' | 'degraded' | 'unknown'
+  entities: MinimapEntityObservation[]
+}> {
   // 1. 基础尺寸与有效性校验
-  if (!buffer || buffer.length === 0 || width <= 0 || height <= 0) {
+  if (
+    !buffer ||
+    buffer.length === 0 ||
+    width <= 0 ||
+    height <= 0 ||
+    !Number.isInteger(width) ||
+    !Number.isInteger(height) ||
+    buffer.length !== width * height * 4
+  ) {
     return { health: 'unknown', entities: [] }
   }
 
@@ -346,15 +585,36 @@ export function processMinimapFrameWithState(
       entity.hitCount++
 
       // 多帧投票识别英雄身份
-      if (knownChampionCandidates && knownChampionCandidates.length > 0) {
-        const classResult = classifyChampionPatch(
+      const baseIdentityCandidates = teamChampionCandidates?.[det.team]?.length
+        ? teamChampionCandidates[det.team]
+        : knownChampionCandidates
+      // 同一阵营的一个英雄身份只能属于一条仍存活的轨迹。否则两个相邻图标
+      // 可能被模型同时识别成同一英雄，随后产生错误的迷雾路线与死亡关联。
+      const identitiesClaimedByOtherTracks = new Set(
+        Array.from(trackedEntities.entries())
+          .filter(
+            ([id, tracked]) =>
+              id !== matchedId &&
+              tracked.team === entity.team &&
+              tracked.lifecycle !== 'invalidated' &&
+              tracked.championId !== null
+          )
+          .map(([, tracked]) => tracked.championId as number)
+      )
+      const identityCandidates = baseIdentityCandidates?.filter(
+        (championId) =>
+          championId === entity.championId || !identitiesClaimedByOtherTracks.has(championId)
+      )
+      if (identityCandidates && identityCandidates.length > 0) {
+        const classResult = await classifyChampionPatch(
           buffer,
           width,
           height,
           det.x,
           det.y,
           pixelFormat,
-          knownChampionCandidates
+          identityCandidates,
+          championClassifier
         )
         if (classResult) {
           const currentVotes = entity.identityVotes.get(classResult.championId) || 0
@@ -362,6 +622,12 @@ export function processMinimapFrameWithState(
           if (currentVotes + 1 >= 3 && entity.hitCount >= 3) {
             entity.championId = classResult.championId
             entity.championConfidence = classResult.confidence
+            if (
+              entity.team === 'ally' &&
+              teamChampionCandidates?.selfChampionId === classResult.championId
+            ) {
+              entity.kind = 'self'
+            }
           }
         }
       }

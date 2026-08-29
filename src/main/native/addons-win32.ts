@@ -1,3 +1,5 @@
+import { loadTrustedNativeRuntime } from './trusted-native-runtime'
+
 export type Win32Addons = typeof import('league-akari-native-win32')
 
 export interface Win32AddonsInitializationResult {
@@ -9,7 +11,7 @@ export interface Win32AddonsInitializationResult {
 type RegisterExitListener = (listener: () => void) => void
 
 function loadWin32AddonsPackage(): Win32Addons {
-  return require('league-akari-native-win32') as Win32Addons
+  return loadTrustedNativeRuntime<Win32Addons>()
 }
 
 function registerProcessExitListener(listener: () => void) {

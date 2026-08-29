@@ -1,3 +1,6 @@
+import crypto from 'node:crypto'
+import fs from 'node:fs'
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import rawFixture from './data-dragon-16-16-1-raw.json'
@@ -5,11 +8,14 @@ import { RiotItemCatalog16_16_1 } from './items-16-16-1'
 
 describe('RiotItemCatalog16_16_1 Authority & Integrity Test', () => {
   it('matches official Data Dragon 16.16.1 SHA-256 fixture checksum', () => {
-    // 验证快照版本与指纹
+    // 真实计算 fixture 文件字节的 SHA-256
+    const fixturePath = path.resolve(__dirname, 'data-dragon-16-16-1-raw.json')
+    const fileBuf = fs.readFileSync(fixturePath)
+    const computedSha256 = crypto.createHash('sha256').update(fileBuf).digest('hex')
+
+    expect(computedSha256).toBe('257d2bb4182917d3700a46246444ab058e122c7ba97e10768cc74515790b39d7')
+    expect(RiotItemCatalog16_16_1.sourceSha256).toBe(computedSha256)
     expect(RiotItemCatalog16_16_1.version).toBe('16.16.1')
-    expect(RiotItemCatalog16_16_1.sourceSha256).toBe(
-      '257d2bb4182917d3700a46246444ab058e122c7ba97e10768cc74515790b39d7'
-    )
   })
 
   it('matches official costs and recipes for disputed patch items', () => {

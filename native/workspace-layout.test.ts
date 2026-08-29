@@ -32,7 +32,17 @@ describe('native workspace runtime contract', () => {
       require: './dist/index.js',
       types: './dist/index.d.ts'
     })
+    expect(nativePackage.exports['./capture']).toMatchObject({
+      require: './dist/capture/index.js',
+      types: './dist/capture/index.d.ts'
+    })
+    expect(nativePackage.exports['./speech']).toMatchObject({
+      require: './dist/speech/index.js',
+      types: './dist/speech/index.d.ts'
+    })
     expect(fs.existsSync(path.resolve('native/win32-x64/dist/index.js'))).toBe(true)
+    expect(fs.existsSync(path.resolve('native/win32-x64/dist/capture/index.js'))).toBe(true)
+    expect(fs.existsSync(path.resolve('native/win32-x64/dist/speech/index.js'))).toBe(true)
     expect(fs.existsSync(path.resolve('native/win32-x64/addons/akari-input-win64.node'))).toBe(true)
     expect(fs.existsSync(path.resolve('native/win32-x64/addons/akari-tools-win64.node'))).toBe(true)
   })

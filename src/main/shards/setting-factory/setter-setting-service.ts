@@ -37,6 +37,7 @@ export class SetterSettingService<TSettings extends object = any> {
   static CONFIG_DIR_NAME = 'AkariConfig'
 
   private readonly _pendingStorageOperations = new Map<string, PendingStorageOperation>()
+  private readonly _storageOperationChains = new Map<string, Promise<unknown>>()
   private readonly _defaults = new Map<SettingPath<TSettings>, TSettings[SettingPath<TSettings>]>()
 
   constructor(
@@ -70,11 +71,11 @@ export class SetterSettingService<TSettings extends object = any> {
       return this._scheduleStorageSave(key, value, config.delay)
     }
 
-    return this._saveToStorageImmediately(key, value)
+    return this._enqueueStorageOperation(key, () => this._saveToStorageImmediately(key, value))
   }
 
   _removeFromStorage(key: string) {
-    return this._removeFromStorageImmediately(key)
+    return this._enqueueStorageOperation(key, () => this._removeFromStorageImmediately(key))
   }
 
   private _scheduleStorageSave(key: string, value: any, delay: number) {
@@ -85,7 +86,9 @@ export class SetterSettingService<TSettings extends object = any> {
       this._createStorageKey(key),
       async () => {
         try {
-          await this._settingFactory._saveToStorage(this._namespace, key, value)
+          await this._enqueueStorageOperation(key, () =>
+            this._settingFactory._saveToStorage(this._namespace, key, value)
+          )
         } finally {
           this._clearPendingStorageOperation(key, pendingOperation)
         }
@@ -104,7 +107,9 @@ export class SetterSettingService<TSettings extends object = any> {
       this._createStorageKey(key),
       async () => {
         try {
-          await this._settingFactory._removeFromStorage(this._namespace, key)
+          await this._enqueueStorageOperation(key, () =>
+            this._settingFactory._removeFromStorage(this._namespace, key)
+          )
         } finally {
           this._clearPendingStorageOperation(key, pendingOperation)
         }
@@ -115,13 +120,13 @@ export class SetterSettingService<TSettings extends object = any> {
     return Promise.resolve()
   }
 
-  private _saveToStorageImmediately(key: string, value: any) {
-    this._cancelPendingStorageOperation(key)
+  private async _saveToStorageImmediately(key: string, value: any) {
+    await this._cancelAndWaitPendingStorageOperation(key)
     return this._settingFactory._saveToStorage(this._namespace, key, value)
   }
 
-  private _removeFromStorageImmediately(key: string) {
-    this._cancelPendingStorageOperation(key)
+  private async _removeFromStorageImmediately(key: string) {
+    await this._cancelAndWaitPendingStorageOperation(key)
     return this._settingFactory._removeFromStorage(this._namespace, key)
   }
 
@@ -129,9 +134,21 @@ export class SetterSettingService<TSettings extends object = any> {
     return `${this._namespace}/${key}`
   }
 
-  private _cancelPendingStorageOperation(key: string) {
+  private async _cancelAndWaitPendingStorageOperation(key: string) {
     this._pendingStorageOperations.delete(key)
-    this._settingFactory._delayed.remove(this._createStorageKey(key))
+    await this._settingFactory._delayed.cancelAndWait(this._createStorageKey(key))
+  }
+
+  private _enqueueStorageOperation<TResult>(key: string, operation: () => Promise<TResult>) {
+    const previousOperation = this._storageOperationChains.get(key) ?? Promise.resolve()
+    const currentOperation = previousOperation.catch(() => undefined).then(operation)
+    this._storageOperationChains.set(key, currentOperation)
+
+    return currentOperation.finally(() => {
+      if (this._storageOperationChains.get(key) === currentOperation) {
+        this._storageOperationChains.delete(key)
+      }
+    })
   }
 
   private _clearPendingStorageOperation(key: string, pendingOperation: PendingStorageOperation) {
@@ -221,6 +238,23 @@ export class SetterSettingService<TSettings extends object = any> {
   async set<K extends SettingPath<TSettings>>(key: K, newValue: TSettings[K]) {
     const value = await this._applySettingConfig(key, newValue)
     this._commitSetting(key, value)
+  }
+
+  /**
+   * 设置内存状态并等待对应值可靠落盘。
+   *
+   * 内存提交发生在写入前；写入失败会向调用方抛出，同时保留新内存值。该语义用于
+   * 授权撤回等必须立即 fail-closed、且 IPC 成功返回前必须完成持久化的安全边界。
+   */
+  async setAndPersist<K extends SettingPath<TSettings>>(key: K, newValue: TSettings[K]) {
+    const value = await this._applySettingConfig(key, newValue)
+    this._commitSettingToState(key, value)
+
+    if (value === null) {
+      await this._removeFromStorage(key)
+    } else {
+      await this._saveToStorage(key, value)
+    }
   }
 
   async get<K extends SettingPath<TSettings>>(key: K): Promise<TSettings[K]> {
@@ -355,12 +389,11 @@ export class SetterSettingService<TSettings extends object = any> {
   private async _removeInvalidStoredValue(key: string) {
     try {
       await this._removeFromStorage(key)
-    } catch (error) {
-      this._logger.warn(
-        'Failed to remove invalid setting value',
-        { namespace: this._namespace, key },
-        error
-      )
+    } catch {
+      this._logger.warn('Failed to remove invalid setting value', {
+        namespace: this._namespace,
+        key
+      })
     }
   }
 
@@ -371,12 +404,11 @@ export class SetterSettingService<TSettings extends object = any> {
       } else {
         await this._saveToStorage(key, value)
       }
-    } catch (error) {
-      this._logger.warn(
-        'Failed to persist normalized setting value',
-        { namespace: this._namespace, key },
-        error
-      )
+    } catch {
+      this._logger.warn('Failed to persist normalized setting value', {
+        namespace: this._namespace,
+        key
+      })
     }
   }
 
@@ -385,7 +417,7 @@ export class SetterSettingService<TSettings extends object = any> {
       namespace: this._namespace,
       key,
       source,
-      issues: Array.isArray(error) ? this._formatIssues(error as ZodIssue[]) : String(error)
+      issues: Array.isArray(error) ? this._formatIssues(error as ZodIssue[]) : 'restore-failed'
     })
   }
 
@@ -418,12 +450,16 @@ export class SetterSettingService<TSettings extends object = any> {
   }
 
   private _commitSetting<K extends SettingPath<TSettings>>(key: K, value: TSettings[K]) {
-    runInAction(() => _.set(this._obj, key, value))
+    this._commitSettingToState(key, value)
 
     if (value === null) {
       this._scheduleStorageRemove(key, 1000)
     } else {
       this._scheduleStorageSave(key, value, 1000)
     }
+  }
+
+  private _commitSettingToState<K extends SettingPath<TSettings>>(key: K, value: TSettings[K]) {
+    runInAction(() => _.set(this._obj, key, value))
   }
 }

@@ -7,6 +7,7 @@ export class CoachOverlayWindowSettings implements BaseAkariWindowBasicSetting {
   public pinned: boolean = true
   public opacity: number = 0.92
   public showShortcut: string | null = null
+  public locked: boolean = true
 
   setEnabled(enabled: boolean) {
     this.enabled = enabled
@@ -24,6 +25,10 @@ export class CoachOverlayWindowSettings implements BaseAkariWindowBasicSetting {
     this.showShortcut = showShortcut
   }
 
+  setLocked(locked: boolean) {
+    this.locked = locked
+  }
+
   constructor() {
     makeAutoObservable(this)
   }
@@ -35,6 +40,11 @@ export class CoachOverlayWindowState implements BaseAkariWindowBasicState {
   public ready: boolean = false
   public show: boolean = false
   public trackedBounds: Electron.Rectangle | null = null
+  public interactive: boolean = false
+
+  setInteractive(interactive: boolean) {
+    this.interactive = interactive
+  }
 
   constructor() {
     makeAutoObservable(this)

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  coachCapabilityIdSchema,
   coachCuePublicDtoSchema,
   coachCueSchema,
   coachEvidenceSchema,
@@ -8,10 +9,36 @@ import {
   itemPurchaseGuidanceSchema,
   liveCoachCapabilityPayloadSchema,
   liveCoachPublicStateSchema,
+  mainToWorkerMessageSchema,
   workerToMainMessageSchema
 } from './index'
 
 describe('live-coach schemas', () => {
+  it('validates every frame envelope before the utility worker consumes its bytes', () => {
+    expect(
+      mainToWorkerMessageSchema.safeParse({
+        type: 'frame-buffer',
+        buffer: new Uint8Array(16),
+        pixelFormat: 'bgra',
+        width: 2,
+        height: 2,
+        observedAt: 1000,
+        sequence: 1
+      }).success
+    ).toBe(true)
+    expect(
+      mainToWorkerMessageSchema.safeParse({
+        type: 'frame-buffer',
+        buffer: 'not-binary',
+        pixelFormat: 'unknown',
+        width: -1,
+        height: 2,
+        observedAt: 1000,
+        sequence: 1
+      }).success
+    ).toBe(false)
+  })
+
   it('validates coachEvidenceSchema correctly', () => {
     const validEvidence = {
       id: 'evi_001',
@@ -105,7 +132,7 @@ describe('live-coach schemas', () => {
       models: {
         'minimap-v1': {
           version: '1.0.0',
-          sha256: 'abc123def456',
+          sha256: 'a'.repeat(64),
           url: 'https://example.com/m.onnx'
         }
       }
@@ -118,6 +145,7 @@ describe('live-coach schemas', () => {
       session: {
         id: 'sess_1',
         state: 'active',
+        pauseReason: null,
         mapId: 11,
         queueId: 420,
         patch: '14.15.1',
@@ -132,13 +160,46 @@ describe('live-coach schemas', () => {
         backend: 'wgc',
         fps: 30,
         frameAgeMs: 50,
-        roiState: 'healthy'
+        roiState: 'healthy',
+        resolution: { width: 1920, height: 1080 },
+        confidence: 0.95,
+        lastObservationAt: 1700000000000,
+        modelVersions: { minimap: '1.0.0' },
+        captureLatencyMs: 12,
+        inferenceLatencyMs: 20,
+        dropCount: 0,
+        queueDepth: 0,
+        workerHeartbeatAt: 1700000000000,
+        workerRestartCount: 0
       },
       liveData: {
         state: 'healthy',
-        lastSuccessAt: 1700000000000
+        lastSuccessAt: 1700000000000,
+        sourceHealth: [
+          {
+            domain: 'game-stats',
+            state: 'healthy',
+            lastSuccessAt: 1700000000000,
+            lastErrorCode: null,
+            consecutiveFailures: 0
+          }
+        ]
       },
       cue: null,
+      recentCues: [],
+      sessionCueStats: {
+        total: 0,
+        information: 0,
+        warning: 0,
+        opportunity: 0,
+        system: 0,
+        review: 0
+      },
+      lastSessionSummary: null,
+      fogInferences: [],
+      itemGuidance: null,
+      cooldowns: [],
+      communicationHistory: [],
       speech: {
         state: 'idle',
         cueId: null
@@ -152,6 +213,17 @@ describe('live-coach schemas', () => {
       lastError: null
     }
     expect(liveCoachPublicStateSchema.safeParse(validState).success).toBe(true)
+    expect(
+      liveCoachPublicStateSchema.safeParse({
+        ...validState,
+        lastError: {
+          code: 'worker-invented-code',
+          stage: 'capture',
+          recoverable: true,
+          occurredAt: 1700000000000
+        }
+      }).success
+    ).toBe(false)
   })
 
   it('validates fogInferenceSchema and itemPurchaseGuidanceSchema with strict constraints', () => {
@@ -228,5 +300,10 @@ describe('live-coach schemas', () => {
       status: 'speaking'
     }
     expect(coachCuePublicDtoSchema.safeParse(invalidPublicDto).success).toBe(false)
+  })
+
+  it('validates coachCapabilityIdSchema includes coach.analyze.minimap-identity', () => {
+    expect(coachCapabilityIdSchema.safeParse('coach.analyze.minimap-identity').success).toBe(true)
+    expect(coachCapabilityIdSchema.options).toContain('coach.analyze.minimap-identity')
   })
 })

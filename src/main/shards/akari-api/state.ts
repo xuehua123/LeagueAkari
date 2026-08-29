@@ -7,6 +7,10 @@ import type {
   AkariRelease,
   AkariSupportedQueuesConfig
 } from '@shared/shards/akari-api'
+import type {
+  LiveCoachCapabilityPayload,
+  LiveCoachCapabilitySnapshotStatus
+} from '@shared/types/live-coach'
 import { makeAutoObservable, observable } from 'mobx'
 
 import {
@@ -20,6 +24,8 @@ export class AkariApiState {
   leagueServers = BUILTIN_SGP_LEAGUE_SERVERS_CONFIG
   supportedQueues = BUILTIN_SUPPORTED_QUEUES
   autoSelectGroups = BUILTIN_AUTO_SELECT_GROUPS
+  liveCoachCapabilities: LiveCoachCapabilityPayload | null = null
+  liveCoachCapabilityStatus: LiveCoachCapabilitySnapshotStatus = 'unavailable'
 
   notice: AkariNotice | null = null
   contactChannels: AkariContactChannels | null = null
@@ -36,6 +42,7 @@ export class AkariApiState {
   isUpdatingLeagueServers = false
   isUpdatingSupportedQueues = false
   isUpdatingAutoSelectGroups = false
+  isUpdatingLiveCoachCapabilities = false
 
   setFeatureGates(value: AkariFeatureGateSnapshot) {
     this.featureGates = value
@@ -51,6 +58,14 @@ export class AkariApiState {
 
   setAutoSelectGroups(value: AkariAutoSelectGroupsConfig) {
     this.autoSelectGroups = value
+  }
+
+  setLiveCoachCapabilities(
+    value: LiveCoachCapabilityPayload | null,
+    status: LiveCoachCapabilitySnapshotStatus
+  ) {
+    this.liveCoachCapabilities = value
+    this.liveCoachCapabilityStatus = status
   }
 
   setNotice(value: AkariNotice | null) {
@@ -89,12 +104,17 @@ export class AkariApiState {
     this.isUpdatingAutoSelectGroups = value
   }
 
+  setUpdatingLiveCoachCapabilities(value: boolean) {
+    this.isUpdatingLiveCoachCapabilities = value
+  }
+
   constructor() {
     makeAutoObservable(this, {
       featureGates: observable.ref,
       leagueServers: observable.ref,
       supportedQueues: observable.ref,
       autoSelectGroups: observable.ref,
+      liveCoachCapabilities: observable.ref,
       notice: observable.ref,
       contactChannels: observable.ref,
       latestRelease: observable.ref

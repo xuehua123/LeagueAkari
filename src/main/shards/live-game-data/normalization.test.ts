@@ -87,7 +87,13 @@ describe('normalization logic', () => {
   it('normalizes active player abilities and gold', () => {
     const rawActivePlayer = {
       abilities: {
-        Q: { abilityLevel: 2, displayName: 'Orb of Deception', id: 'AhriQ' },
+        Q: {
+          abilityLevel: 2,
+          displayName: 'Orb of Deception',
+          id: 'AhriQ',
+          rawDescription: 'game_ability_ahri_q_description',
+          rawDisplayName: 'game_ability_ahri_q_name'
+        },
         W: { abilityLevel: 1, displayName: 'Fox-Fire', id: 'AhriW' }
       },
       championName: 'Ahri',
@@ -103,6 +109,8 @@ describe('normalization logic', () => {
     expect(normalized?.currentGold).toBe(850.5)
     expect(normalized?.team).toBe('CHAOS')
     expect(normalized?.abilities.Q.abilityLevel).toBe(2)
+    expect(normalized?.abilities.Q.rawDescription).toBe('game_ability_ahri_q_description')
+    expect(normalized?.abilities.Q.rawDisplayName).toBe('game_ability_ahri_q_name')
     expect(normalized?.abilities.W.displayName).toBe('Fox-Fire')
   })
 

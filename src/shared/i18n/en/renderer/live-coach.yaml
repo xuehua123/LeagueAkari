@@ -8,10 +8,30 @@ liveCoach:
     reviews: Reviews
     privacy: Privacy
     diagnostics: Diagnostics
+    help: Help & Quick Start
   overlay:
     activeTitle: AI Coach Active
+    pausedTitle: AI Coach Paused
     idleTitle: AI Coach Idle
+    pauseReason:
+      user-pause: Paused from the main page
+      global-shortcut: Paused with the global shortcut
+      environment-abnormal: Match environment issue
+      feature-unavailable: Required capability unavailable
+    backendUnavailable: Capture unavailable
     waiting: Waiting for tactical events...
+    recentCue: Recent
+    outputMuted: Muted
+    outputOff: No output
+    output:
+      sound: Sound
+      subtitle: Subtitle
+      speech: Speech
+    roiState:
+      healthy: Healthy
+      degraded: Degraded
+      occluded: Occluded
+      unknown: Unknown
     optionPrefix: 'Suggestion:'
     rolePrimary: Primary
     roleAlternative: Alternative
@@ -21,12 +41,338 @@ liveCoach:
     sessionStatus: Session Status
     latestCue: Live Cue Preview
     noCue: No tactical cue currently active
+    impactPrefix: 'Impact: '
+    optionPrefix: 'Option: '
+    backendUnavailable: Not Ready
+    backendIdle: Waiting for Match
+    sessionLabel: Session State
+    captureLabel: Capture Backend
+    speechLabel: Speech Output
+    currentCueCount_one: '{{count}} cue this session'
+    currentCueCount_other: '{{count}} cues this session'
+    pauseReason:
+      user-pause: Paused from the main page
+      global-shortcut: Paused with the global shortcut
+      environment-abnormal: The match environment is abnormal
+      feature-unavailable: A required capability is unavailable
+    lastSessionSummary: Previous Session Summary
+    latestReplay:
+      title: Latest Offline Review
+      label: 'Recording {{fingerprint}} · patch {{patch}}'
+      unknownPatch: unknown
+      open: View Review History
+      status:
+        preparing: Preparing
+        analyzing: Analyzing
+        completed: Completed
+        failed: Failed; reselect the source to retry from the beginning
+        cancelled: Cancelled; reselect the source to retry from the beginning
+        interrupted: Interrupted when the app exited; reselect the source to retry from the beginning
+    duration: Duration
+    totalCues: Total Cues
+    warningCues: Warning Cues
+    endReason: End Reason
+    startManualSession: Start Coach Session
+    pauseSession: Pause Coach
+    resumeSession: Resume Coach
+    stopSession: Stop Current Session
+    testSpeech: Test Speech
+    manualSessionStarted: Coach started from the current live match.
+    manualSessionFailed: 'Unable to start: {{error}}'
+    sessionPaused: Coach paused. Real-time capture and output have stopped.
+    sessionResumed: Coach resumed and will process only new observations.
+    sessionControlFailed: 'Unable to change session state: {{error}}'
+    testSpeechText: Live AI Coach speech test succeeded with the current volume and rate.
+    testSpeechFailed: 'Speech failed: {{error}}'
+    fogTitle: Spatio-Temporal Fog Inference
+    noFogInference: No enemy movements currently detected in fog of war
+    enemyTrack: 'Enemy {{id}}'
+    confidence: 'Overall confidence {{value}}'
+    expiresIn: 'Expires in {{seconds}}s'
+    likelyRoute: 'Likely route: '
+    likelyIntent: 'Likely intent: '
+    itemGuidanceTitle: Item Purchase Guidance
+    noItemGuidance: Builds and components will be analyzed automatically after entering a Summoner's Rift match
+    currentGold: 'Current gold: {{gold}}g'
+    primaryPurchase: Primary purchase
+    alternativePurchase: Alternative purchase
+    missingGold: '{{gold}}g short'
+    purchaseAffordable: 'Affordable: costs {{cost}}g, leaving {{remaining}}g'
+    cooldownTitle: Ability, Objective, and Ward Timers
+    noCooldowns: No active cooldown timer currently running
+    recordCooldown: Record Timer
+    cancelCooldown: Cancel
+    cooldownRecorded: User-confirmed timer recorded
+    cooldownCancelled: Timer cancelled
+    cooldownLabelPlaceholder: 'Example: enemy Flash'
+    cooldownReady: Ready
+    cooldownSeconds: 'Ready in {{seconds}}s'
+    cooldownRange: 'Estimated ready in {{earliest}}–{{latest}}s'
+    secondsUnit: sec
+    cooldownDisclaimer: User timers explicitly track confirmed cooldown and objective spawn times.
+    confirmCommunication: Confirm Communication
+    communicationCopied: The phrase was copied. Paste and send it in game yourself.
+    communicationRateLimited: Confirmations are rate-limited. Try again shortly.
+    communicationBlocked: This suggestion expired or communication is unavailable.
+    resolutionUnknown: Resolution unobserved
+    patchAndModel: 'Patch version:'
+    patchLabel: 'Patch version:'
+    patchUnconfirmed: Unconfirmed
+    observationConfidence: 'Observation confidence:'
+    unknownValue: Unknown
+    modelUnavailable: Not loaded
+    cueStatus:
+      pending: Pending
+      speaking: Outputting
+      spoken: Delivered
+      cancelled: Cancelled
+      expired: Expired
+      suppressed: Suppressed
+    cueCancellationReason:
+      priority-below-current-mode: Below the priority threshold for the current mode
+      queue-delay-exceeded: Waited too long and missed its useful moment
+      queue-overflow: Replaced by higher-priority content when the queue filled
+      interrupted-by-higher-priority: Interrupted by a higher-priority cue
+      category-disabled: This cue category was disabled
+      evidence-invalidated: Supporting evidence is no longer valid
+      feature-disabled: A required capability was disabled
+      coach-mode-changed: No longer eligible after the coach mode changed
+      shadow-mode: Recorded by shadow mode without user-facing output
+      pacing-settings-changed: No longer eligible after pacing settings changed
+      suppressed/output-gated: No permitted output channel was available
+      output-delivery-failed: Sound, speech, and subtitle delivery all failed
+      muted: Current audio stopped when mute was enabled
+      speech-output-disabled: Speech output was disabled
+      expired: The cue expired
+    roiState:
+      healthy: Calibration healthy
+      degraded: Calibration degraded
+      occluded: Minimap occluded
+      unknown: Calibration unknown
+    cooldownKind:
+      ability: Ability
+      summoner-spell: Summoner Spell
+      ultimate: Ultimate
+      ward: Ward
+      jungle-camp: Jungle Camp
+      objective: Objective
+    cooldownSource:
+      official-api: Official Local Data
+      visible-screen: Visible Screen
+      user-recorded: User Confirmed
+      model-estimate: Model Estimate
+    cooldownOwner:
+      self: Self
+      ally: Ally
+      enemy: Enemy
+      neutral: Neutral
+      unknown: Unknown
+    region:
+      top_lane: Top lane
+      mid_lane: Mid lane
+      bot_lane: Bot lane
+      top_river: Top river
+      bot_river: Bottom river
+      top_jungle: Top jungle
+      bot_jungle: Bottom jungle
+      dragon_pit: Dragon pit
+      baron_pit: Baron pit
+      base_recall: Recall
+    intent:
+      roam: Roam
+      recall: Recall
+      ambush: Ambush
+      flank: Flank
+      objective: Objective
+      lane-swap: Lane swap
+      unknown: Unknown
     state:
       idle: Idle (Waiting for Summoner's Rift match)
+      awaiting-game: Waiting for a match
+      starting: Starting
+      calibrating: Calibrating minimap
+      shadow: Shadow analysis
       active: Active
       paused: Paused
+      degraded: Recovering or waiting for the environment
+      recovering: Recovering
+      ending: Ending
+      completed: Completed
       unsupported: Unsupported map or environment
       disabled: Disabled
+    liveDataState:
+      idle: Idle
+      connecting: Connecting
+      healthy: Healthy
+      degraded: Degraded
+      unavailable: Unavailable
+    speechState:
+      idle: Idle
+      speaking: Speaking
+      paused: Paused
+      muted: Muted
+      unavailable: Unavailable
+  onboarding:
+    title: Enable Live AI Coach
+    steps:
+      scope: Choose a Path
+      environment: Prepare
+      prepare: Controls & Data
+      consent: Review
+    scopeTitle: Understand the capability boundaries first
+    capabilities: The feature reads Riot's local Live Client Data and analyzes only the minimap region of the current game window to provide real-time subtitles, sounds, speech, and deterministic guidance.
+    support: Phase 1 supports Windows 10/11, Summoner's Rift, and windowed or borderless mode. Dependent output stops in unsupported environments.
+    privacy: Raw frames are neither uploaded nor persisted by default, and microphone permission is not requested. Structured feedback stays local and can be exported, withdrawn, or deleted.
+    risk: Fog positions, routes, and intent are probability estimates—not directly observed facts. The coach should remain silent or retract a cue when confidence is low or evidence expires.
+    controls: Configure pause, mute, recalibration, and overlay adjustment shortcuts in Settings so the coach remains controllable during a match.
+    test: Run the environment, TTS, and game capture checks in Diagnostics before your first match.
+    pathTitle: Where would you like to start?
+    pathRealtime: Live Coach
+    pathOffline: Offline Video Analysis
+    pathRealtimeDesc: Check this device, minimap position, output, and in-game controls. Real-time processing starts only after your final confirmation.
+    pathOfflineDesc: Analyze a local structured JSON replay or MP4, MKV, or WebM recording without enabling real-time screen capture.
+    environmentTitle: Environment and output checks
+    environmentDescription: Check the Windows capture backend, local voices, and shortcut support, then test TTS and game-window capture separately.
+    openDiagnostics: Open Diagnostics
+    calibrationTitle: Check the minimap position
+    calibrationDescription: Enter a match and request one preview. Confirm that the outline covers the complete minimap; the preview clears after 10 seconds.
+    openCalibration: Open Calibration
+    offlineTitle: Offline analysis does not require Live Coach
+    offlineDescription: Native .rofl files cannot be imported directly. Use structured JSON or prepare an MP4, MKV, or WebM recording. Without a sidecar, only minimap capabilities run.
+    controlsTitle: In-game controls and speech test
+    openControls: Configure Controls & Output
+    testSpeech: Test Current Local Voice
+    privacyTitle: Data scope and withdrawal
+    openPrivacy: Open Privacy & Data Controls
+    replayTitle: Learn the output with an offline replay
+    replayDescription: Reviews provides a clearly labeled sample and local recording import. Simulated results are never presented as a live match.
+    openReplay: Open Tactical Reviews
+    consentTitle: Review the summary before confirming
+    consentDescription: Choosing Live Coach authorizes only the on-device real-time processing described here. Choosing offline analysis does not enable real-time screen capture. You can go back to make changes or continue skipped checks later.
+    summaryPath: First-use path
+    summaryCalibration: Current minimap status
+    summaryOutput: Current output channels
+    summaryShortcuts: Pause, mute, and recalibration shortcuts
+    summaryShortcutCount_one: '{{count}} of 3 configured'
+    summaryShortcutCount_other: '{{count}} of 3 configured'
+    summaryNone: No output enabled
+    reopenHint: You can reopen this guide from Help & Quick Start, or withdraw real-time processing consent from Privacy at any time.
+    acknowledge: I understand the support limits, privacy handling, prediction uncertainty, and how to disable the feature.
+    cancel: Not Now
+    previous: Back
+    next: Next
+    enable: Confirm and Enable
+    done: Finish Review
+    startOffline: Continue to Offline Analysis
+  help:
+    title: Help & Quick Start
+    phaseTitle: Prepare before entering a live match
+    phaseDescription: This page provides the recommended setup order and troubleshooting entry points. Diagnostics and the current capability state are authoritative; opening Help does not mean the environment passed.
+    steps:
+      environment:
+        title: 1. Check the environment
+        description: Check capture, local voices, and shortcut support, then test game-window capture once you are in a match.
+        action: Open Diagnostics
+      calibration:
+        title: 2. Confirm the minimap region
+        description: Request a one-time preview and confirm the outline covers the full minimap. Adjust and save it when confidence is insufficient.
+        action: Open Calibration
+      controls:
+        title: 3. Configure in-game controls
+        description: Configure pause, mute, repeat, recalibration, and overlay shortcuts, then choose subtitle, sound, or speech output.
+        action: Open Coach Settings
+      replay:
+        title: 4. Try an offline review first
+        description: Load the clearly labeled sample or import a local JSON, MP4, MKV, or WebM file to learn the timeline and cue states.
+        action: Open Tactical Reviews
+      privacy:
+        title: 5. Review the data boundaries
+        description: See how frames, minimap ROI, structured data, and diagnostics are handled, plus the exact scope of withdrawal, export, and deletion.
+        action: Open Privacy
+    boundariesTitle: Keep these boundaries in mind
+    boundaryObservation: Currently visible minimap content is directly observed. Fog regions, routes, and intent are time-limited probability estimates.
+    boundaryControl: The coach never clicks, buys, casts, or sends game input automatically. Communication phrases still require confirmation and manual paste.
+    boundaryReplay: Samples and offline analyses are always labeled as examples or reviews and never represent the current live match.
+    boundaryPrivacy: Phase 1 requests no microphone permission and does not listen to team voice or system audio. Full game frames are not persisted or uploaded by default.
+    topicsTitle: Tutorials & Troubleshooting
+    topics:
+      gettingStarted:
+        title: Reopen the first-use tutorial
+        description: Choose offline or live use again and review capabilities, support limits, preparation steps, and the final summary. Reviewing an existing consent does not automatically change the main switch.
+        action: Open First-use Guide
+      calibration:
+        title: The minimap region is incorrect
+        description: Enter Summoner's Rift in windowed or borderless mode, confirm the in-game minimap side, and request one preview. Adjust and save the outline if it is incomplete or low-confidence.
+        action: Open Calibration
+      capture:
+        title: Game-window capture is missing, black, or stalled
+        description: Keep the League game window open on the same Windows desktop, use windowed or borderless mode, and rerun the full environment check. A one-time preview does not prove that a real-time WGC/DDA backend is available.
+        action: Check Capture Again
+      permission:
+        title: Screen capture permission is unavailable
+        description: Allow League Akari to capture the game window in Windows privacy or security controls, then restart the app and rerun the full environment check. No permission result is treated as a pass.
+        action: Recheck Permission
+      patch:
+        title: The current game patch is unknown or unsupported
+        description: Update League and League Akari, enter a supported match so the patch can be detected, and inspect the capability reason again. Do not force real-time coaching while the patch gate is closed.
+        action: Inspect Patch Status
+      platform:
+        title: Platform or native runtime is unsupported
+        description: Phase 1 real-time capture and native shortcuts require a supported Windows build and working native runtime. Offline review remains available when the real-time platform gate is closed.
+        action: Inspect Platform Status
+      consent:
+        title: Real-time processing consent is missing or outdated
+        description: Review the current privacy notice and processing purposes in Privacy, then explicitly confirm the current consent version. Opening Help or completing environment checks never grants consent.
+        action: Review Privacy & Consent
+      liveData:
+        title: Live Client Data is unavailable
+        description: Keep the League game and client running, wait for the in-game Live Client Data endpoint to become healthy, and rerun Diagnostics. Map-space conclusions still require healthy minimap evidence.
+        action: Inspect Live Data
+      noSound:
+        title: No alert sound or speech
+        description: Confirm the output channels include Sound or Speech, the coach is not muted, local speech is enabled, and a working output device is selected. Then run the TTS test.
+        action: Check Voice Settings
+      overlay:
+        title: Overlay subtitles are not visible
+        description: Confirm Subtitle output and the overlay are enabled, with visible opacity. To reposition it, unlock the overlay and use its adjustment shortcut.
+        action: Check Coach Settings
+      automaticPause:
+        title: Why the coach paused automatically
+        description: Unsupported map, queue, region, or patch; a missing, black, or stalled capture; uncalibrated or occluded ROI; and interrupted Live Data can pause or degrade the coach. Diagnostics shows the current reason code.
+        action: Open Diagnostics
+      replay:
+        title: Supported offline replay formats
+        description: Project structured JSON and MP4, MKV, or WebM recordings are supported; native .rofl is not. Place an optional same-name .sidecar.json beside a video to supply structured events.
+        action: Open Tactical Reviews
+      privacy:
+        title: Withdraw, export, or delete data
+        description: Withdrawing real-time consent first disables Live Coach but does not delete existing local data. Deletion clears feedback, cues, timers, communication history, acceptance evidence, privacy-filtered replay history and internal results, and manual calibration—not source recordings, sidecars, or saved exports.
+        action: Open Privacy
+      unsupported:
+        title: The current environment is unsupported
+        description: Phase 1 real-time support targets Windows 10/11, Summoner's Rift, and windowed or borderless mode, subject to region, queue, patch, and capability gates. Offline reviews remain independent.
+        action: Inspect the Reason
+      reportIssue:
+        title: Information needed to report an issue
+        description: Generate a privacy-safe diagnostics report and provide it manually through the project's existing support channel. It excludes raw frames, recordings, full paths, summoner names, custom communication text, and tokens; this page never uploads it automatically.
+        action: Generate Diagnostics Report
+    openGuide: Reopen First-use Guide
+    backToOverview: Back to Overview
+  feedback:
+    prompt: How was this cue?
+    type:
+      useful: Useful
+      not-useful: Not useful
+      incorrect: Incorrect
+      late: Too late
+      too-frequent: Too frequent
+    withdraw: Undo
+    delete: Delete
+    saved: Feedback saved locally.
+    withdrawn: Feedback withdrawn.
+    deleted: Feedback deleted.
+    loadFailed: Unable to load local cue feedback.
+    saveFailed: Unable to save cue feedback.
   calibration:
     title: Minimap Calibration & Environment
     desc: To ensure visual observation accuracy, the system detects resolution and minimap ROI. You can adjust the layout below.
@@ -40,18 +386,121 @@ liveCoach:
     backendAuto: 'Auto'
     backendWgc: 'WGC (Recommended)'
     backendDda: 'DXGI DDA'
+    previewTitle: Minimap Preview and Manual Selection
+    previewDesc: A single League game-window preview is captured only when requested. Its longest edge is limited to 512 pixels and it is cleared from the page after 10 seconds.
+    showImage: Show image
+    requestPreview: Request one preview
+    previewAlt: One-time League game-window minimap calibration preview
+    previewHidden: The preview image is hidden; you can still adjust the ROI outline.
+    previewEmpty: Enter a match, then select “Request one preview”.
+    roiAriaLabel: Draggable and resizable minimap region
+    sourceResolution: 'Target window:'
+    sourceResolutionUnknown: Unavailable from target window
+    calibrationSource: 'Calibration:'
+    confidence: 'Confidence:'
+    detectedSide: 'Minimap side:'
+    detectionUncertain: Automatic detection could not confirm the minimap location reliably. Adjust the selection in the preview and save it manually; the candidate box is not treated as a successful calibration until confirmed.
+    reset: Reset to automatic
+    confirm: Save manual calibration
+    saved: Manual minimap calibration saved and applied immediately.
+    resetDone: Automatic calibration restored.
   settings:
     title: Coach Modes & Output Policy
+    featureSwitchesTitle: Independent Coach Capabilities
+    autoStartSwitch: Start Automatically in Supported Matches
+    autoStartSwitchDesc: When off, the coach starts only after you click “Start Coach Manually” and does not interrupt an already running session.
+    fogInferenceSwitch: Fog-of-War Probability Estimates
+    fogInferenceSwitchDesc: Shows probable regions, routes, and intent from last-seen minimap evidence. Disabling it immediately withdraws related estimates and cues.
+    fogInferenceDetail:
+      region: Regions only
+      route: Regions and routes
+      intent: Full intent estimates
+    itemGuidanceSwitch: Item Purchase Guidance
+    itemGuidanceSwitchDesc: Generates purchase advice only and never opens the shop, clicks, or buys automatically.
+    cooldownTrackingSwitch: Basic Cooldown Tracking
+    cooldownTrackingSwitchDesc: Enables official event timers and user-confirmed ability, ward, and objective timers.
+    communicationAssistSwitch: Ping & Communication Assistance
+    communicationAssistSwitchDesc: Off by default. Every action still requires confirmation and only copies a phrase without controlling the game.
+    itemGuidanceTitle: Item Purchase Guidance
+    itemGuidanceModeTitle: Recommendation Source
+    itemGuidanceMode:
+      system: League Client recommendations
+      common: Common build
+      adaptive: Match-adaptive (Recommended)
+      custom: Custom build
+    itemGuidanceModeDesc:
+      system: Use the current champion's recommendations from the locally running League Client.
+      common: Use patch-verified common core items without changing the order for the enemy composition.
+      adaptive: Start from the common build and prioritize counters for enemy healing and magic threats.
+      custom: Follow the item order you configured for the current champion.
+    customBuildTitle: Custom Champion Builds
+    customBuildDesc: Enter a numeric champion ID and item IDs in purchase order. No guidance is generated when the configuration is invalid.
+    championIdPlaceholder: Champion ID
+    itemIdsPlaceholder: Item IDs, e.g. 6655, 3020, 4645
+    saveCustomBuild: Save
+    removeCustomBuild: Remove
+    customBuildRow: 'Champion {{championId}}: {{itemIds}}'
+    customBuildChampionRequired: Enter a valid champion ID.
+    customBuildItemsRequired: Enter at least one valid item ID.
+    customBuildSaved: Custom build saved.
+    communicationTitle: Confirmed Pings & Communication Templates
+    communicationDesc: A phrase is copied only after you click or press the confirmation shortcut. The coach never sends automatically, simulates keys, or controls the game. Paste and send it yourself in game.
+    communicationKind:
+      missing: Enemy Missing
+      resource: Objective
+      retreat: Retreat
+      push: Push
+      group: Group
+      danger: Danger
+    communicationCooldownTitle: Confirmation Cooldown
+    communicationCooldownDesc: Limits repeated confirmations to prevent communication spam.
+    saveCommunication: Save Communication Settings
+    communicationTemplateRequired: Every communication template is required.
+    communicationCooldownRequired: Enter a confirmation cooldown from 3 to 60 seconds.
+    communicationSaved: Communication templates and cooldown saved.
     coachModeTitle: Coach Feedback Mode
     modeMinimal: Minimal (High risk warnings only)
     modeBalanced: Balanced (Recommended)
     modeTraining: Training
     outputModeTitle: Output Channel
+    outputModeDesc: Combine alert sounds, overlay subtitles, and local short speech. Deselect all channels for no output, or use the mute control for temporary silence.
+    outputSound: Alert Sound
     outputSpeech: Local Speech (TTS)
     outputSubtitle: Overlay Subtitle
+    coachModeDesc: Controls how often in-game cues are triggered and how much detail they include.
+    shadowModeTitle: Silent Shadow Mode
+    shadowModeDesc: Run capture, recognition, and rules while recording would-be cues without sound or subtitles for real-match validation.
+    cueDensityTitle: Cue Density
+    cueDensity:
+      low: Low
+      standard: Standard
+      high: High-frequency Training
+    minimumCueIntervalTitle: Minimum Cue Interval
+    categoriesTitle: Cue Categories
+    category:
+      information: Information
+      warning: Danger
+      resource: Objectives
+      opportunity: Opportunity
+      system: System Status
+      review: Review
     overlaySwitchTitle: Enable Transparent Overlay Window
     overlaySwitchDesc: Display floating tactical cards above the game with mouse passthrough
     opacityTitle: Overlay Opacity
+    opacityDesc: Adjust overlay visibility above the game.
+    shortcutsTitle: In-game Controls & Global Shortcuts
+    muteTitle: Mute Coach Audio
+    muteDesc: Disable speech and alert sounds while keeping live subtitles.
+    pauseShortcut: Pause / Resume Coach
+    muteShortcut: Mute / Restore Audio
+    repeatShortcut: Show Last Subtitle Again
+    recalibrateShortcut: Recalibrate Minimap Automatically
+    overlayShortcut: Hold to Adjust Overlay
+    overlayShortcutDesc: Hold the shortcut to temporarily enable overlay mouse input, movement, and resizing.
+    communicationConfirmShortcut: Confirm Latest Communication Suggestion
+    communicationConfirmShortcutDesc: Copies the latest valid suggestion only and never sends input to the game automatically.
+    overlayLockedTitle: Lock Overlay Position & Size
+    overlayLockedDesc: When enabled, holding the adjustment shortcut will not move or resize the window.
   voice:
     title: Voice & TTS Settings
     enableSwitch: Enable Local TTS Speech
@@ -59,35 +508,533 @@ liveCoach:
     voiceSelectTitle: SAPI Voice Selection
     voiceSelectDesc: Select installed system voice
     defaultVoice: Follow system default voice
+    outputDeviceTitle: Speech Output Device
+    outputDeviceDesc: Select the speaker or headset used by SAPI speech
+    defaultOutputDevice: Follow system default output device
     volumeTitle: Speech Volume
     volumeDesc: Adjust TTS speech output volume
     rateTitle: Speech Rate
     rateDesc: 0.5x ~ 1.5x speed
     testBtn: Test Current Voice Output
+    cancelBtn: Stop Speech Now
+    testSucceeded: Speech test completed
+    testFailed: Speech test could not play; check the voice and output device
+    testText: Live AI Coach speech test. Volume and speech rate are working.
+    testError: 'Speech test failed: {{error}}'
+    loadFailed: Unable to read local SAPI voices or output devices
   reviews:
     title: Tactical Reviews & Offline Video Analysis
     desc: Analyze replays and recordings offline to trace tactical moments and minimap evidence chains.
+    importGuideTitle: Check formats and capability boundaries before importing
+    importFormats: Supports project structured JSON and MP4, MKV, or WebM recordings. Native League Client .rofl files cannot be read directly.
+    sidecarGuide: A verified “recording.ext.sidecar.json” or “recording.sidecar.json” beside a video is detected automatically. Without a sidecar, only minimap analysis runs; rules requiring level, item, death, or objective events stay disabled.
+    sourceBoundary: Analysis stays on this device and never modifies or copies the source. History stores only sanitized structured results—never recordings, full paths, filenames, previews, or raw frames. Reports saved elsewhere remain under your control.
+    history:
+      title: Local Review History
+      refresh: Refresh
+      clearAll: Delete All Reviews
+      empty: No persisted review records yet
+      open: Open
+      retryFromStart: Reselect and Retry from Start
+      delete: Delete
+      sourceUnavailable: For privacy, the source recording path is not saved. To synchronize video playback, import the same file again; duplicate detection opens the stored result and links the source only for the current app session.
+      resultUnavailable: This review result is missing or damaged.
+      itemLabel: '{{kind}} {{fingerprint}} · patch {{patch}}'
+      unknownPatch: unknown
+      kind:
+        json: Structured replay
+        video: Local recording
+      status:
+        preparing: Preparing
+        analyzing: Analyzing
+        completed: Completed
+        failed: Failed
+        cancelled: Cancelled
+        interrupted: Interrupted when the app exited
+      retryingFromStart: Verifying the reselected source and restarting analysis from the beginning. This is not checkpoint resume.
+      retryCompleted: The from-start retry completed.
+      duplicateOpened: An identical recording, configuration, model, and rule result already exists and was opened.
+      clearConfirmTitle: Delete all review history?
+      clearConfirmContent: This deletes the app's sanitized results, task records, caches, and temporary content. Source recordings and reports saved elsewhere are not deleted.
+      deleteConfirmTitle: Delete this review?
+      deleteConfirmContent: This permanently deletes the app's stored result and temporary content, but not the source recording or external exports.
+      confirm: Delete
+      cancel: Cancel
+      deleted: The review result and internal temporary content were deleted.
+      cleared_one: 'Deleted {{count}} review record and its internal result.'
+      cleared_other: 'Deleted {{count}} review records and their internal results.'
+    importReplayBtn: Import Recording / Replay
     loadDemoBtn: Load Sample Match Replay
-    exportSidecarBtn: Export Sidecar JSON
+    exportAnalysisJsonBtn: Export analysis JSON
     exportMarkdownBtn: Export Markdown Report
+    processing: Processing...
+    cancelImportBtn: Cancel Import
+    sessionId: Match ID
+    patch: Game Patch
+    totalCues: Tactical Cues
+    cueCount_one: '{{count}} cue'
+    cueCount_other: '{{count}} cues'
+    offlineReviewBadge: Offline Review
+    timelineTitle: Tactical Moment Timeline
+    spokenText: 'Spoken cue: “{{text}}”'
+    option: 'Option: {{option}}'
+    evidenceIds: 'Evidence: {{ids}}'
     emptyText: No review data available. Click "Load Sample Match Replay" or import a file to inspect timeline events.
+    calibrationTitle: Confirm Replay Minimap Region
+    calibrationDesc: A one-time frame was extracted and the minimap was located automatically. Move the outline and resize it from either corner before starting analysis.
+    calibrationPreviewAlt: Replay minimap calibration preview
+    calibrationPreviewExpired: The replay preview expired. The outline remains editable; cancel and import again to request another preview.
+    calibrationRoiAriaLabel: Draggable and resizable replay minimap region
+    calibrationRequired: Automatic detection confidence was insufficient. Adjust the outline to cover the complete minimap.
+    sidecarStatus: 'Sidecar:'
+    sidecarFound: found and verified
+    sidecarMissing: not provided; minimap-only analysis
+    cancelCalibration: Cancel
+    startAnalysis: Confirm Region and Analyze
+    preparingCalibration: Reading replay metadata and preparing a minimap preview...
+    startingAnalysis: Starting replay analysis...
+    importCompleted: Replay import and review analysis completed.
+    deleteAnalysis: Delete Current Analysis
+    analysisDeleted: The current sample result was removed from page memory.
+    startPlayback: Play Timeline
+    pausePlayback: Pause Playback
+    previousFrame: Previous Frame
+    nextFrame: Next Frame
+    currentObservation: 'Current observation: '
+    noCurrentObservation: No structured observation is available at this moment
+    observationSummary: '{{minimap}} minimap entities; Live Data: {{liveData}}'
+    videoFrameSummary: 'Analysis frame {{current}} / {{total}}'
+    available: available
+    unavailable: unavailable
+    jumpToMoment: Jump to Moment
+    simulateSpeech: Simulate Coach Speech
+    listSeparator: ', '
+    metadata:
+      patch: Game Patch
+      patchPlaceholder: e.g. 16.17.1
+      mapId: Map ID
+      queueId: Queue / Mode ID
+      selfTeam: Your Team
+      minimapSide: Minimap Side
+      selfChampionId: Your Champion ID
+      gameStartOffset: Game Start Offset (seconds)
+      blueRoster: Blue Team Champion IDs (comma-separated)
+      redRoster: Red Team Champion IDs (comma-separated)
+      blueRosterPlaceholder: e.g. 86,64,103,22,40
+      redRosterPlaceholder: Leave blank if unknown
+      unknown: Unknown
+      blueTeam: Blue Team
+      redTeam: Red Team
+      leftSide: Left
+      rightSide: Right
+      fields:
+        patch: game patch
+        mapId: map
+        selfTeam: your team
+        selfChampionId: your champion
+        roster: both team rosters
+        videoGameStartMs: game start offset
+    capability:
+      missingTitle: Missing Information
+      missingDescription: 'Missing: {{fields}}. Unknown fields may be left blank; dependent capabilities will stay disabled.'
+      available: 'Available: {{capabilities}}'
+      disabled: '{{capability}} disabled: {{reason}}'
+      names:
+        minimap-basic: basic minimap analysis
+        region-change: region changes
+        visible-grouping: visible enemy grouping
+        champion-identity-candidate: champion identity candidates
+        champion-identity: champion identity
+        approaching-player-candidate: approaching-player candidates
+        approaching-player: approaching-player detection
+        sidecar-events: structured sidecar events
+        sidecar-dependent-rules: sidecar-dependent rules
+      reasons:
+        requires-summoners-rift-and-team: Confirm Summoner's Rift and your team.
+        requires-patch-team-roster-and-validated-model: Confirm the patch, your team, both rosters, and use a validated matching model.
+        requires-self-champion-team-roster-and-position: Confirm your champion, team, and rosters, and successfully identify your position.
+        requires-structured-sidecar: No structured sidecar was provided, so level, item, death, and objective-event rules are disabled.
+        requires-sidecar-time-alignment: Sidecar events have no game time and no video-to-game time offset has been set.
+        validated-model-unavailable-for-patch: No integrity-validated identity model could be loaded for this patch.
+    errors:
+      invalidRoster: '{{team}} contains an invalid champion ID.'
+      rosterTooLarge: Both rosters may contain at most 10 champions.
+    readingFile: Reading file...
+    importFileCompleted: 'Replay analysis completed: {{file}}'
+    importFailed: 'Unable to import recording: {{error}}'
+    importCancelled: Replay import was cancelled.
+    loadingDemo: Loading sample data...
+    demoLoaded: The sample match replay and tactical timeline are ready.
+    demoFailed: 'Unable to load the sample replay: {{error}}'
+    demoResultTitle: Standard demo data
+    demoResultDescription: This built-in deterministic example only demonstrates the timeline and cue interactions. It is not a real match and does not count toward Phase 1 replay acceptance.
+    analysisJsonExported: Replay analysis JSON exported. It is not an importable replay Sidecar.
+    markdownExported: Markdown review report exported.
+    exportFailed: 'Unable to export replay analysis: {{error}}'
+    progress:
+      json-parsing: Parsing JSON replay session data...
+      json-completed: JSON replay parsing completed.
+      video-probing: Probing video encoding and dimensions...
+      video-extracting: 'Streaming minimap pixels at 5 FPS ({{width}}×{{height}}, {{duration}} seconds)...'
+      video-analyzing: 'Analyzing video frames ({{current}}/{{total}})...'
+      video-completed: Video recording analysis completed.
   privacy:
     title: Privacy & Data Policy
     localComputeTitle: 100% Local Computation
-    localComputeDesc: All Live Client Data and frame analysis execute entirely in isolated local child processes. No game frames are uploaded.
+    localComputeDesc: All coach processing stays on this device. Minimap vision runs in an isolated child process, and raw game frames are never uploaded. Phase 1 requests no microphone permission and does not listen to team voice or system audio.
     noAntiCheatTitle: Anti-Cheat Compliance
-    noAntiCheatDesc: Operates only on official Live Client Data (port 2999) and minimap visuals without memory injection or process manipulation.
+    noAntiCheatDesc: Uses only Riot Live Client Data (port 2999) and screen capture, without reading game memory, injecting code, or controlling the game process. Public release remains subject to Riot review and remote capability controls.
+    dataScopeTitle: How each local data category is used
+    screenDataTitle: Game-window frames
+    screenDataDesc: Read only during real-time capture or a preview you request. Full frames are not persisted or uploaded by default, and previews are cleared from the page automatically.
+    roiDataTitle: Minimap ROI
+    roiDataDesc: Only minimap-region pixels are passed to the isolated worker. Manual outline coordinates stay on this device and are removed by reset or local-data deletion.
+    structuredDataTitle: Structured match data
+    structuredDataDesc: Riot local Live Data, cues, timers, confirmed communication, and feedback are used only for coach output, reviews, and local Phase 1 acceptance evidence.
+    diagnosticsDataTitle: Diagnostics
+    diagnosticsDataDesc: Environment, capability, performance, and error codes support local troubleshooting. They are written to a report only when you export it, with raw frames, full paths, and summoner names excluded by default.
+    dataImprovementTitle: Data-improvement sharing is not available
+    dataImprovementDesc: This build has no upload channel for anonymous metrics, diagnostics logs, or minimap samples, so every sharing category remains off. Local export is user-initiated and is never sent automatically.
+    consentTitle: Real-time Processing Consent
+    consentGranted: Confirmed
+    consentWithdrawn: Not Confirmed
+    consentGrantedDesc: This consent covers only the on-device real-time processing described here, not data-improvement uploads. You can review the guide or withdraw consent to stop the current and future live sessions at any time.
+    consentWithdrawnDesc: Live Coach remains disabled. The built-in demo stays available, but importing a local replay requires confirming the current privacy notice again. Withdrawing consent does not automatically delete existing local data.
+    reviewGuide: Review First-use Guide
+    withdrawConsent: Withdraw & Review Again
+    withdrawConsentConfirm: Live Coach will be disabled and the current session ended before consent is withdrawn. Existing local data will not be deleted. Continue?
+    withdrawConsentDone: Real-time processing consent withdrawn and Live Coach disabled.
+    withdrawConsentFailed: Unable to fully withdraw real-time processing consent.
+    localDataTitle: Local Coach Data
+    localDataDesc: Cue feedback is retained for up to 180 days. Exports contain the current structured session, recent cues, timers, confirmed communication, feedback, manual calibration, Phase 1 acceptance evidence, and privacy-filtered replay tasks and results—never raw frames, source video, full source paths, or microphone audio. Deletion does not reset coach preferences or consent and cannot remove source recordings, sidecars, or exports saved elsewhere.
+    export: Export Local Coach Data
+    delete: Delete Local Coach Data
+    deleteConfirm: This ends the current coach session and deletes local feedback, current and recent cues, timers, communication history, Phase 1 acceptance evidence, offline review history and internal results/temporary content, and manual calibration. It does not delete source recordings, sidecars, saved exports, coach preferences, or consent. Continue?
+    exported: Local coach data exported.
+    exportFailed: Unable to export local coach data.
+    deleted: Local coach data deleted.
+    deleteFailed: Unable to fully delete local coach data.
   diagnostics:
     title: System Diagnostics & Monitoring
     matrixTitle: System Compatibility Matrix
+    environment:
+      description: Every item uses current renderer state plus explicit local probes. Unknown or partially verified items never count as passed.
+      runAll: Run Full Check
+      retryUnready: Retry Unready Items
+      checkedAt: Last checked at {{time}}
+      fixLabel: 'Suggested action:'
+      openHelp: Troubleshoot
+      probeFailureTitle: Some local probes failed. Their dependent items remain unknown instead of being treated as passed.
+      storeOnlyNotice: Map, queue, region, and patch have no direct renderer probe; retry only reevaluates their latest session and capability state.
+      probeGroups:
+        capture: Capture backend and permission
+        preview: One-time game-window and calibration preview
+        voices: Local speech voices
+        audio: Audio output devices
+      probeErrors:
+        capture: The capture backend and permission probe failed.
+        preview: No supported game window was available for a one-time preview.
+        previewConsentRequired: The game window was not read because the current privacy notice has not been confirmed. Other non-frame probes still ran.
+        voices: The local speech runtime did not return a voice list.
+        audio: The local audio runtime did not return output devices.
+      status:
+        available: Available
+        partial: Partially verified
+        unavailable: Unavailable
+        unknown: Unknown
+      summary:
+        available: All required environment items are currently verified.
+        partial: The environment check is incomplete because at least one item is only partially verified.
+        unavailable: The environment check did not pass because at least one required item is unavailable.
+        unknown: The environment check is not a pass because at least one required item cannot yet be confirmed.
+      items:
+        platform: Operating system
+        capture: Real-time backend & permission
+        resolution: Display resolution
+        dpi: Display scaling
+        hdr: HDR / SDR
+        windowMode: Game window mode
+        roi: Minimap ROI
+        map: Map
+        queue: Queue
+        region: Region & remote policy
+        patch: Game patch
+        liveData: Live Client Data
+        voice: Local speech voice
+        audioOutput: Audio output device
+        nativeShortcuts: Native global shortcuts
+      values:
+        platformWindows: Windows
+        platformUnknown: Platform not reported
+        platformOther: '{{platform}}'
+        captureBackend: '{{backend}} (active)'
+        probeFailed: Probe failed
+        notChecked: Not checked
+        permissionDenied: Permission denied
+        captureBackends: '{{backends}}'
+        previewOnly: One-time preview only
+        unavailable: Unavailable
+        resolution: '{{width}} × {{height}}'
+        waitingForGame: Waiting for a running match
+        dpi: '{{percent}}%'
+        sdr: SDR
+        hdr: HDR
+        hdrNotConfirmed: Current HDR/SDR state is not detectable
+        windowModeUnknown: Cannot be detected
+        windowed: Windowed
+        borderless: Borderless
+        exclusiveFullscreen: Exclusive fullscreen
+        roiConfidence: '{{confidence}}% confidence'
+        roiNotLocated: Not located
+        roiHealthy: Healthy in the current session
+        roiDegraded: Degraded in the current session
+        roiUnsupported: Unsupported in the current session
+        previewFailed: Preview unavailable
+        waitingForCalibration: Waiting for calibration
+        mapId: 'Map ID {{id}}'
+        queueId: 'Queue ID {{id}}'
+        regionRejected: Rejected by the region gate
+        regionNotExposed: Region identity is not exposed here
+        patchVersion: '{{patch}}'
+        patchUnknown: Waiting for patch detection
+        liveDataUnavailable: Unavailable or degraded
+        liveDataHealthy: Healthy
+        noVoices: No local voices
+        selectedVoiceMissing: Selected voice is missing
+        selectedVoice: '{{name}}'
+        voiceCount_one: '{{count}} local voice'
+        voiceCount_other: '{{count}} local voices'
+        noAudioOutputs: No output devices
+        selectedAudioOutputMissing: Selected device is missing
+        selectedAudioOutput: '{{name}}'
+        shortcutsConfigured_one: '{{count}} shortcut configured'
+        shortcutsConfigured_other: '{{count}} shortcuts configured'
+        elevationRequired: Administrator permission required
+        initializationFailed: Native runtime initialization failed
+      reasons:
+        platformSupported: Phase 1 real-time processing targets Windows.
+        platformUnknown: The app has not reported a supported operating system.
+        platformUnsupported: Phase 1 real-time capture is not supported on this platform.
+        captureRunning: A native real-time backend is active.
+        captureProbeFailed: The backend or permission probe did not return a trustworthy result.
+        runCheck: Run the full check before relying on this item.
+        capturePermissionDenied: The local probe reports that capture permission is not granted.
+        capturePermissionUnknown: Native backends were detected, but the current API cannot verify game-window permission before real capture starts. This item does not pass automatically.
+        nativeCaptureAvailable: At least one native WGC/DDA real-time backend and capture permission are available.
+        realtimeBackendMissing: A one-time desktop preview is available, but no native real-time backend was found.
+        captureUnsupported: No supported game-window capture path is available.
+        resolutionUnknown: Resolution requires a running game-window preview or active capture state.
+        resolutionSupported: This resolution is in the frozen Phase 1 16:9 support matrix.
+        resolutionUnsupported: Phase 1 is validated only for 1920×1080 and 2560×1440.
+        dpiUnknown: Display scaling requires a current environment fingerprint.
+        dpiSupported: Display scaling is inside the Phase 1 100%–150% range.
+        dpiUnsupported: Display scaling is outside the Phase 1 100%–150% range.
+        hdrUnknown: HDR/SDR state has not been confirmed for the current game environment.
+        hdrNotDetectable: The current fingerprint API does not reliably detect whether Windows HDR is enabled, so an SDR-looking value cannot pass automatically.
+        sdrSupported: The current environment fingerprint reports SDR.
+        hdrNotReleaseValidated: The backend reports HDR capability, but HDR is not in the Phase 1 release-validated matrix.
+        hdrBackendUnsupported: The current environment reports HDR without a verified HDR capture backend.
+        windowModeNotDetectable: Native target inspection cannot reliably distinguish borderless from exclusive fullscreen, so this item cannot pass automatically.
+        windowModeSupported: Windowed and borderless modes are the Phase 1 supported modes.
+        exclusiveFullscreenUnsupported: Exclusive fullscreen is not in the Phase 1 release-validated matrix.
+        roiLocated: The one-time preview located the minimap with sufficient confidence.
+        roiLowConfidence: The minimap candidate exists, but confidence is below the automatic-pass threshold.
+        roiNotLocated: The one-time preview could not reliably locate the minimap.
+        roiHealthy: The active capture pipeline currently reports a healthy minimap region.
+        roiDegraded: The active capture pipeline reports degraded minimap evidence.
+        roiUnsupported: The active capture pipeline reports an unsupported minimap region.
+        previewUnavailable: The game-window preview failed; this does not prove that the ROI is healthy.
+        roiUnknown: No current calibration preview or healthy session evidence is available.
+        mapUnsupported: The current map is rejected by the Phase 1 capability gate.
+        mapUnknown: Map identity is available only after the client reports a current match.
+        mapSupported: Summoner's Rift passed the current map gate.
+        queueUnsupported: The current queue is rejected by the capability policy.
+        queueUnknown: Queue identity is available only after the client reports a current match.
+        queueGatePassed: The current session queue passed the capability gate.
+        regionUnsupported: The current region is rejected by the capability policy.
+        regionNotExposed: The renderer has no region identity or remote-policy detail to independently verify; absence of a rejection is not a pass.
+        patchUnsupported: The detected patch is rejected by the current capability policy.
+        patchUnknown: Patch identity is available only after the client reports a current match.
+        patchGatePassed: The detected patch passed the current capability gate.
+        liveDataUnavailable: Live Client Data is degraded or rejected by the current capability state.
+        liveDataHealthy: The current session has a successful Live Client Data heartbeat.
+        liveDataUnknown: Live Client Data cannot be confirmed until a supported match is running.
+        voiceProbeFailed: The local speech runtime did not return a voice list.
+        voiceUnavailable: No local speech voice is available.
+        selectedVoiceMissing: The configured speech voice is no longer present.
+        voiceAvailable: A selectable local speech voice is available.
+        audioProbeFailed: The local audio runtime did not return output devices.
+        audioOutputUnavailable: No audio output device is available.
+        selectedAudioOutputMissing: The configured output device is disconnected or no longer present.
+        audioOutputAvailable: A local output device is available.
+        nativeShortcutsAvailable: The Windows native input runtime is available for global shortcuts.
+        shortcutElevationRequired: Native global shortcuts are unavailable because the app is not elevated.
+        shortcutPlatformUnsupported: Native global shortcuts are unsupported on this platform.
+        shortcutInitializationFailed: The Windows native input runtime did not initialize successfully.
+      fixes:
+        restartApp: Restart League Akari; if the state remains unknown, use offline review and export a diagnostics report.
+        useWindows: Use the supported Windows build for real-time coaching, or continue with offline review.
+        rerunCheck: Rerun the failed item. If it still fails, keep real-time coaching disabled and export a diagnostics report.
+        grantCapturePermission: Grant local screen-capture permission, restart the app, and rerun the check.
+        verifyCaptureInGame: Confirm the current privacy notice and enter a supported match. Permission is confirmed only while WGC or DDA is actually running.
+        installNativeCapture: Repair or reinstall the Windows native runtime; the desktop preview is diagnostic-only.
+        useSupportedCaptureEnvironment: Use a supported Windows game-window environment or switch to offline review.
+        enterGameAndRerun: Enter a supported match, keep the game window visible, then rerun the failed items.
+        useSupportedResolution: Switch the game/display to 1920×1080 or 2560×1440 before calibration.
+        useSupportedDpi: Use Windows display scaling from 100% to 150%, then recalibrate.
+        preferSdr: Use SDR for Phase 1 release validation; HDR remains partially verified.
+        confirmSdrManually: Confirm Windows HDR is off before real-time coaching; this build cannot verify that setting automatically.
+        disableHdr: Disable HDR before starting real-time coaching.
+        useWindowedOrBorderless: Select windowed or borderless mode in League, then rerun capture and calibration.
+        manualCalibration: Open Calibration, inspect the preview, and save a manual ROI only when it covers the full minimap.
+        rerunCalibration: Keep the minimap visible and rerun calibration; pause map guidance until it is healthy.
+        enterGameAndCalibrate: Enter a supported match and complete one-time minimap calibration.
+        useSummonersRift: Use a supported Summoner's Rift queue, or analyze the match offline.
+        enterSupportedGame: Enter a supported match and let the client report the map and queue.
+        useSupportedQueue: Change to a queue allowed by the current capability policy, or use offline review.
+        useSupportedRegionOrOffline: Use an enabled region or continue with offline review; do not bypass the region gate.
+        waitForRegionGate: Enter a match and inspect any explicit region reason; this renderer cannot independently confirm region policy.
+        updateAndWaitForPatch: Update League and League Akari, then wait for the current patch capability to be enabled.
+        enterGameForPatch: Enter a supported match so the client can report its patch.
+        restoreLiveData: Keep the League client and game running, wait for the local endpoint to recover, and rerun Diagnostics.
+        enterGameForLiveData: Enter a supported match and wait for the local Live Client Data endpoint to become healthy.
+        checkSpeechRuntime: Repair local speech support, then rerun the voice probe and TTS test.
+        installLocalVoice: Install a local system voice and select it in Voice Settings.
+        selectAvailableVoice: Select a voice that is currently listed in Voice Settings.
+        checkAudioDevices: Connect or enable an output device, then rerun the audio probe.
+        connectAudioOutput: Connect or enable a local audio output device.
+        selectAvailableAudioOutput: Select an output device that is currently connected.
+        configureShortcuts: Native support is available; configure the shortcuts you want before a live match.
+        restartElevated: Restart League Akari as administrator if you choose to use native global shortcuts.
     metricsTitle: Pipeline Metrics & Health
+    captureLatency: 'Capture latency:'
+    inferenceLatency: 'Inference latency:'
+    dropCount: 'Dropped frames:'
+    queueDepth: 'Worker queue depth:'
+    workerHeartbeat: 'Worker heartbeat:'
+    workerRestartCount: 'Worker restarts:'
+    detectorVersions: 'Detector versions:'
+    liveDataHeartbeat: '2999 aggregate heartbeat:'
+    liveDataDomainsTitle: 2999 Domain Health
+    liveDataDomains:
+      game-stats: Game stats
+      players: Players
+      events: Events
+      active-player: Active player
+    windowsPlatform: Windows (supported)
+    unsupportedPlatform: Non-Windows (real-time unsupported)
+    noneValue: None
+    availableValue: available
+    disconnectedValue: Disconnected
+    unknownValue: Unknown
+    heartbeatAge_one: '{{count}} second ago'
+    heartbeatAge_other: '{{count}} seconds ago'
+    hoursUnit: h
     platform: 'Platform:'
+    buildChannel: 'Build channel:'
     backend: 'Capture Backend:'
     features: 'Enabled Features:'
     unavailable: 'Unavailable Reasons:'
+    unavailableReasons:
+      unsupported-platform: Platform is not supported
+      unsupported-map: Map is not supported
+      unsupported-queue: Queue is not supported
+      unsupported-region: Region is not supported
+      unsupported-patch: Game patch is unknown or unsupported
+      capability-disabled: Capability switch is disabled
+      consent-required: User consent is required
+      capture-target-not-found: Game capture target was not found
+      capture-permission-denied: Screen capture permission was denied
+      capture-black-frame: Captured game frame is black
+      capture-stalled: Game capture stopped updating
+      calibration-required: Minimap calibration is required
+      roi-occluded: Minimap ROI is uncalibrated or currently occluded
+      live-data-unavailable: Live game data is not connected
+      speech-unavailable: Local speech is unavailable
+      internal-error: Internal pipeline error
     sampling: 'Visual Sampling:'
     latency: 'Frame Latency:'
     roi: 'ROI Health:'
     session: 'Session State:'
     speechState: 'Speech State:'
     heartbeat: 'Source Heartbeat:'
+    lastErrorTitle: Latest Pipeline Error
+    openErrorHelp: Open troubleshooting for this error
+    secondsAgo: '{{seconds}}s ago'
+    selfTestTitle: Local Capability Self-test
+    selfTestDesc: The full environment check runs non-frame probes first. It reads one game-window thumbnail for resolution, display, and ROI checks only after the current privacy notice is confirmed; the image is not retained. The TTS test immediately plays one local phrase.
+    systemTest: Check Environment
+    speechTest: Test TTS
+    captureTest: Test Game Capture
+    exportReport: Generate Issue Report
+    exportReportConfirm: The report includes environment, capability state, performance metrics, and error codes. It excludes raw frames, recordings, full paths, summoner names, custom communication text, and tokens. Export it now?
+    exportReportDone: Diagnostics report exported.
+    exportReportFailed: Unable to export the diagnostics report.
+    systemTestResult: 'Capture backend: {{capture}}; local voices: {{voices}}; global shortcuts: {{shortcuts}}.'
+    diagnosticOnly: calibration preview only; real-time capture unavailable
+    unavailableValue: unavailable
+    speechTestText: Live AI Coach local speech self-test passed.
+    speechTestPassed: Local TTS playback succeeded.
+    speechTestUnavailable: Local TTS could not play; check the Chinese voice and output device.
+    captureTestPassed: 'Game capture succeeded at {{width}}×{{height}} with {{confidence}}% minimap calibration confidence.'
+    captureTestPassedUnknownSize: 'The game-window preview succeeded, but the target resolution could not be measured reliably; minimap calibration confidence is {{confidence}}%.'
+    captureTestFailed: Game capture failed. Enter a match in windowed or borderless mode and check the capture backend.
+    captureTestConsentRequired: The game window was not read because the current privacy notice has not been confirmed.
+    acceptanceTitle: Phase 1 Acceptance Progress
+    acceptanceDesc: Automatically accumulates privacy-safe real-session, shadow, offline-replay, cue-audit, and process-performance evidence without raw frames, recordings, summoner names, or full paths.
+    acceptanceRefresh: Refresh
+    acceptanceExport: Export Acceptance Report
+    acceptanceClear: Clear Records
+    acceptanceClearConfirm: This removes Phase 1 statistics only, not source replay files. End any active real-time session first. Continue?
+    acceptanceLoadFailed: Unable to load Phase 1 acceptance evidence.
+    acceptanceExportDone: Phase 1 acceptance report exported.
+    acceptanceExportFailed: Unable to export the Phase 1 acceptance report.
+    acceptanceClearDone: Phase 1 acceptance evidence cleared.
+    acceptanceClearFailed: Unable to clear Phase 1 acceptance evidence.
+    shadowMatches: Valid Real Shadow Matches
+    offlineReplays: Unique Offline Replays
+    shadowHours: Shadow Soak Hours
+    cueLabels: Cues With Feedback
+    acceptanceStatus:
+      passed: Passed
+      failed: Failed
+      pending: Pending
+    acceptanceCriteria:
+      shadow-match-count: Real Shadow Match Count
+      offline-replay-count: Offline Replay Count
+      soak-hours: Stability Run Time
+      roi-startup-success: ROI Startup Success
+      cue-traceability: Cue Evidence Traceability
+      cue-error-rate: High-priority Cue Error Rate
+      visual-accuracy: Minimap Visual Accuracy
+      false-healthy: Catastrophic False Healthy
+      paired-performance: Paired Performance Benchmark
+      game-fps-impact: Game FPS Impact
+    acceptanceTargets:
+      shadow-match-count: At least 50 matches
+      offline-replay-count: At least 100 unique replays
+      soak-hours: At least 100 hours
+      roi-startup-success: At least 50 independent episodes with both the point estimate and match-clustered 95% lower bound at or above 99%
+      cue-traceability: 100%
+      cue-error-rate: At least 95% label coverage and no more than 0.5 per 30 minutes
+      visual-accuracy: Precision 95% lower bound at least 98%; Recall lower bound at least 85%
+      false-healthy: Zero confirmed events
+      paired-performance: CPU, GPU, memory, and VRAM incremental limits
+      game-fps-impact: Less than 5% reduction in 1% low FPS
+    acceptanceReasons:
+      requires-more-real-shadow-matches: More real shadow matches are required
+      requires-more-unique-offline-replays: More unique real replays are required
+      requires-more-real-shadow-hours: More real shadow run time is required
+      requires-more-eligible-roi-sessions: More eligible WGC/DDA sessions are required
+      requires-more-roi-startup-episodes: More independent session-start or recalibration episodes are required
+      roi-startup-rate-below-threshold: ROI startup success is below the threshold
+      requires-cluster-confidence-analysis: The point estimate meets the threshold, but a match-clustered 95% lower bound and independent review are still required
+      requires-cue-samples: No cues are available for evaluation yet
+      cue-evidence-traceability-incomplete: Some cues lack a rule version, evidence, or expiry
+      requires-complete-cue-labels: Most cues still need correctness feedback
+      cue-error-rate-above-threshold: The cue error rate exceeds the stop line
+      requires-independent-ground-truth-annotations: Independent two-person real-event annotations are required
+      requires-reviewed-roi-failure-labels: Every ROI anomaly needs human review
+      requires-paired-disabled-enabled-benchmark: A paired coach-disabled/coach-enabled benchmark is required
+      requires-game-frame-time-capture: Game frame-time or equivalent FPS benchmark data is required
+    testFailed: Local capability self-test failed.

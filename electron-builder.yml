@@ -20,6 +20,12 @@ files:
   - '!rabi-*'
   - '!feedback-platform{,/**}'
   - '!native{,/**}'
+  - '!resources/live-coach/ffmpeg/runtime{,/**}'
+  # Keep the manifest so accepted models and their hash-locked validation reports are
+  # visible to the packaged resolver. Bootstrap identity artifacts only prove the
+  # ONNX delivery path and must never ship as release assets.
+  - '!resources/live-coach/models/champion-icons-*.json'
+  - '!resources/live-coach/models/*bootstrap*.onnx'
   - '!**/.venv/**'
   - '!node_modules/electron{,/**}'
   - '!node_modules/**/*.map'
@@ -41,7 +47,13 @@ afterSign: ./scripts/macos/ensure-codesign.cjs
 
 asarUnpack:
   - resources/**
+  - node_modules/onnxruntime-node/bin/**
 win:
+  extraResources:
+    - from: resources/live-coach/ffmpeg/runtime
+      to: live-coach/ffmpeg/runtime
+      filter:
+        - '**/*'
   target:
     - 7z
   executableName: LeagueAkari
@@ -57,7 +69,14 @@ dmg:
   artifactName: ${name}-${version}.${ext}
 asar: true
 electronFuses:
+  runAsNode: false
+  enableCookieEncryption: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
   enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  loadBrowserProcessSpecificV8Snapshot: false
+  grantFileProtocolExtraPrivileges: true
 
 npmRebuild: false
 publish:

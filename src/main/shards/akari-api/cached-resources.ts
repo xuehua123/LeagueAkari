@@ -5,6 +5,7 @@ import {
   AkariLeagueServersConfigSchema,
   AkariSupportedQueuesConfigSchema
 } from '@shared/shards/akari-api'
+import { liveCoachCapabilityEnvelopeSchema } from '@shared/types/live-coach'
 
 import {
   AKARI_API_CACHED_RESOURCE_UPDATE_INTERVAL,
@@ -29,6 +30,16 @@ export interface CachedResource<T extends object> {
   getUpdating: (state: AkariApiState) => boolean
   setUpdating: (state: AkariApiState, isUpdating: boolean) => void
 }
+
+export const LIVE_COACH_CAPABILITY_CACHED_RESOURCE = Object.freeze({
+  id: 'liveCoachCapabilities',
+  name: 'live coach capabilities',
+  resource: 'live-coach/capabilities' as const,
+  cachePath: 'config/v1/live-coach/capabilities.json',
+  metadataCachePath: 'config/v1/live-coach/capabilities-meta.json',
+  intervalMs: AKARI_API_CACHED_RESOURCE_UPDATE_INTERVAL,
+  schema: liveCoachCapabilityEnvelopeSchema
+})
 
 export const AKARI_API_CACHED_RESOURCES: CachedResource<any>[] = [
   {

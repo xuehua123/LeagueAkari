@@ -1,14 +1,114 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  ChampionIconClassifier,
   TrackedEntity,
+  classifyChampionPatch,
   computeFrameHash,
+  deriveMinimapEvents,
   extractConnectedComponents,
   getMapRegion,
   processMinimapFrameWithState
 } from './minimap-cv'
 
 describe('Minimap Observer CV & Tracking Algorithms (minimap-cv)', () => {
+  it('fails closed when frame dimensions do not match the pixel buffer', async () => {
+    const trackedEntities = new Map<string, TrackedEntity>()
+
+    expect(
+      await processMinimapFrameWithState(
+        new Uint8Array(99),
+        5,
+        5,
+        Date.now(),
+        'bgra',
+        trackedEntities,
+        () => 'unused'
+      )
+    ).toEqual({ health: 'unknown', entities: [] })
+    expect(trackedEntities.size).toBe(0)
+  })
+
+  it('derives visible-count, region-change, and grouping events from adjacent tracked snapshots', () => {
+    const createEnemy = (trackId: string, regionId: string) => ({
+      trackId,
+      kind: 'enemy' as const,
+      team: 'enemy' as const,
+      championId: null,
+      point: { x: 0.5, y: 0.5 },
+      regionId,
+      confidence: 0.9,
+      lifecycle: 'confirmed' as const,
+      firstObservedAt: 1000,
+      lastObservedAt: 2000,
+      expiresAt: 7000
+    })
+    const previous = [createEnemy('enemy-1', 'mid_lane')]
+    const current = [
+      createEnemy('enemy-1', 'bot_river'),
+      createEnemy('enemy-2', 'bot_river'),
+      createEnemy('enemy-3', 'bot_river')
+    ]
+
+    const events = deriveMinimapEvents(previous, current, 2000)
+
+    expect(events.map((event) => event.kind)).toEqual(
+      expect.arrayContaining([
+        'enemy-visible-count-increased',
+        'enemy-region-changed',
+        'enemy-grouping-started'
+      ])
+    )
+    expect(events.find((event) => event.kind === 'enemy-grouping-started')?.payload).toEqual({
+      regionId: 'bot_river',
+      count: 3
+    })
+  })
+
+  it('derives visible approach and pincer predictions only from consecutive direct observations', () => {
+    const entity = (
+      trackId: string,
+      kind: 'self' | 'enemy',
+      x: number,
+      y: number,
+      regionId: string
+    ) => ({
+      trackId,
+      kind,
+      team: kind === 'self' ? ('ally' as const) : ('enemy' as const),
+      championId: kind === 'self' ? 103 : null,
+      point: { x, y },
+      regionId,
+      confidence: 0.95,
+      lifecycle: 'confirmed' as const,
+      firstObservedAt: 1000,
+      lastObservedAt: 2000,
+      expiresAt: 7000
+    })
+    const previous = [
+      entity('self', 'self', 0.5, 0.5, 'mid_lane'),
+      entity('enemy-left', 'enemy', 0.2, 0.5, 'top_jungle'),
+      entity('enemy-right', 'enemy', 0.8, 0.5, 'bot_jungle')
+    ]
+    const current = [
+      entity('self', 'self', 0.5, 0.5, 'mid_lane'),
+      entity('enemy-left', 'enemy', 0.23, 0.5, 'top_jungle'),
+      entity('enemy-right', 'enemy', 0.77, 0.5, 'bot_jungle')
+    ]
+
+    const kinds = deriveMinimapEvents(previous, current, 2200).map((event) => event.kind)
+    expect(kinds).toContain('enemy-approaching-player-region')
+    expect(kinds).toContain('visible-pincer-approach-predicted')
+
+    const noSelfKinds = deriveMinimapEvents(
+      previous.filter((item) => item.kind !== 'self'),
+      current.filter((item) => item.kind !== 'self'),
+      2300
+    ).map((event) => event.kind)
+    expect(noSelfKinds).not.toContain('enemy-approaching-player-region')
+    expect(noSelfKinds).not.toContain('visible-pincer-approach-predicted')
+  })
+
   it('correctly clusters a contiguous block of red pixels into a single CCL detection with accurate centroid', () => {
     const width = 100
     const height = 100
@@ -36,7 +136,7 @@ describe('Minimap Observer CV & Tracking Algorithms (minimap-cv)', () => {
     expect(detections[0].y).toBeCloseTo(0.32, 2)
   })
 
-  it('distinguishes two adjacent enemy heroes and maintains distinct tracks in production processMinimapFrameWithState', () => {
+  it('distinguishes two adjacent enemy heroes and maintains distinct tracks in production processMinimapFrameWithState', async () => {
     const width = 100
     const height = 100
     const buffer = new Uint8Array(width * height * 4)
@@ -82,7 +182,7 @@ describe('Minimap Observer CV & Tracking Algorithms (minimap-cv)', () => {
       return `track_${team}_${entityCounter}`
     }
 
-    const result = processMinimapFrameWithState(
+    const result = await processMinimapFrameWithState(
       buffer,
       width,
       height,
@@ -95,6 +195,133 @@ describe('Minimap Observer CV & Tracking Algorithms (minimap-cv)', () => {
     expect(result.health).toBe('healthy')
     expect(result.entities.length).toBe(2)
     expect(result.entities.map((e) => e.trackId)).toEqual(['track_enemy_1', 'track_enemy_2'])
+  })
+
+  it('passes icon patches to the configured classifier and confirms identity after three votes', async () => {
+    const width = 100
+    const height = 100
+    const buffer = new Uint8Array(width * height * 4)
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 4
+        const value = ((x * 7 + y * 13) % 60) + 30
+        buffer[idx] = value
+        buffer[idx + 1] = value
+        buffer[idx + 2] = value
+        buffer[idx + 3] = 255
+      }
+    }
+    for (let y = 20; y < 25; y++) {
+      for (let x = 20; x < 25; x++) {
+        const idx = (y * width + x) * 4
+        buffer[idx] = 0
+        buffer[idx + 1] = 0
+        buffer[idx + 2] = 255
+        buffer[idx + 3] = 255
+      }
+    }
+
+    const classifier: ChampionIconClassifier = {
+      isReady: () => true,
+      getManifest: () => ({
+        modelName: 'test-champion-icons',
+        version: '1.0.0',
+        sha256: 'test',
+        inputShape: [1, 4, 16, 16],
+        confidenceThreshold: 0.75,
+        classes: ['103']
+      }),
+      classifyIconPatch: (_patch, patchWidth, patchHeight, candidates) => {
+        expect(patchWidth).toBe(16)
+        expect(patchHeight).toBe(16)
+        expect(candidates).toEqual([103])
+        return { championId: 103, confidence: 0.92, top2Margin: 0.3 }
+      }
+    }
+    const trackedEntities = new Map<string, TrackedEntity>()
+    const getNewEntityId = (team: string) => `track_${team}_1`
+
+    let result = await processMinimapFrameWithState(
+      buffer,
+      width,
+      height,
+      1_000,
+      'bgra',
+      trackedEntities,
+      getNewEntityId,
+      undefined,
+      [103],
+      classifier
+    )
+    result = await processMinimapFrameWithState(
+      buffer,
+      width,
+      height,
+      1_100,
+      'bgra',
+      trackedEntities,
+      getNewEntityId,
+      undefined,
+      [103],
+      classifier
+    )
+    result = await processMinimapFrameWithState(
+      buffer,
+      width,
+      height,
+      1_200,
+      'bgra',
+      trackedEntities,
+      getNewEntityId,
+      undefined,
+      [103],
+      classifier
+    )
+    result = await processMinimapFrameWithState(
+      buffer,
+      width,
+      height,
+      1_300,
+      'bgra',
+      trackedEntities,
+      getNewEntityId,
+      undefined,
+      [103],
+      classifier
+    )
+
+    expect(result.entities).toHaveLength(1)
+    expect(result.entities[0].championId).toBe(103)
+  })
+
+  it('rejects classifier answers outside the current match candidate roster', async () => {
+    const width = 100
+    const height = 100
+    const buffer = new Uint8Array(width * height * 4)
+    for (let i = 0; i < buffer.length; i += 4) {
+      const value = ((i / 4) % 53) + 30
+      buffer[i] = value
+      buffer[i + 1] = value
+      buffer[i + 2] = value
+      buffer[i + 3] = 255
+    }
+
+    const classifier: ChampionIconClassifier = {
+      isReady: () => true,
+      getManifest: () => ({
+        modelName: 'bad-adapter',
+        version: '1.0.0',
+        sha256: 'test',
+        inputShape: [1, 4, 16, 16],
+        confidenceThreshold: 0.75,
+        classes: ['103', '238']
+      }),
+      classifyIconPatch: () => ({ championId: 238, confidence: 0.99, top2Margin: 0.9 })
+    }
+
+    expect(
+      await classifyChampionPatch(buffer, width, height, 0.5, 0.5, 'bgra', [103], classifier)
+    ).toBeNull()
   })
 
   it('accurately classifies summoner rift geometry: mid lane along x+y=1, river along x=y, top lane and bot lane', () => {
@@ -118,7 +345,7 @@ describe('Minimap Observer CV & Tracking Algorithms (minimap-cv)', () => {
     expect(getMapRegion(0.8, 0.55)).toBe('bot_jungle')
   })
 
-  it('correctly reports degraded health for pure black, pure white, pure grey, or flat blank occlusion frames', () => {
+  it('correctly reports degraded health for pure black, pure white, pure grey, or flat blank occlusion frames', async () => {
     const width = 100
     const height = 100
     const trackedEntities = new Map<string, TrackedEntity>()
@@ -127,14 +354,16 @@ describe('Minimap Observer CV & Tracking Algorithms (minimap-cv)', () => {
     // 1. 纯黑画面 (0, 0, 0)
     const blackBuffer = new Uint8Array(width * height * 4)
     expect(
-      processMinimapFrameWithState(
-        blackBuffer,
-        width,
-        height,
-        Date.now(),
-        'bgra',
-        trackedEntities,
-        getNewEntityId
+      (
+        await processMinimapFrameWithState(
+          blackBuffer,
+          width,
+          height,
+          Date.now(),
+          'bgra',
+          trackedEntities,
+          getNewEntityId
+        )
       ).health
     ).toBe('degraded')
 
@@ -142,14 +371,16 @@ describe('Minimap Observer CV & Tracking Algorithms (minimap-cv)', () => {
     const greyBuffer = new Uint8Array(width * height * 4)
     greyBuffer.fill(128)
     expect(
-      processMinimapFrameWithState(
-        greyBuffer,
-        width,
-        height,
-        Date.now(),
-        'bgra',
-        trackedEntities,
-        getNewEntityId
+      (
+        await processMinimapFrameWithState(
+          greyBuffer,
+          width,
+          height,
+          Date.now(),
+          'bgra',
+          trackedEntities,
+          getNewEntityId
+        )
       ).health
     ).toBe('degraded')
 
@@ -157,19 +388,21 @@ describe('Minimap Observer CV & Tracking Algorithms (minimap-cv)', () => {
     const whiteBuffer = new Uint8Array(width * height * 4)
     whiteBuffer.fill(255)
     expect(
-      processMinimapFrameWithState(
-        whiteBuffer,
-        width,
-        height,
-        Date.now(),
-        'bgra',
-        trackedEntities,
-        getNewEntityId
+      (
+        await processMinimapFrameWithState(
+          whiteBuffer,
+          width,
+          height,
+          Date.now(),
+          'bgra',
+          trackedEntities,
+          getNewEntityId
+        )
       ).health
     ).toBe('degraded')
   })
 
-  it('detects frozen texture frames when pixel contents remain identical for 15+ consecutive ticks', () => {
+  it('detects frozen texture frames when pixel contents remain identical for 15+ consecutive ticks', async () => {
     const width = 100
     const height = 100
     const buffer = new Uint8Array(width * height * 4)
@@ -193,7 +426,7 @@ describe('Minimap Observer CV & Tracking Algorithms (minimap-cv)', () => {
 
     // 前 14 帧为 healthy
     for (let i = 0; i < 14; i++) {
-      const res = processMinimapFrameWithState(
+      const res = await processMinimapFrameWithState(
         buffer,
         width,
         height,
@@ -207,7 +440,7 @@ describe('Minimap Observer CV & Tracking Algorithms (minimap-cv)', () => {
     }
 
     // 第 15 帧完全静止，判定为 degraded
-    const frozenRes = processMinimapFrameWithState(
+    const frozenRes = await processMinimapFrameWithState(
       buffer,
       width,
       height,
@@ -221,7 +454,7 @@ describe('Minimap Observer CV & Tracking Algorithms (minimap-cv)', () => {
     expect(frozenRes.entities).toEqual([])
   })
 
-  it('differentiates small 5x5 icon movements in a 250x250 frame and resets frozen counter without false degradation', () => {
+  it('differentiates small 5x5 icon movements in a 250x250 frame and resets frozen counter without false degradation', async () => {
     const width = 250
     const height = 250
     const frameA = new Uint8Array(width * height * 4)
@@ -262,7 +495,7 @@ describe('Minimap Observer CV & Tracking Algorithms (minimap-cv)', () => {
     }
 
     // 传入发生运动的 frameB，验证连续冻结帧计数器被成功重置为 1
-    const res = processMinimapFrameWithState(
+    const res = await processMinimapFrameWithState(
       frameB,
       width,
       height,

@@ -26,6 +26,50 @@ export interface RawAllGameDataResponse {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value)
+}
+
+function hasValidGameStats(data: RawAllGameDataResponse): boolean {
+  return (
+    isRecord(data.gameData) && isFiniteNumber(data.gameData.gameTime) && data.gameData.gameTime >= 0
+  )
+}
+
+function hasValidPlayers(data: RawAllGameDataResponse): boolean {
+  return (
+    Array.isArray(data.allPlayers) &&
+    data.allPlayers.length > 0 &&
+    data.allPlayers.every(
+      (player) =>
+        isRecord(player) &&
+        typeof player.championName === 'string' &&
+        typeof player.team === 'string' &&
+        Array.isArray(player.items)
+    )
+  )
+}
+
+function hasValidEvents(data: RawAllGameDataResponse): boolean {
+  return (
+    Array.isArray(data.events) ||
+    (isRecord(data.events) && Array.isArray((data.events as Record<string, unknown>).Events))
+  )
+}
+
+function hasValidActivePlayer(data: RawAllGameDataResponse): boolean {
+  return (
+    isRecord(data.activePlayer) &&
+    isFiniteNumber(data.activePlayer.currentGold) &&
+    data.activePlayer.currentGold >= 0 &&
+    isRecord(data.activePlayer.abilities)
+  )
+}
+
 export class LiveClientDataLoader {
   private readonly _http: AxiosInstance
   private _sequence = 0
@@ -59,6 +103,10 @@ export class LiveClientDataLoader {
     }
   }
 
+  public getSourceHealth(): LiveGameSourceHealth[] {
+    return Object.values(this._domainHealth).map((health) => ({ ...health }))
+  }
+
   private _markSuccess(domain: LiveGameDomain, now: number): void {
     this._domainHealth[domain] = {
       domain,
@@ -83,27 +131,41 @@ export class LiveClientDataLoader {
 
   public async fetchSnapshot(
     sessionId: string,
-    patch: string = ''
+    patch: string = '',
+    signal?: AbortSignal
   ): Promise<LiveGameSnapshot | null> {
     const observedAt = Date.now()
     try {
-      const resp = await this._http.get<RawAllGameDataResponse>('/liveclientdata/allgamedata')
+      const resp = await this._http.get<RawAllGameDataResponse>('/liveclientdata/allgamedata', {
+        signal
+      })
       const receivedAt = Date.now()
       const data = resp.data || {}
 
       const now = Date.now()
-      this._markSuccess('game-stats', now)
-      this._markSuccess('players', now)
-      this._markSuccess('events', now)
-      this._markSuccess('active-player', now)
+      const domainValidity: Record<LiveGameDomain, boolean> = {
+        'game-stats': hasValidGameStats(data),
+        players: hasValidPlayers(data),
+        events: hasValidEvents(data),
+        'active-player': hasValidActivePlayer(data)
+      }
+      for (const domain of Object.keys(domainValidity) as LiveGameDomain[]) {
+        if (domainValidity[domain]) {
+          this._markSuccess(domain, now)
+        } else {
+          this._markFailure(domain, 'SCHEMA_INVALID')
+        }
+      }
 
-      const activePlayer = normalizeActivePlayer(data.activePlayer)
-      const players = Array.isArray(data.allPlayers)
-        ? data.allPlayers.map((p) => normalizePlayer(p))
-        : []
-      const events = normalizeGameEvents(data.events)
-      const gameTimeSeconds =
-        typeof data.gameData?.gameTime === 'number' ? data.gameData.gameTime : null
+      const activePlayer = domainValidity['active-player']
+        ? normalizeActivePlayer(data.activePlayer)
+        : null
+      const players =
+        domainValidity.players && Array.isArray(data.allPlayers)
+          ? data.allPlayers.map((p) => normalizePlayer(p))
+          : []
+      const events = domainValidity.events ? normalizeGameEvents(data.events) : []
+      const gameTimeSeconds = domainValidity['game-stats'] ? data.gameData!.gameTime! : null
 
       this._sequence++
 
@@ -122,6 +184,9 @@ export class LiveClientDataLoader {
         }
       }
     } catch (err: any) {
+      if (axios.isCancel(err) || signal?.aborted || err?.name === 'CanceledError') {
+        return null
+      }
       const errCode = err?.code || err?.message || 'REQUEST_FAILED'
       this._markFailure('game-stats', errCode)
       this._markFailure('players', errCode)

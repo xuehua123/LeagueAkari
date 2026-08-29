@@ -93,6 +93,13 @@ type LiveCoachBuildChannel = 'internal' | 'public'
 - 构建渠道不能通过设置页、命令行参数或远程配置由普通用户切换；
 - 内部渠道只绕过“外部审核状态”，不绕过采集健康、补丁、准确率、性能、隐私授权和红线检查。
 
+构建命令固定如下：
+
+- `yarn dev` / `yarn dev:no-watch`：开发环境，编译为 `internal`；
+- `yarn build:win:internal`：项目负责人自用测试安装包，编译为 `internal`；
+- `yarn build:win`：公开安装包，默认编译为 `public` 并严格应用 Gate A/B；
+- 渠道值在 Electron 主进程构建时写入只读常量，安装完成后不存在设置项或运行参数可以切换。
+
 ## 3. 数据来源与权威边界
 
 ### 3.1 数据源职责

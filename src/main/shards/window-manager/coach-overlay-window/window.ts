@@ -1,3 +1,5 @@
+import { is } from '@electron-toolkit/utils'
+import { GameClientMain } from '@main/shards/game-client'
 import icon from '@resources/LA_ICON.ico?asset'
 import { comparer } from 'mobx'
 import { z } from 'zod'
@@ -17,6 +19,10 @@ export class AkariCoachOverlayWindow extends BaseAkariWindow<
   static readonly BASE_HEIGHT = 168
   static readonly MIN_WIDTH = 320
   static readonly MIN_HEIGHT = 80
+  static readonly INTERACTION_SHORTCUT_TARGET_ID =
+    'window-manager-main/coach-overlay-window/interaction'
+
+  private _interactionRequestGeneration = 0
 
   constructor(_context: WindowManagerMainContext) {
     const state = new CoachOverlayWindowState()
@@ -29,7 +35,7 @@ export class AkariCoachOverlayWindow extends BaseAkariWindow<
       minHeight: AkariCoachOverlayWindow.MIN_HEIGHT,
       htmlEntry: AkariCoachOverlayWindow.HTML_ENTRY,
       rememberPosition: true,
-      rememberSize: false,
+      rememberSize: true,
       repositionWindowIfInvisible: true,
       settingSchema: {
         pinned: {
@@ -45,14 +51,15 @@ export class AkariCoachOverlayWindow extends BaseAkariWindow<
         showShortcut: {
           default: settings.showShortcut,
           schema: z.string().nullable()
-        }
+        },
+        locked: { default: settings.locked, schema: z.boolean() }
       },
       browserWindowOptions: {
         title: AkariCoachOverlayWindow.TITLE,
         icon,
         frame: false,
         transparent: true,
-        resizable: false,
+        resizable: true,
         skipTaskbar: true,
         alwaysOnTop: true,
         focusable: false,
@@ -70,7 +77,32 @@ export class AkariCoachOverlayWindow extends BaseAkariWindow<
 
     this._window.setSkipTaskbar(true)
     this._window.setAlwaysOnTop(true, 'screen-saver', 1)
-    this._window.setIgnoreMouseEvents(true, { forward: true })
+    const canMoveOrResize = this.state.interactive && !this.settings.locked
+    this._window.setFocusable(this.state.interactive)
+    this._window.setMovable(canMoveOrResize)
+    this._window.setResizable(canMoveOrResize)
+    this._window.setIgnoreMouseEvents(!this.state.interactive, { forward: true })
+  }
+
+  public async setInteractionMode(interactive: boolean): Promise<void> {
+    const requestGeneration = ++this._interactionRequestGeneration
+    if (!interactive) {
+      this.state.setInteractive(false)
+      this._applyOverlayWindowBehavior()
+      return
+    }
+
+    const canInteract = is.dev || (await GameClientMain.isGameClientForeground())
+    if (requestGeneration !== this._interactionRequestGeneration || !canInteract) {
+      return
+    }
+
+    if (!this.state.show) {
+      this.show()
+    }
+    this.state.setInteractive(true)
+    this._applyOverlayWindowBehavior()
+    this._window?.focus()
   }
 
   public override async onInit(): Promise<void> {
@@ -97,7 +129,8 @@ export class AkariCoachOverlayWindow extends BaseAkariWindow<
       }
     )
 
-    // 2. 窗口 Ready 后设置穿透，默认仅在对局中展示
+    // 2. 窗口 Ready 后只设置行为并保持隐藏。是否展示由 LiveCoachMain 的真实
+    // 会话状态统一决定，不能仅因 Gameflow=InProgress 就向未启用教练的用户弹出。
     this._mobxUtils.reaction(
       () => this.state.ready,
       (ready) => {
@@ -108,30 +141,30 @@ export class AkariCoachOverlayWindow extends BaseAkariWindow<
             this._applyOverlayWindowBehavior()
           })
 
-          if (this._leagueClient.data.gameflow.phase === 'InProgress') {
-            this.show()
-          } else {
-            this.hide()
-          }
+          this.hide()
         }
       },
       { fireImmediately: true, equals: comparer.shallow }
     )
 
-    // 3. 对局内根据 Gameflow 严格联动显示与隐藏
     this._mobxUtils.reaction(
-      () => this._leagueClient.data.gameflow.phase,
-      (phase) => {
-        if (this._window && !this._window.isDestroyed()) {
-          if (phase === 'InProgress' && this.settings.enabled) {
-            this.show()
-            this._applyOverlayWindowBehavior()
-          } else {
-            this.hide()
-          }
-        }
-      },
-      { fireImmediately: true }
+      () => [this.state.interactive, this.settings.locked],
+      () => this._applyOverlayWindowBehavior(),
+      { fireImmediately: true, equals: comparer.shallow }
     )
+  }
+
+  public override hide(): void {
+    this._interactionRequestGeneration++
+    this.state.setInteractive(false)
+    super.hide()
+  }
+
+  protected override getSettingPropKeys() {
+    return ['enabled', 'showShortcut', 'locked'] as const
+  }
+
+  protected override getStatePropKeys() {
+    return ['interactive'] as const
   }
 }

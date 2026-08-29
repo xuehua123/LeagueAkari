@@ -1,4 +1,4 @@
-import { Shard } from '@shared/akari-shard'
+import { IAkariShardInitDispose, Shard } from '@shared/akari-shard'
 import { protocol } from 'electron'
 import { Readable } from 'node:stream'
 
@@ -9,29 +9,58 @@ import {
   type AkariProtocolDomainHandler
 } from './context'
 import { createLocalFileDomainHandler } from './local-file-domain'
+import {
+  type LocalFileGrantDescriptor,
+  type LocalFileGrantPurpose,
+  LocalFileGrantRegistry
+} from './local-file-grants'
 import { AkariProtocolRouter } from './protocol-router'
 
 /**
  * 实现 `akari://` 协议, 用户特殊资源的代理
- * akari://local/* 代理到本地文件系统
+ * akari://local/* 仅代理 main 进程签发的短期单文件 capability token
  * akari://league-client/* 代理到 LeagueClient 的 HTTP 服务
  * akari://riot-client/* 代理到 RiotClient 的 HTTP 服务
  */
 @Shard(AkariProtocolMain.id)
-export class AkariProtocolMain {
+export class AkariProtocolMain implements IAkariShardInitDispose {
   static id = AKARI_PROTOCOL_MAIN_NAMESPACE
 
   static AKARI_PROXY_PROTOCOL = AKARI_PROXY_PROTOCOL
 
   private readonly _router = new AkariProtocolRouter()
+  private readonly _localFileGrants = new LocalFileGrantRegistry()
 
   constructor(private readonly _ipc: AkariIpcMain) {}
 
-  onInit() {
-    this.registerDomain('local', createLocalFileDomainHandler())
+  async onInit(): Promise<void> {
+    this.registerDomain('local', createLocalFileDomainHandler(this._localFileGrants))
     this._ipc.onCall(AkariProtocolMain.id, 'cancelProxyRequest', (_, requestId: string) => {
       return this.cancelProxyRequest(requestId)
     })
+  }
+
+  async onDispose(): Promise<void> {
+    this._localFileGrants.clear()
+  }
+
+  issueLocalFileGrant(
+    filePath: string,
+    purpose: LocalFileGrantPurpose
+  ): Promise<LocalFileGrantDescriptor> {
+    return this._localFileGrants.issue(filePath, purpose)
+  }
+
+  resolveLocalFileGrant(token: string, allowedPurposes: readonly LocalFileGrantPurpose[]) {
+    return this._localFileGrants.resolve(token, allowedPurposes)
+  }
+
+  revokeLocalFileGrant(token: string): boolean {
+    return this._localFileGrants.revoke(token)
+  }
+
+  revokeLocalFileGrantsByPurposes(purposes: readonly LocalFileGrantPurpose[]): number {
+    return this._localFileGrants.revokeByPurposes(purposes)
   }
 
   static convertWebStreamToNodeStream(readableStream: ReadableStream): Readable {
@@ -107,3 +136,5 @@ export class AkariProtocolMain {
     ])
   }
 }
+
+export * from './local-file-grants'

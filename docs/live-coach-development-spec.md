@@ -7,15 +7,16 @@
 
 ## 0. 如何使用本文
 
-五份文档的职责固定如下：
+六份文档的职责固定如下：
 
-| 文档                                   | 回答的问题                                     |
-| -------------------------------------- | ---------------------------------------------- |
-| `live-coach-feature-checklist.md`      | 最终要实现哪些功能                             |
-| `live-coach-product-feature-list.md`   | 功能属于哪一期、哪个大项目和子项目             |
-| `live-coach-three-phase-plan.md`       | 产品原则、技术基线、指标、停止线和总架构       |
-| `live-coach-p0-technical-decisions.md` | 已冻结的技术选择                               |
-| 本文                                   | 具体创建什么模块、接口、状态、设置、任务和测试 |
+| 文档                                      | 回答的问题                                     |
+| ----------------------------------------- | ---------------------------------------------- |
+| `live-coach-feature-checklist.md`         | 最终要实现哪些功能                             |
+| `live-coach-product-feature-list.md`      | 功能属于哪一期、哪个大项目和子项目             |
+| `live-coach-three-phase-plan.md`          | 产品原则、技术基线、指标、停止线和总架构       |
+| `live-coach-p0-technical-decisions.md`    | 已冻结的技术选择                               |
+| 本文                                      | 具体创建什么模块、接口、状态、设置、任务和测试 |
+| `live-coach-phase1-acceptance-runbook.md` | 第一期代码完成后如何收集真实验收证据与放行     |
 
 冲突优先级：
 
@@ -554,6 +555,9 @@ ROI 使用相对窗口内容区的 0–1 坐标。环境指纹任一关键字段
 interface CoachReplaySidecarV1 {
   schemaVersion: 1
   artifactSha256: string
+  source: string
+  producerVersion: string
+  exportedAt: string
   patch: string | null
   mapId: number | null
   queueId: number | null
@@ -569,7 +573,7 @@ interface CoachReplaySidecarV1 {
 }
 ```
 
-sidecar 缺失不阻止纯小地图复盘；依赖 patch、阵容、游戏时间或事件的规则必须逐项关闭。`artifactSha256` 不匹配时拒绝 sidecar。
+sidecar 缺失不阻止纯小地图复盘；依赖 patch、阵容、游戏时间或事件的规则必须逐项关闭。`artifactSha256` 不匹配时拒绝 sidecar。`source`、`producerVersion`、`exportedAt` 必填，事件必须按 `videoTimeMs` 升序排列；不满足契约时整体拒绝，避免逐帧重放时事件身份漂移或重复触发。
 
 ### 3.11 能力快照
 
@@ -632,7 +636,7 @@ interface LiveCoachCapabilityPayload {
 | --------------------------------- | ---------------------------------------- | ----------------------------- | -------- |
 | `enabled`                         | boolean / false                          | 总开关                        | P1       |
 | `coachMode`                       | `minimal/balanced/training` / balanced   | 三种固定模式                  | P1       |
-| `outputMode`                      | `sound/subtitle/speech`[] / 全部         | 至少允许全关                  | P1       |
+| `outputMode`                      | `sound/subtitle/speech`[] / 仅字幕       | 首次使用低打扰，至少允许全关  | P1       |
 | `captureBackend`                  | `auto/wgc/dda` / auto                    | 普通用户默认 auto             | P1       |
 | `minimapSide`                     | `auto/left/right` / auto                 | 手动选择覆盖自动结果          | P1       |
 | `manualCalibration`               | object/null                              | 分辨率、DPI、side 绑定        | P1       |

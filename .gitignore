@@ -11,6 +11,10 @@ addons/build
 .yarn/install-state*.gz
 native/*/build/
 native/*/*.tgz
+resources/live-coach/ffmpeg/runtime/
+**/.venv*/
+**/__pycache__/
+*.py[cod]
 
 # Keep native package bootstrap artifacts checked in.
 !native/*/addons/

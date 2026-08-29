@@ -10,6 +10,7 @@ import { SetterSettingService } from '../setting-factory/setter-setting-service'
 import { AkariApiBootstrapController } from './bootstrap-controller'
 import { AkariApiConfigLoader } from './config-loader'
 import type { AkariApiMainContext } from './context'
+import { LiveCoachCapabilityLoader } from './live-coach-capability-loader'
 import { AkariApiNoticeLoader } from './notice-loader'
 import { AkariApiProtocolController } from './protocol-controller'
 import { AkariApiReleaseLoader } from './release-loader'
@@ -27,6 +28,7 @@ export class AkariApiMain implements IAkariShardInitDispose {
   private readonly _bootstrapController: AkariApiBootstrapController
   private readonly _protocolController: AkariApiProtocolController
   private readonly _configLoader: AkariApiConfigLoader
+  private readonly _liveCoachCapabilityLoader: LiveCoachCapabilityLoader
   private readonly _noticeLoader: AkariApiNoticeLoader
   private readonly _releaseLoader: AkariApiReleaseLoader
 
@@ -63,6 +65,7 @@ export class AkariApiMain implements IAkariShardInitDispose {
       api: this.api
     }
     this._configLoader = new AkariApiConfigLoader(this._context)
+    this._liveCoachCapabilityLoader = new LiveCoachCapabilityLoader(this._context)
     this._noticeLoader = new AkariApiNoticeLoader(this._context)
     this._releaseLoader = new AkariApiReleaseLoader(this._context)
   }
@@ -73,17 +76,20 @@ export class AkariApiMain implements IAkariShardInitDispose {
 
     try {
       await this._configLoader.initFromLocal()
+      await this._liveCoachCapabilityLoader.initFromLocal()
     } catch (error) {
       this._logger.warn('Failed to load config cache', error)
     }
 
     this._protocolController.register()
     this._configLoader.watch()
+    this._liveCoachCapabilityLoader.watch()
     this._noticeLoader.watch()
   }
 
   async onDispose() {
     this._configLoader.dispose()
+    this._liveCoachCapabilityLoader.dispose()
     this._noticeLoader.dispose()
     this._protocolController.unregister()
   }

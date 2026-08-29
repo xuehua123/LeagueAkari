@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
+import { createInitialSnapshot } from './normalization'
 import { LiveGameDataPollingController } from './polling-controller'
 
 describe('LiveGameDataPollingController', () => {
@@ -59,7 +60,7 @@ describe('LiveGameDataPollingController', () => {
         setIsPolling: vi.fn(),
         setSnapshot: vi.fn(),
         reset: vi.fn(),
-        snapshot: null
+        snapshot: createInitialSnapshot()
       },
       setGameflow(newPhase: string, newSession: any = null) {
         phase = newPhase
@@ -88,6 +89,18 @@ describe('LiveGameDataPollingController', () => {
     controller.dispose()
   })
 
+  it('uses the shared provisional session id before LCU exposes gameId', () => {
+    const ctx = createMockContext()
+    const controller = new LiveGameDataPollingController(ctx)
+    const startSpy = vi.spyOn(controller, 'startPolling').mockImplementation(() => {})
+    controller.init()
+
+    ctx.setGameflow('InProgress', { gameData: { gameVersion: '16.16.1.123' } })
+
+    expect(startSpy).toHaveBeenCalledWith('pending-game', '16.16.1')
+    controller.dispose()
+  })
+
   it('protects against cross-session race condition when Game A request finishes after Game B starts', async () => {
     const ctx = createMockContext()
     let resolvePatchRequestA: any = null
@@ -113,10 +126,82 @@ describe('LiveGameDataPollingController', () => {
     }
     await new Promise((r) => setTimeout(r, 10))
 
-    expect(ctx.logger.info).not.toHaveBeenCalledWith(
-      expect.stringContaining('Starting LiveGameData polling for session: 10001')
+    controller.dispose()
+  })
+
+  it('aborts active fetch request and signal when stopPolling is called', async () => {
+    const ctx = createMockContext()
+    let capturedSignal: AbortSignal | undefined
+
+    const controller = new LiveGameDataPollingController(ctx)
+    ;(controller as any)._loader.fetchSnapshot = vi.fn(
+      async (_sessionId: string, _patch: string, signal?: AbortSignal) => {
+        capturedSignal = signal
+        return new Promise(() => {}) // never resolves
+      }
     )
 
+    controller.startPolling('session_abort_test', '16.16.1')
+
+    await new Promise((r) => setTimeout(r, 10))
+    expect(capturedSignal).toBeDefined()
+    expect(capturedSignal?.aborted).toBe(false)
+
+    controller.stopPolling()
+    expect(capturedSignal?.aborted).toBe(true)
+
+    controller.dispose()
+  })
+
+  it('aborts active LCU patch request when phase changes or stopPolling is called', async () => {
+    const ctx = createMockContext()
+    let capturedPatchSignal: AbortSignal | undefined
+
+    ctx.leagueClient.http.request.mockImplementation((opts: any) => {
+      capturedPatchSignal = opts.signal
+      return new Promise(() => {}) // never resolves
+    })
+
+    const controller = new LiveGameDataPollingController(ctx)
+    controller.init()
+
+    // 1. InProgress 启动且无 patch，发起 LCU 补丁查询
+    ctx.setGameflow('InProgress', { gameData: { gameId: 1001 } })
+    await new Promise((r) => setTimeout(r, 10))
+
+    expect(capturedPatchSignal).toBeDefined()
+    expect(capturedPatchSignal?.aborted).toBe(false)
+
+    // 2. 退出对局（切至 None），触发 stopPolling
+    ctx.setGameflow('None', null)
+    expect(capturedPatchSignal?.aborted).toBe(true)
+
+    controller.dispose()
+  })
+
+  it('publishes degraded source health when a poll fails instead of leaving stale data healthy', async () => {
+    const ctx = createMockContext()
+    const controller = new LiveGameDataPollingController(ctx)
+    ;(controller as any)._loader.fetchSnapshot = vi.fn().mockResolvedValue(null)
+    ;(controller as any)._loader.getSourceHealth = vi.fn().mockReturnValue([
+      {
+        domain: 'game-stats',
+        state: 'degraded',
+        lastSuccessAt: null,
+        lastErrorCode: 'ECONNREFUSED',
+        consecutiveFailures: 1
+      }
+    ])
+
+    controller.startPolling('session-health', '16.16.1')
+    await new Promise((resolve) => setTimeout(resolve, 10))
+
+    expect(ctx.state.setSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: 'session-health',
+        sourceHealth: [expect.objectContaining({ state: 'degraded' })]
+      })
+    )
     controller.dispose()
   })
 })

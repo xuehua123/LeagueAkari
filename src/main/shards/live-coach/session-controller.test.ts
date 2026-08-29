@@ -602,6 +602,58 @@ describe('LiveCoachSessionController Lifecycle & Exit Cleanup Test', () => {
     controller.dispose()
   })
 
+  it("auto-starts a Summoner's Rift custom game before LCU finishes resolving its queue", () => {
+    const ctx = createMockContext()
+    const capabilityController = { evaluateCapabilities: vi.fn(), isGateAEnabled: true } as any
+    const scheduler = { reset: vi.fn(), submitCues: vi.fn() } as any
+    const controller = new LiveCoachSessionController(ctx, capabilityController, scheduler)
+    controller.init()
+
+    ctx.setGameflow('InProgress', {
+      map: { id: 11, gameMode: 'CLASSIC' },
+      gameData: { gameId: 234567, isCustomGame: true }
+    })
+
+    expect(ctx.state.session.state).toBe('active')
+    expect(ctx.state.setSessionInfo).toHaveBeenCalledWith(
+      expect.objectContaining({ id: '234567', mapId: 11, queueId: 0, state: 'active' })
+    )
+    expect(capabilityController.evaluateCapabilities).toHaveBeenCalledWith(
+      11,
+      0,
+      'unknown',
+      expect.any(Object)
+    )
+    controller.dispose()
+  })
+
+  it('does not auto-start a tutorial that happens to report the custom queue id', () => {
+    const ctx = createMockContext()
+    const capabilityController = { evaluateCapabilities: vi.fn(), isGateAEnabled: true } as any
+    const scheduler = { reset: vi.fn(), submitCues: vi.fn() } as any
+    const controller = new LiveCoachSessionController(ctx, capabilityController, scheduler)
+    controller.init()
+
+    ctx.setGameflow('InProgress', {
+      map: { id: 11, gameMode: 'TUTORIAL' },
+      gameData: {
+        gameId: 345678,
+        isCustomGame: true,
+        queue: { id: 0, isCustom: true }
+      }
+    })
+
+    expect(ctx.state.session.state).toBe('degraded')
+    expect(ctx.state.session.id).toBe('')
+    expect(capabilityController.evaluateCapabilities).toHaveBeenLastCalledWith(
+      11,
+      null,
+      'unknown',
+      expect.any(Object)
+    )
+    controller.dispose()
+  })
+
   it('uses the shared provisional id until LCU exposes the official game id', () => {
     const ctx = createMockContext()
     const capabilityController = { evaluateCapabilities: vi.fn(), isGateAEnabled: true } as any

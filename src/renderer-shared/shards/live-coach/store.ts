@@ -33,7 +33,7 @@ export const useLiveCoachStore = defineStore('shard:live-coach-renderer', () => 
     shadowModeEnabled: false,
     cueDensity: 'standard' as 'low' | 'standard' | 'high',
     minimumCueIntervalSeconds: 3,
-    outputMode: ['subtitle'] as Array<'sound' | 'subtitle' | 'speech'>,
+    outputMode: ['subtitle', 'speech'] as Array<'sound' | 'subtitle' | 'speech'>,
     captureBackend: 'auto' as 'auto' | 'wgc' | 'dda',
     minimapSide: 'auto' as 'auto' | 'left' | 'right',
     itemGuidanceMode: 'adaptive' as ItemGuidanceMode,

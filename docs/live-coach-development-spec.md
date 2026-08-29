@@ -636,7 +636,7 @@ interface LiveCoachCapabilityPayload {
 | --------------------------------- | ---------------------------------------- | ----------------------------- | -------- |
 | `enabled`                         | boolean / false                          | 总开关                        | P1       |
 | `coachMode`                       | `minimal/balanced/training` / balanced   | 三种固定模式                  | P1       |
-| `outputMode`                      | `sound/subtitle/speech`[] / 仅字幕       | 首次使用低打扰，至少允许全关  | P1       |
+| `outputMode`                      | `sound/subtitle/speech`[] / 字幕+短语音  | 首次使用可感知，至少允许全关  | P1       |
 | `captureBackend`                  | `auto/wgc/dda` / auto                    | 普通用户默认 auto             | P1       |
 | `minimapSide`                     | `auto/left/right` / auto                 | 手动选择覆盖自动结果          | P1       |
 | `manualCalibration`               | object/null                              | 分辨率、DPI、side 绑定        | P1       |

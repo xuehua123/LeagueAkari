@@ -19,6 +19,7 @@ import type { LiveCoachMainContext } from './context'
 import type { CooldownTrackerController } from './cooldown-tracker-controller'
 import { CueSchedulerController } from './cue-scheduler-controller'
 import { FactFusionEngine, findActivePlayerRecord } from './fact-fusion'
+import { resolveLiveCoachGameflowContext } from './gameflow-context'
 import {
   LIVE_COACH_CONSENT_REQUIRED_REASON,
   hasCurrentLiveCoachPrivacyConsent
@@ -123,8 +124,7 @@ export class LiveCoachSessionController {
         session: this._context.leagueClient.data.gameflow.session
       }),
       ({ enabled, privacyConsentGranted, autoStartEnabled, phase, session }) => {
-        const mapId = session?.map?.id ?? null
-        const queueId = session?.gameData?.queue?.id ?? null
+        const { mapId, queueId } = resolveLiveCoachGameflowContext(session)
         const patch = this.latestPatch || 'unknown'
 
         if (!privacyConsentGranted) {
@@ -240,8 +240,7 @@ export class LiveCoachSessionController {
       }),
       ({ roiState, backend, patch }) => {
         const session = this._context.leagueClient.data.gameflow.session
-        const mapId = session?.map?.id ?? null
-        const queueId = session?.gameData?.queue?.id ?? null
+        const { mapId, queueId } = resolveLiveCoachGameflowContext(session)
         this._capabilityController.evaluateCapabilities(mapId, queueId, patch || 'unknown', {
           roiHealth: roiState,
           liveDataHealth: this._context.state.liveData.state,
@@ -539,8 +538,7 @@ export class LiveCoachSessionController {
       if (batch.health && batch.health !== this._context.state.capture.roiState) {
         this._context.state.setCaptureState({ roiState: batch.health })
         const session = this._context.leagueClient.data.gameflow.session
-        const mapId = session?.map?.id ?? null
-        const queueId = session?.gameData?.queue?.id ?? null
+        const { mapId, queueId } = resolveLiveCoachGameflowContext(session)
         this._capabilityController.evaluateCapabilities(mapId, queueId, batch.patch || 'unknown', {
           roiHealth: batch.health,
           liveDataHealth: this._context.state.liveData.state,
@@ -710,9 +708,10 @@ export class LiveCoachSessionController {
           : 'degraded'
     this._context.state.setLiveDataState(state, lastSuccessAt, snapshot.sourceHealth)
     const gameflowSession = this._context.leagueClient.data.gameflow.session
+    const { mapId, queueId } = resolveLiveCoachGameflowContext(gameflowSession)
     this._capabilityController.evaluateCapabilities(
-      gameflowSession?.map?.id ?? null,
-      gameflowSession?.gameData?.queue?.id ?? null,
+      mapId,
+      queueId,
       snapshot.patch || this.latestPatch || 'unknown',
       {
         roiHealth: this._context.state.capture.roiState,

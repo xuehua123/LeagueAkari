@@ -31,9 +31,9 @@ export class LiveCoachSettings {
   public shadowModeEnabled: boolean = false
   public cueDensity: 'low' | 'standard' | 'high' = 'standard'
   public minimumCueIntervalSeconds: number = 3
-  // First-run default stays deliberately low-interruption. Users can opt into
-  // earcons and speech during onboarding or from Voice Settings.
-  public outputMode: Array<'sound' | 'subtitle' | 'speech'> = ['subtitle']
+  // A voice coach must be immediately observable on first use. Speech remains local,
+  // short, rate-limited, and can be disabled with one click.
+  public outputMode: Array<'sound' | 'subtitle' | 'speech'> = ['subtitle', 'speech']
   public captureBackend: 'auto' | 'wgc' | 'dda' = 'auto'
   public minimapSide: 'auto' | 'left' | 'right' = 'auto'
   public itemGuidanceMode: ItemGuidanceMode = 'adaptive'

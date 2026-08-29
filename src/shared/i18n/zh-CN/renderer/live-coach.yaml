@@ -37,7 +37,30 @@ liveCoach:
     roleAlternative: 备选
   overview:
     mainSwitch: 实时语音 AI 教练
-    mainSwitchDesc: 在召唤师峡谷对局中，基于小地图可见事实与 Live Client Data 提供实时确定性决策与语音辅助。
+    mainSwitchDesc: 开启一次即可；进入召唤师峡谷自定义、训练、匹配或排位对局后，教练会自动识别并开始。
+    quickStart:
+      readyTitle: 已设置好，直接进入一局即可
+      readyDescription: 进入召唤师峡谷自定义、训练、匹配或排位对局后会自动开始，无需手动创建会话；请使用窗口化或无边框模式。
+      runningCustomTitle: AI 教练正在自定义或训练对局中运行
+      runningTitle: AI 教练正在运行
+      runningDescription: 会话已经自动建立，教练会在有明确时机时通过字幕和短语音提醒；没有可靠建议时会保持安静。
+      shadowTitle: 当前是影子模式，不会显示或播放任何提醒
+      shadowDescription: 影子模式只用于记录验收数据。点击“恢复自动语音模式”即可切回正常教练。
+      pausedTitle: AI 教练已暂停
+      pausedDescription: 暂停期间不会采集或输出提醒；点击“立即恢复”继续当前对局。
+      manualTitle: 当前设置为手动启动
+      manualDescription: 进入对局后不会自动开始。点击“恢复自动语音模式”即可改回进入对局自动启动。
+      mutedTitle: AI 教练当前已静音
+      mutedDescription: 仍会显示字幕，但不会播放语音。点击“恢复自动语音模式”即可恢复本地短语音。
+      speechUnavailableTitle: 可以自动开始，但本地语音暂不可用
+      speechUnavailableDescription: 字幕仍可正常使用；点击“运行诊断”检查 Windows 中文语音和输出设备。
+      blockedTitle: 还没启动：当前有一项条件未满足
+      blockedDescription: '当前原因：{{reason}}。点击“运行诊断”可以直接查看处理办法。'
+      waitingForGame: 正在等待游戏窗口和对局数据
+    restoreSimpleMode: 恢复自动语音模式
+    simpleModeRestored: 已恢复自动启动、正常提醒和本地短语音
+    resumeNow: 立即恢复
+    openDiagnostics: 运行诊断
     sessionStatus: 当前会话状态
     latestCue: 实时提示预览
     noCue: 当前暂无正在播报的战术提示
@@ -71,7 +94,7 @@ liveCoach:
     totalCues: 提示总数
     warningCues: 风险提示
     endReason: 结束原因
-    startManualSession: 启动教练会话
+    startManualSession: 手动开始当前对局
     pauseSession: 暂停教练
     resumeSession: 恢复教练
     stopSession: 结束当前会话
@@ -212,7 +235,7 @@ liveCoach:
       muted: 已静音
       unavailable: 不可用
   onboarding:
-    title: 首次启用实时 AI 教练
+    title: 开启实时 AI 教练（一次确认）
     steps:
       scope: 使用方式
       environment: 准备环境
@@ -220,7 +243,10 @@ liveCoach:
       consent: 确认摘要
     scopeTitle: 先了解能力边界
     capabilities: 功能会读取本机 Riot 官方 Live Client Data，并只分析当前游戏窗口中的小地图区域，用于实时字幕、提示音、语音和确定性建议。
-    support: 首期支持 Windows 10/11、召唤师峡谷、窗口化或无边框模式；不支持时会停止相关输出。
+    support: 首期支持 Windows 10/11、召唤师峡谷自定义、训练、匹配和排位对局，以及窗口化或无边框模式；不支持时会停止相关输出。
+    customSupportTitle: 支持自定义对局和训练模式
+    customSupportDescription: 确认后不需要继续配置。直接进入召唤师峡谷自定义或训练对局，游戏开始时 AI 教练会自动启动。
+    voiceDefault: 默认启用悬浮字幕和本地短语音；无需麦克风，也不会上传游戏画面，之后可随时一键静音或关闭语音。
     privacy: 默认不上传或落盘原始画面，不申请麦克风权限；结构化反馈保存在本机且可导出、撤销和删除。
     risk: 迷雾位置、路线和意图属于概率预测，不是直接看到的事实；低置信度或证据失效时系统应保持安静或撤销提示。
     controls: 请在“提醒策略”页设置暂停、静音、重新标定和悬浮窗调整快捷键，避免对局中无法快速控制。
@@ -247,7 +273,7 @@ liveCoach:
     replayDescription: 回放页提供明确标记的标准演示，也支持导入本机录像；模拟结果不会冒充真实对局。
     openReplay: 打开战术复盘
     consentTitle: 检查摘要后再确认
-    consentDescription: 选择实时教练会授权当前说明中的本机实时处理；选择离线分析不会启用实时屏幕采集。你可以返回前面修改或以后继续未完成的检查。
+    consentDescription: 确认后会启用当前说明中的本机实时处理；可随时关闭总开关或在“隐私与授权”中撤回。
     summaryPath: 首次使用方式
     summaryCalibration: 当前小地图状态
     summaryOutput: 当前输出方式
@@ -260,6 +286,7 @@ liveCoach:
     previous: 上一步
     next: 下一步
     enable: 确认并启用
+    enabledSuccess: AI 教练已开启，直接进入召唤师峡谷自定义或训练对局即可。
     done: 完成查看
     startOffline: 前往离线分析
   help:

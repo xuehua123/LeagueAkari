@@ -37,7 +37,30 @@ liveCoach:
     roleAlternative: Alternative
   overview:
     mainSwitch: Live AI Coach
-    mainSwitchDesc: Real-time deterministic tactical guidance based on minimap observations and Live Client Data during Summoner's Rift matches.
+    mainSwitchDesc: Enable it once. The coach automatically detects and starts in Summoner's Rift custom, Practice Tool, normal, and ranked games.
+    quickStart:
+      readyTitle: You're ready—just enter a game
+      readyDescription: The coach starts automatically in Summoner's Rift custom, Practice Tool, normal, or ranked games. No manual session setup is needed; use windowed or borderless mode.
+      runningCustomTitle: AI Coach is running in your custom or Practice Tool game
+      runningTitle: AI Coach is running
+      runningDescription: The session started automatically. The coach uses subtitles and short local speech when it has a clear recommendation, and stays quiet when evidence is weak.
+      shadowTitle: Shadow mode is active, so no cue will be shown or played
+      shadowDescription: Shadow mode only records acceptance data. Select Restore Automatic Voice Mode to return to normal coaching.
+      pausedTitle: AI Coach is paused
+      pausedDescription: Capture and output are stopped while paused. Select Resume Now to continue this game.
+      manualTitle: Manual start is enabled
+      manualDescription: The coach will not start when you enter a game. Select Restore Automatic Voice Mode to enable automatic start.
+      mutedTitle: AI Coach is muted
+      mutedDescription: Subtitles remain visible, but speech is off. Select Restore Automatic Voice Mode to restore short local speech.
+      speechUnavailableTitle: Automatic start is ready, but local speech is unavailable
+      speechUnavailableDescription: Subtitles still work. Open Diagnostics to check the Windows Chinese voice and output device.
+      blockedTitle: 'Not started: one requirement is not ready'
+      blockedDescription: 'Current reason: {{reason}}. Open Diagnostics for the exact fix.'
+      waitingForGame: Waiting for the game window and live match data
+    restoreSimpleMode: Restore Automatic Voice Mode
+    simpleModeRestored: Automatic start, normal cues, and local speech are restored
+    resumeNow: Resume Now
+    openDiagnostics: Open Diagnostics
     sessionStatus: Session Status
     latestCue: Live Cue Preview
     noCue: No tactical cue currently active
@@ -72,7 +95,7 @@ liveCoach:
     totalCues: Total Cues
     warningCues: Warning Cues
     endReason: End Reason
-    startManualSession: Start Coach Session
+    startManualSession: Manually Start This Game
     pauseSession: Pause Coach
     resumeSession: Resume Coach
     stopSession: Stop Current Session
@@ -213,7 +236,7 @@ liveCoach:
       muted: Muted
       unavailable: Unavailable
   onboarding:
-    title: Enable Live AI Coach
+    title: Enable Live AI Coach (One Confirmation)
     steps:
       scope: Choose a Path
       environment: Prepare
@@ -221,7 +244,10 @@ liveCoach:
       consent: Review
     scopeTitle: Understand the capability boundaries first
     capabilities: The feature reads Riot's local Live Client Data and analyzes only the minimap region of the current game window to provide real-time subtitles, sounds, speech, and deterministic guidance.
-    support: Phase 1 supports Windows 10/11, Summoner's Rift, and windowed or borderless mode. Dependent output stops in unsupported environments.
+    support: Phase 1 supports Windows 10/11, Summoner's Rift custom, Practice Tool, normal, and ranked games in windowed or borderless mode. Dependent output stops in unsupported environments.
+    customSupportTitle: Custom games and Practice Tool are supported
+    customSupportDescription: No extra setup is required after confirmation. Enter a Summoner's Rift custom or Practice Tool game and AI Coach starts automatically when the game begins.
+    voiceDefault: Overlay subtitles and short local speech are enabled by default. No microphone is needed and game frames are not uploaded; you can mute or disable speech at any time.
     privacy: Raw frames are neither uploaded nor persisted by default, and microphone permission is not requested. Structured feedback stays local and can be exported, withdrawn, or deleted.
     risk: Fog positions, routes, and intent are probability estimates—not directly observed facts. The coach should remain silent or retract a cue when confidence is low or evidence expires.
     controls: Configure pause, mute, recalibration, and overlay adjustment shortcuts in Settings so the coach remains controllable during a match.
@@ -248,7 +274,7 @@ liveCoach:
     replayDescription: Reviews provides a clearly labeled sample and local recording import. Simulated results are never presented as a live match.
     openReplay: Open Tactical Reviews
     consentTitle: Review the summary before confirming
-    consentDescription: Choosing Live Coach authorizes only the on-device real-time processing described here. Choosing offline analysis does not enable real-time screen capture. You can go back to make changes or continue skipped checks later.
+    consentDescription: Confirming enables only the on-device real-time processing described here. You can disable the main switch or withdraw consent from Privacy at any time.
     summaryPath: First-use path
     summaryCalibration: Current minimap status
     summaryOutput: Current output channels
@@ -262,6 +288,7 @@ liveCoach:
     previous: Back
     next: Next
     enable: Confirm and Enable
+    enabledSuccess: AI Coach is enabled. Enter a Summoner's Rift custom or Practice Tool game.
     done: Finish Review
     startOffline: Continue to Offline Analysis
   help:

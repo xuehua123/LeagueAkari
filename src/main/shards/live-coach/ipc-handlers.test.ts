@@ -98,6 +98,62 @@ describe('LiveCoachIpcHandlers privacy gate', () => {
     expect(result.cues).toEqual(expect.any(Array))
     expect(result.sidecar.sessionId).toBe(sample.session.metadata.sessionId)
   })
+
+  it('manually starts a supported custom game while its queue metadata is still resolving', async () => {
+    const calls: Record<string, (...args: any[]) => any> = {}
+    const context = {
+      namespace: 'live-coach-main',
+      ipc: {
+        onCall: vi.fn((_namespace, name, handler) => {
+          calls[name] = handler
+        })
+      },
+      settings: {
+        enabled: true,
+        onboardingCompleted: true,
+        privacyConsentVersion: CURRENT_LIVE_COACH_PRIVACY_NOTICE_VERSION
+      },
+      state: {
+        buildChannel: 'internal',
+        session: { state: 'idle', patch: null }
+      },
+      leagueClient: {
+        data: {
+          gameflow: {
+            phase: 'InProgress',
+            session: {
+              map: { id: 11, gameMode: 'CLASSIC' },
+              gameData: { gameId: 9001, isCustomGame: true }
+            }
+          }
+        }
+      }
+    }
+    const sessionController = {
+      latestPatch: '16.17.1',
+      startSession: vi.fn(() => {
+        context.state.session.state = 'active'
+      })
+    }
+    new LiveCoachIpcHandlers(
+      context as any,
+      sessionController as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any
+    ).register()
+
+    await expect(calls.startManualSession({} as any)).resolves.toEqual({
+      success: true,
+      sessionId: '9001'
+    })
+    expect(sessionController.startSession).toHaveBeenCalledWith('9001', 11, 0, '16.17.1')
+  })
 })
 
 describe('LiveCoachIpcHandlers durable privacy withdrawal', () => {

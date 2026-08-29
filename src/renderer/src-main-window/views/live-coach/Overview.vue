@@ -17,6 +17,44 @@
           </div>
         </NCard>
 
+        <NAlert
+          v-if="coachStore.settings.enabled"
+          :type="quickStartStatus.type"
+          :title="t(quickStartStatus.titleKey)"
+        >
+          {{
+            t(quickStartStatus.descriptionKey, {
+              reason: unavailableReasonLabel(primaryUnavailableReason)
+            })
+          }}
+          <div class="mt-3 flex flex-wrap gap-2">
+            <NButton
+              v-if="simpleModeNeedsRestore"
+              size="small"
+              type="primary"
+              @click="restoreSimpleMode()"
+            >
+              {{ t('liveCoach.overview.restoreSimpleMode') }}
+            </NButton>
+            <NButton
+              v-if="coachStore.session.state === 'paused'"
+              size="small"
+              type="primary"
+              @click="handlePauseResume"
+            >
+              {{ t('liveCoach.overview.resumeNow') }}
+            </NButton>
+            <NButton
+              v-if="quickStartStatus.showDiagnostics"
+              size="small"
+              secondary
+              @click="openDiagnostics"
+            >
+              {{ t('liveCoach.overview.openDiagnostics') }}
+            </NButton>
+          </div>
+        </NAlert>
+
         <!-- 会话状态与快捷操作 -->
         <NCard size="small" :title="t('liveCoach.overview.sessionStatus', '当前会话状态')">
           <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -123,7 +161,7 @@
               "
               @click="handleStartManual"
             >
-              {{ t('liveCoach.overview.startManualSession', '启动教练会话') }}
+              {{ t('liveCoach.overview.startManualSession', '手动开始当前对局') }}
             </NButton>
             <NButton
               size="small"
@@ -488,226 +526,43 @@
     >
       <template #header>{{ t('liveCoach.onboarding.title') }}</template>
       <div class="space-y-4 text-sm">
-        <NSteps :current="onboardingStep" size="small">
-          <NStep :title="t('liveCoach.onboarding.steps.scope')" />
-          <NStep :title="t('liveCoach.onboarding.steps.environment')" />
-          <NStep :title="t('liveCoach.onboarding.steps.prepare')" />
-          <NStep :title="t('liveCoach.onboarding.steps.consent')" />
-        </NSteps>
-
-        <template v-if="onboardingStep === 1">
-          <NAlert type="info" :title="t('liveCoach.onboarding.scopeTitle')">
-            {{ t('liveCoach.onboarding.capabilities') }}
-          </NAlert>
-          <div class="grid gap-2 text-xs text-gray-600 sm:grid-cols-2 dark:text-gray-300">
-            <div class="rounded border border-gray-200 p-3 dark:border-gray-700">
-              {{ t('liveCoach.onboarding.support') }}
-            </div>
-            <div class="rounded border border-gray-200 p-3 dark:border-gray-700">
-              {{ t('liveCoach.onboarding.risk') }}
-            </div>
+        <NAlert type="info" :title="t('liveCoach.onboarding.scopeTitle')">
+          {{ t('liveCoach.onboarding.capabilities') }}
+        </NAlert>
+        <NAlert type="success" :title="t('liveCoach.onboarding.customSupportTitle')">
+          {{ t('liveCoach.onboarding.customSupportDescription') }}
+          <div class="mt-1">{{ t('liveCoach.onboarding.support') }}</div>
+        </NAlert>
+        <div class="grid gap-2 text-xs text-gray-600 sm:grid-cols-2 dark:text-gray-300">
+          <div class="rounded border border-gray-200 p-3 dark:border-gray-700">
+            {{ t('liveCoach.onboarding.privacy') }}
           </div>
-          <div>
-            <div class="mb-2 font-medium">{{ t('liveCoach.onboarding.pathTitle') }}</div>
-            <NRadioGroup v-model:value="onboardingPath" name="live-coach-onboarding-path">
-              <NRadioButton value="realtime">
-                {{ t('liveCoach.onboarding.pathRealtime') }}
-              </NRadioButton>
-              <NRadioButton value="offline">
-                {{ t('liveCoach.onboarding.pathOffline') }}
-              </NRadioButton>
-            </NRadioGroup>
-            <div class="mt-2 text-xs text-gray-500">
-              {{
-                onboardingPath === 'realtime'
-                  ? t('liveCoach.onboarding.pathRealtimeDesc')
-                  : t('liveCoach.onboarding.pathOfflineDesc')
-              }}
-            </div>
+          <div class="rounded border border-gray-200 p-3 dark:border-gray-700">
+            {{ t('liveCoach.onboarding.risk') }}
           </div>
-        </template>
-
-        <template v-else-if="onboardingStep === 2">
-          <template v-if="onboardingPath === 'realtime'">
-            <div class="text-gray-600 dark:text-gray-300">
-              {{ t('liveCoach.onboarding.test') }}
-            </div>
-            <div class="grid gap-2 sm:grid-cols-2">
-              <div class="rounded border border-gray-200 p-3 dark:border-gray-700">
-                <div class="font-medium">{{ t('liveCoach.onboarding.environmentTitle') }}</div>
-                <div class="mt-1 text-xs text-gray-500">
-                  {{ t('liveCoach.onboarding.environmentDescription') }}
-                </div>
-                <NButton
-                  class="mt-3"
-                  size="small"
-                  secondary
-                  @click="openOnboardingSection('diagnostics')"
-                >
-                  {{ t('liveCoach.onboarding.openDiagnostics') }}
-                </NButton>
-              </div>
-              <div class="rounded border border-gray-200 p-3 dark:border-gray-700">
-                <div class="font-medium">{{ t('liveCoach.onboarding.calibrationTitle') }}</div>
-                <div class="mt-1 text-xs text-gray-500">
-                  {{ t('liveCoach.onboarding.calibrationDescription') }}
-                </div>
-                <NButton
-                  class="mt-3"
-                  size="small"
-                  secondary
-                  @click="openOnboardingSection('calibration')"
-                >
-                  {{ t('liveCoach.onboarding.openCalibration') }}
-                </NButton>
-              </div>
-            </div>
-          </template>
-          <template v-else>
-            <NAlert type="info" :title="t('liveCoach.onboarding.offlineTitle')">
-              {{ t('liveCoach.onboarding.offlineDescription') }}
-            </NAlert>
-            <NButton size="small" secondary @click="openOnboardingSection('reviews')">
-              {{ t('liveCoach.onboarding.openReplay') }}
-            </NButton>
-          </template>
-        </template>
-
-        <template v-else-if="onboardingStep === 3">
-          <template v-if="onboardingPath === 'realtime'">
-            <div class="rounded border border-gray-200 p-3 dark:border-gray-700">
-              <div class="font-medium">{{ t('liveCoach.onboarding.controlsTitle') }}</div>
-              <div class="mt-1 text-xs text-gray-500">
-                {{ t('liveCoach.onboarding.controls') }}
-              </div>
-              <div class="mt-3 flex flex-wrap gap-2">
-                <NButton size="small" secondary @click="openOnboardingSection('coach')">
-                  {{ t('liveCoach.onboarding.openControls') }}
-                </NButton>
-                <NButton size="small" secondary @click="handleTestSpeech">
-                  {{ t('liveCoach.onboarding.testSpeech') }}
-                </NButton>
-              </div>
-            </div>
-          </template>
-          <div class="grid gap-2 sm:grid-cols-2">
-            <div class="rounded border border-gray-200 p-3 dark:border-gray-700">
-              <div class="font-medium">{{ t('liveCoach.onboarding.privacyTitle') }}</div>
-              <div class="mt-1 text-xs text-gray-500">
-                {{ t('liveCoach.onboarding.privacy') }}
-              </div>
-              <NButton
-                class="mt-3"
-                size="small"
-                secondary
-                @click="openOnboardingSection('privacy')"
-              >
-                {{ t('liveCoach.onboarding.openPrivacy') }}
-              </NButton>
-            </div>
-            <div class="rounded border border-gray-200 p-3 dark:border-gray-700">
-              <div class="font-medium">{{ t('liveCoach.onboarding.replayTitle') }}</div>
-              <div class="mt-1 text-xs text-gray-500">
-                {{ t('liveCoach.onboarding.replayDescription') }}
-              </div>
-              <NButton
-                class="mt-3"
-                size="small"
-                secondary
-                @click="openOnboardingSection('reviews')"
-              >
-                {{ t('liveCoach.onboarding.openReplay') }}
-              </NButton>
-            </div>
-          </div>
-        </template>
-
-        <template v-else>
-          <NAlert type="warning" :title="t('liveCoach.onboarding.consentTitle')">
-            {{ t('liveCoach.onboarding.consentDescription') }}
-          </NAlert>
-          <div class="grid gap-2 text-xs sm:grid-cols-2">
-            <div class="rounded border border-gray-200 p-3 dark:border-gray-700">
-              <div class="text-gray-500">{{ t('liveCoach.onboarding.summaryPath') }}</div>
-              <div class="mt-1 font-medium">
-                {{
-                  onboardingPath === 'realtime'
-                    ? t('liveCoach.onboarding.pathRealtime')
-                    : t('liveCoach.onboarding.pathOffline')
-                }}
-              </div>
-            </div>
-            <div
-              v-if="onboardingPath === 'realtime'"
-              class="rounded border border-gray-200 p-3 dark:border-gray-700"
-            >
-              <div class="text-gray-500">{{ t('liveCoach.onboarding.summaryCalibration') }}</div>
-              <div class="mt-1 font-medium">
-                {{ t(`liveCoach.overview.roiState.${coachStore.capture.roiState}`) }}
-              </div>
-            </div>
-            <div
-              v-if="onboardingPath === 'realtime'"
-              class="rounded border border-gray-200 p-3 dark:border-gray-700"
-            >
-              <div class="text-gray-500">{{ t('liveCoach.onboarding.summaryOutput') }}</div>
-              <div class="mt-1 font-medium">
-                {{
-                  coachStore.settings.outputMode
-                    .map((mode) => t(`liveCoach.overlay.output.${mode}`))
-                    .join(t('liveCoach.reviews.listSeparator')) ||
-                  t('liveCoach.onboarding.summaryNone')
-                }}
-              </div>
-            </div>
-            <div
-              v-if="onboardingPath === 'realtime'"
-              class="rounded border border-gray-200 p-3 dark:border-gray-700"
-            >
-              <div class="text-gray-500">{{ t('liveCoach.onboarding.summaryShortcuts') }}</div>
-              <div class="mt-1 font-medium">
-                {{
-                  t('liveCoach.onboarding.summaryShortcutCount', { count: configuredShortcutCount })
-                }}
-              </div>
-            </div>
-          </div>
-          <NCheckbox v-model:checked="onboardingAcknowledged">
-            {{ t('liveCoach.onboarding.acknowledge') }}
-          </NCheckbox>
-          <div class="text-xs text-gray-500">
-            {{ t('liveCoach.onboarding.reopenHint') }}
-          </div>
-        </template>
+        </div>
+        <div class="text-xs text-gray-500">
+          {{ t('liveCoach.onboarding.voiceDefault') }}
+        </div>
+        <NCheckbox v-model:checked="onboardingAcknowledged">
+          {{ t('liveCoach.onboarding.acknowledge') }}
+        </NCheckbox>
+        <div class="text-xs text-gray-500">
+          {{ t('liveCoach.onboarding.reopenHint') }}
+        </div>
       </div>
       <template #footer>
-        <div class="flex items-center justify-between gap-2">
-          <NButton v-if="onboardingStep > 1" @click="onboardingStep -= 1">
-            {{ t('liveCoach.onboarding.previous') }}
+        <div class="flex justify-end gap-2">
+          <NButton @click="showOnboarding = false">
+            {{ t('liveCoach.onboarding.cancel') }}
           </NButton>
-          <span v-else />
-          <div class="flex gap-2">
-            <NButton @click="showOnboarding = false">
-              {{ t('liveCoach.onboarding.cancel') }}
-            </NButton>
-            <NButton v-if="onboardingStep < 4" type="primary" @click="onboardingStep += 1">
-              {{ t('liveCoach.onboarding.next') }}
-            </NButton>
-            <NButton
-              v-else
-              type="primary"
-              :disabled="!onboardingAcknowledged"
-              @click="completeOnboarding"
-            >
-              {{
-                onboardingPath === 'offline'
-                  ? t('liveCoach.onboarding.startOffline')
-                  : onboardingWillEnable
-                    ? t('liveCoach.onboarding.enable')
-                    : t('liveCoach.onboarding.done')
-              }}
-            </NButton>
-          </div>
+          <NButton type="primary" :disabled="!onboardingAcknowledged" @click="completeOnboarding">
+            {{
+              onboardingWillEnable
+                ? t('liveCoach.onboarding.enable')
+                : t('liveCoach.onboarding.done')
+            }}
+          </NButton>
         </div>
       </template>
     </NModal>
@@ -723,6 +578,7 @@ import type {
   CoachCooldownRecord,
   CoachFeedbackRecord,
   CoachFeedbackType,
+  CoachUnavailableReason,
   ItemPurchasePlan,
   ReplayAnalysisHistoryEntry
 } from '@shared/types/live-coach'
@@ -736,12 +592,8 @@ import {
   NInput,
   NInputNumber,
   NModal,
-  NRadioButton,
-  NRadioGroup,
   NScrollbar,
   NSelect,
-  NStep,
-  NSteps,
   NSwitch,
   NTag,
   useMessage
@@ -761,8 +613,6 @@ const latestReplayAnalysis = ref<ReplayAnalysisHistoryEntry | null>(null)
 const uiNow = ref(Date.now())
 let uiClockTimer: ReturnType<typeof setInterval> | null = null
 const showOnboarding = ref(false)
-const onboardingStep = ref(1)
-const onboardingPath = ref<'realtime' | 'offline'>('realtime')
 const onboardingAcknowledged = ref(false)
 const onboardingWillEnable = ref(false)
 const privacyConsentGranted = computed(() => hasCurrentLiveCoachPrivacyConsent(coachStore.settings))
@@ -788,14 +638,89 @@ const ownerTeamOptions = computed(() =>
   }))
 )
 
-const configuredShortcutCount = computed(
-  () =>
-    [
-      coachStore.settings.pauseShortcut,
-      coachStore.settings.muteShortcut,
-      coachStore.settings.recalibrateShortcut
-    ].filter(Boolean).length
+const speechOutputEnabled = computed(
+  () => coachStore.settings.speechEnabled && coachStore.settings.outputMode.includes('speech')
 )
+
+const simpleModeNeedsRestore = computed(
+  () =>
+    !coachStore.settings.autoStartEnabled ||
+    coachStore.settings.shadowModeEnabled ||
+    coachStore.settings.muted ||
+    !speechOutputEnabled.value
+)
+
+const primaryUnavailableReason = computed<CoachUnavailableReason | null>(
+  () => Object.values(coachStore.capability.unavailable)[0] ?? null
+)
+
+const quickStartStatus = computed(() => {
+  if (coachStore.session.state === 'shadow' || coachStore.settings.shadowModeEnabled) {
+    return {
+      type: 'warning' as const,
+      titleKey: 'liveCoach.overview.quickStart.shadowTitle',
+      descriptionKey: 'liveCoach.overview.quickStart.shadowDescription',
+      showDiagnostics: false
+    }
+  }
+  if (coachStore.session.state === 'paused') {
+    return {
+      type: 'warning' as const,
+      titleKey: 'liveCoach.overview.quickStart.pausedTitle',
+      descriptionKey: 'liveCoach.overview.quickStart.pausedDescription',
+      showDiagnostics: false
+    }
+  }
+  if (['degraded', 'disabled'].includes(coachStore.session.state)) {
+    return {
+      type: 'warning' as const,
+      titleKey: 'liveCoach.overview.quickStart.blockedTitle',
+      descriptionKey: 'liveCoach.overview.quickStart.blockedDescription',
+      showDiagnostics: true
+    }
+  }
+  if (!coachStore.settings.autoStartEnabled) {
+    return {
+      type: 'warning' as const,
+      titleKey: 'liveCoach.overview.quickStart.manualTitle',
+      descriptionKey: 'liveCoach.overview.quickStart.manualDescription',
+      showDiagnostics: false
+    }
+  }
+  if (coachStore.settings.muted) {
+    return {
+      type: 'warning' as const,
+      titleKey: 'liveCoach.overview.quickStart.mutedTitle',
+      descriptionKey: 'liveCoach.overview.quickStart.mutedDescription',
+      showDiagnostics: false
+    }
+  }
+  if (speechOutputEnabled.value && coachStore.speech.state === 'unavailable') {
+    return {
+      type: 'warning' as const,
+      titleKey: 'liveCoach.overview.quickStart.speechUnavailableTitle',
+      descriptionKey: 'liveCoach.overview.quickStart.speechUnavailableDescription',
+      showDiagnostics: true
+    }
+  }
+  if (coachStore.session.state === 'active') {
+    return {
+      type: 'success' as const,
+      titleKey:
+        coachStore.session.queueId === 0
+          ? 'liveCoach.overview.quickStart.runningCustomTitle'
+          : 'liveCoach.overview.quickStart.runningTitle',
+      descriptionKey: 'liveCoach.overview.quickStart.runningDescription',
+      showDiagnostics: false
+    }
+  }
+  return {
+    type: 'info' as const,
+    titleKey: 'liveCoach.overview.quickStart.readyTitle',
+    descriptionKey: 'liveCoach.overview.quickStart.readyDescription',
+    showDiagnostics: false
+  }
+})
 
 const displayedCues = computed<CoachCuePublicDto[]>(() => {
   const cues = coachStore.recentCues.toReversed()
@@ -913,44 +838,73 @@ async function confirmCommunication(cueId: string, optionId: string) {
   }
 }
 
-function handleEnabledChange(enabled: boolean) {
-  if (!enabled) {
-    void coachShard.setEnabled(false)
-    return
+async function handleEnabledChange(enabled: boolean) {
+  try {
+    if (!enabled) {
+      await coachShard.setEnabled(false)
+      return
+    }
+    if (privacyConsentGranted.value) {
+      await coachShard.setEnabled(true)
+      return
+    }
+    openOnboarding(true)
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : String(error))
   }
-  if (privacyConsentGranted.value) {
-    void coachShard.setEnabled(true)
-    return
-  }
-  openOnboarding(true)
 }
 
 function openOnboarding(enableAfterCompletion: boolean) {
-  onboardingStep.value = 1
-  onboardingPath.value = 'realtime'
   onboardingAcknowledged.value = false
   onboardingWillEnable.value = enableAfterCompletion
   showOnboarding.value = true
 }
 
 async function completeOnboarding() {
-  if (!privacyConsentGranted.value) {
-    await coachShard.setOnboardingCompleted(true)
-  }
-  if (onboardingPath.value === 'offline') {
+  try {
+    if (!privacyConsentGranted.value) {
+      await coachShard.setOnboardingCompleted(true)
+    }
+    if (onboardingWillEnable.value) {
+      await restoreSimpleMode(false)
+      await coachShard.setEnabled(true)
+      message.success(t('liveCoach.onboarding.enabledSuccess'))
+    }
     showOnboarding.value = false
-    await router.push({ name: 'live-coach', params: { section: 'reviews' } })
-    return
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : String(error))
   }
-  if (onboardingWillEnable.value) {
-    await coachShard.setEnabled(true)
-  }
-  showOnboarding.value = false
 }
 
-function openOnboardingSection(section: string) {
-  showOnboarding.value = false
-  void router.push({ name: 'live-coach', params: { section } })
+async function restoreSimpleMode(notify = true) {
+  const modes = Array.from(
+    new Set<'sound' | 'subtitle' | 'speech'>([
+      ...coachStore.settings.outputMode,
+      'subtitle',
+      'speech'
+    ])
+  )
+  try {
+    await coachShard.setAutoStartEnabled(true)
+    await coachShard.setShadowModeEnabled(false)
+    await coachShard.setMuted(false)
+    await coachShard.setSpeechEnabled(true)
+    await coachShard.setOutputMode(modes)
+    if (notify) message.success(t('liveCoach.overview.simpleModeRestored'))
+  } catch (error) {
+    if (notify) message.error(error instanceof Error ? error.message : String(error))
+    if (!notify) throw error
+  }
+}
+
+function openDiagnostics() {
+  void router.push({ name: 'live-coach', params: { section: 'diagnostics' } })
+}
+
+function unavailableReasonLabel(reason: CoachUnavailableReason | null) {
+  return reason
+    ? t(`liveCoach.diagnostics.unavailableReasons.${reason}`, reason)
+    : t('liveCoach.overview.quickStart.waitingForGame')
 }
 
 function openReplayHistory() {

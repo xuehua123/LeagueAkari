@@ -28,6 +28,7 @@ import {
   createLiveCoachDiagnosticsReport,
   liveCoachDiagnosticsReportSchema
 } from './diagnostics-report'
+import { resolveLiveCoachGameflowContext } from './gameflow-context'
 import { createLiveCoachLocalDataExport, liveCoachLocalDataExportSchema } from './local-data-export'
 import type { LocalSpeechExecutor } from './local-speech-executor'
 import {
@@ -94,8 +95,7 @@ export class LiveCoachIpcHandlers {
         throw new Error('当前没有可启动教练的进行中对局')
       }
 
-      const mapId = gameflowSession.map?.id ?? null
-      const queueId = gameflowSession.gameData?.queue?.id ?? null
+      const { mapId, queueId } = resolveLiveCoachGameflowContext(gameflowSession)
       const sessionId = resolveLiveGameSessionId(gameflowSession.gameData?.gameId)
       const patch =
         this._context.state.session.patch || this._sessionController.latestPatch || 'unknown'

@@ -205,7 +205,6 @@ const isVisualCoachPartial = computed(
   () =>
     coachStore.session.state === 'active' &&
     (!coachStore.capability.enabledFeatureIds.includes('coach.analyze.minimap-basic') ||
-      coachStore.capture.backend === 'desktopCapturer' ||
       coachStore.capture.backend === 'unavailable' ||
       coachStore.lastError?.code === 'capture-stalled')
 )

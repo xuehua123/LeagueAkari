@@ -23,7 +23,6 @@ export const PHASE_ONE_CAPABILITY_IDS: readonly CoachCapabilityId[] = Object.fre
   'coach.output.tts'
 ])
 
-const INTERNAL_SUMMONERS_RIFT_QUEUES = Object.freeze([0, 400, 420, 430, 440])
 const PATCH_LOCKED_CAPABILITIES = new Set<CoachCapabilityId>([
   'coach.analyze.minimap-identity',
   'coach.analyze.fog-inference',
@@ -31,19 +30,25 @@ const PATCH_LOCKED_CAPABILITIES = new Set<CoachCapabilityId>([
   'coach.guidance.micro',
   'coach.track.cooldowns'
 ])
+const WINDOWS_CAPTURE_CAPABILITIES = new Set<CoachCapabilityId>([
+  'coach.capture.screen',
+  'coach.analyze.minimap-basic',
+  'coach.analyze.minimap-advanced',
+  'coach.analyze.minimap-identity',
+  'coach.analyze.fog-inference'
+])
 
 function createInternalRule(id: CoachCapabilityId): LiveCoachCapabilityRule {
   if (id === 'coach.offline-review') {
-    return { id, version: '1', enabled: true, supportedPlatforms: ['win32'] }
+    return { id, version: '1', enabled: true }
   }
 
   return {
     id,
     version: '1',
     enabled: true,
-    supportedPlatforms: ['win32'],
+    ...(WINDOWS_CAPTURE_CAPABILITIES.has(id) ? { supportedPlatforms: ['win32'] as const } : {}),
     supportedMaps: [11],
-    supportedQueues: [...INTERNAL_SUMMONERS_RIFT_QUEUES],
     ...(PATCH_LOCKED_CAPABILITIES.has(id)
       ? { minPatch: CURRENT_LIVE_COACH_PATCH, maxPatch: CURRENT_LIVE_COACH_PATCH }
       : {})

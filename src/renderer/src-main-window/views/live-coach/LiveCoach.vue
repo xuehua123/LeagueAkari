@@ -1,5 +1,7 @@
 <template>
+  <Diagnostics v-if="route.params.section === 'diagnostics'" />
   <TabbedPage
+    v-else
     :icon="BotIcon"
     :title="t('liveCoach.title', '实时语音 AI 教练')"
     :tabs="tabs"
@@ -12,7 +14,6 @@
 import {
   Bot24Regular as BotIcon,
   Headset24Regular as HeadsetIcon,
-  HeartPulse24Regular as ActivityIcon,
   History24Regular as HistoryIcon,
   Map24Regular as MapIcon,
   Navigation24Regular as NavigationIcon,
@@ -22,6 +23,7 @@ import {
 } from '@vicons/fluent'
 import { useTranslation } from 'i18next-vue'
 import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 
 import TabbedPage, { TabConfig } from '@main-window/components/TabbedPage.vue'
 
@@ -35,6 +37,7 @@ import Reviews from './Reviews.vue'
 import VoiceSettings from './VoiceSettings.vue'
 
 const { t } = useTranslation()
+const route = useRoute()
 
 const tabs = computed<TabConfig[]>(() => [
   {
@@ -72,12 +75,6 @@ const tabs = computed<TabConfig[]>(() => [
     name: t('liveCoach.tabs.privacy', '隐私与授权'),
     icon: ShieldIcon,
     component: Privacy
-  },
-  {
-    key: 'diagnostics',
-    name: t('liveCoach.tabs.diagnostics', '运行诊断'),
-    icon: ActivityIcon,
-    component: Diagnostics
   },
   {
     key: 'help',

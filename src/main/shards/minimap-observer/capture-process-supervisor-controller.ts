@@ -58,7 +58,13 @@ type InspectNativeCaptureTarget = (options: {
 }) => NativeCaptureTargetEnvironment | null
 
 const LEAGUE_GAME_WINDOW_TITLE = 'League of Legends (TM) Client'
-const NATIVE_CAPTURE_RETRY_DELAYS_MS = [500, 1000, 2000, 4000] as const
+const NATIVE_CAPTURE_RETRY_DELAYS_MS = [15_000, 30_000, 60_000] as const
+const NATIVE_CAPTURE_PROBE_TIMEOUT_MS = 5000
+const WORKER_INITIALIZATION_TIMEOUT_MS = 30_000
+const NATIVE_CAPTURE_FPS = 10
+const COMPATIBILITY_CAPTURE_FPS = 5
+const COMPATIBILITY_CAPTURE_SIZE = { width: 1600, height: 900 } as const
+const AUTOMATIC_RECALIBRATION_DELAYS_MS = [2000, 5000, 15_000, 30_000] as const
 
 function parseDesktopCapturerWindowHandle(sourceId: string): number | null {
   const match = sourceId.match(/^window:(\d+):/)
@@ -136,6 +142,7 @@ function inspectNativeCaptureTarget(options: {
 
 export class CaptureProcessSupervisorController {
   private _worker: UtilityProcess | null = null
+  private _workerReady = false
   private _isSupervising = false
   private _currentSessionId = ''
   private readonly _maxCrashLimit = 3
@@ -149,15 +156,20 @@ export class CaptureProcessSupervisorController {
   private _nativeCaptureRetryCount = 0
   private _nativeCaptureRetryInFlight = false
   private _nativeCaptureRetryGeneration = 0
+  private _nativeCaptureProbeTimer: NodeJS.Timeout | null = null
+  private _nativeCaptureAttemptActive = false
   private _lifecycleVersion = 0
   private _simulationTimer: NodeJS.Timeout | null = null
   private _heartbeatTimer: NodeJS.Timeout | null = null
+  private _workerInitializationTimer: NodeJS.Timeout | null = null
   private _lastWorkerHeartbeatAt = 0
   private _heartbeatSequence = 0
   private _workerRestartCount = 0
   private _dropCountBase = 0
   private _lastCaptureResolution: { width: number; height: number } | null = null
   private _recalibrationInFlight = false
+  private _automaticRecalibrationAttempt = 0
+  private _nextAutomaticRecalibrationAt = 0
   private _onObservationBatchCallback: ((batch: MinimapObservationBatch) => void) | null = null
   private _currentCalibration: MinimapCalibration | null = null
   private _targetPid: number | null = null
@@ -257,9 +269,9 @@ export class CaptureProcessSupervisorController {
 
     return {
       supported: true,
-      // desktopCapturer is intentionally limited to one-shot diagnostics/calibration.
-      // Production minimap analysis requires a native WGC or DDA backend.
-      realtimeSupported: nativeBackends.length > 0,
+      // WGC/DDA remain preferred, but Electron window capture is a real compatibility backend.
+      // A missing or temporarily unavailable native addon must not make the whole coach unusable.
+      realtimeSupported: true,
       platform,
       backends: [...nativeBackends, 'desktopCapturer'],
       nativeBackends,
@@ -299,7 +311,11 @@ export class CaptureProcessSupervisorController {
       throw new Error('未找到正在运行的英雄联盟游戏窗口，无法生成小地图标定预览')
     }
 
-    if (process.platform === 'win32' && !this._updateTargetWindowFromSource(source)) {
+    if (
+      process.platform === 'win32' &&
+      !this._updateTargetWindowFromSource(source) &&
+      source.name !== LEAGUE_GAME_WINDOW_TITLE
+    ) {
       throw new Error('无法验证英雄联盟游戏窗口所属进程，未应用标定预览')
     }
 
@@ -351,6 +367,8 @@ export class CaptureProcessSupervisorController {
 
   private _currentPatch: string = 'unknown'
   private _identityModelDescriptor: { version: string; sha256: string } | null = null
+  private _identityModelLoading = false
+  private _skipIdentityModelForSession = false
 
   private _targetHwnd: number | null = null
 
@@ -360,8 +378,14 @@ export class CaptureProcessSupervisorController {
     if (this._nativeCaptureFailed && !ignoreNativeCaptureFailure) return 'desktopCapturer'
     const configured = this._context.liveCoach.settings.captureBackend
     const support = this._detectNativeCaptureSupport()
-    if (configured === 'dda' && support.dda) return 'dda'
-    if (configured === 'wgc' && support.wgc) return 'wgc'
+    if (configured === 'dda') {
+      if (support.dda) return 'dda'
+      if (support.wgc) return 'wgc'
+    }
+    if (configured === 'wgc') {
+      if (support.wgc) return 'wgc'
+      if (support.dda) return 'dda'
+    }
     if (configured === 'auto') {
       if (support.wgc && support.dda) return 'auto'
       if (support.wgc) return 'wgc'
@@ -443,7 +467,9 @@ export class CaptureProcessSupervisorController {
         if (!this._isCurrentLifecycle(lifecycleVersion, sessionId)) return
         if (source?.thumbnail && !source.thumbnail.isEmpty()) {
           const targetVerified =
-            process.platform !== 'win32' || this._updateTargetWindowFromSource(source)
+            process.platform !== 'win32' ||
+            this._updateTargetWindowFromSource(source) ||
+            source.name === LEAGUE_GAME_WINDOW_TITLE
           const size = source.thumbnail.getSize()
           if (targetVerified && size.width >= 320 && size.height >= 240) {
             this._currentCalibration = this._calibrationController.applyAutomaticDetection(
@@ -500,12 +526,13 @@ export class CaptureProcessSupervisorController {
       `Starting MinimapObserver capture supervisor, backend: ${backend}, targetPid: ${this._targetPid}, targetHwnd: ${this._targetHwnd}`
     )
     this._context.state.setIsCapturing(true)
-    this._context.state.setFps(10)
+    this._context.state.setFps(
+      backend === 'desktopCapturer' ? COMPATIBILITY_CAPTURE_FPS : NATIVE_CAPTURE_FPS
+    )
 
     try {
       const workerCalibration = this._currentCalibration ?? effectiveCalibration
       this._spawnWorker(sessionId, workerCalibration)
-      if (backend === 'desktopCapturer') this._startCaptureLoop()
     } catch (error) {
       const warningMessage = formatSanitizedErrorLog(
         'Failed to spawn utility worker; falling back to degraded status',
@@ -575,11 +602,17 @@ export class CaptureProcessSupervisorController {
   private _stopWorkerRuntime(stoppedSessionId: string): void {
     this._captureInFlight = false
     this._nativeCaptureFailed = false
+    this._nativeCaptureAttemptActive = false
     this._clearNativeCaptureRetry(true)
+    this._clearNativeCaptureProbe()
     this._lastCaptureResolution = null
     this._recalibrationInFlight = false
+    this._automaticRecalibrationAttempt = 0
+    this._nextAutomaticRecalibrationAt = 0
     this._context.liveCoach.setIdentityModelLoaded(false)
     this._identityModelDescriptor = null
+    this._identityModelLoading = false
+    this._skipIdentityModelForSession = false
 
     if (this._captureTimer) {
       clearInterval(this._captureTimer)
@@ -592,12 +625,14 @@ export class CaptureProcessSupervisorController {
     }
 
     this._stopHeartbeatMonitor()
+    this._stopWorkerInitializationTimeout()
 
     if (this._worker) {
       const worker = this._worker
       // Detach first so a synchronous/late exit event from this lifecycle cannot affect the next
       // worker assigned during a session-id promotion.
       this._worker = null
+      this._workerReady = false
       try {
         worker.postMessage({
           type: 'stop',
@@ -643,6 +678,7 @@ export class CaptureProcessSupervisorController {
     })
 
     this._worker = child
+    this._workerReady = false
 
     child.on('message', (rawMsg: unknown) => {
       if (this._worker !== child) return
@@ -657,8 +693,6 @@ export class CaptureProcessSupervisorController {
     })
 
     this._initializeWorker(child)
-
-    this._postWorkerStart(sessionId, calibration)
   }
 
   private _handleWorkerExit(
@@ -671,8 +705,18 @@ export class CaptureProcessSupervisorController {
     if (this._worker !== child) return
     this._context.logger.warn(`Minimap worker exited with code ${code}`)
     this._worker = null
+    this._workerReady = false
     this._clearNativeCaptureRetry(false)
+    this._clearNativeCaptureProbe()
     this._stopHeartbeatMonitor()
+    this._stopWorkerInitializationTimeout()
+    if (this._identityModelLoading) {
+      this._identityModelLoading = false
+      this._skipIdentityModelForSession = true
+      this._context.logger.warn(
+        'Optional identity model stalled with the worker; restarting without identity analysis'
+      )
+    }
     this._context.liveCoach.setIdentityModelLoaded(false)
     const now = Date.now()
     this._workerCrashTimestamps = this._workerCrashTimestamps
@@ -698,10 +742,7 @@ export class CaptureProcessSupervisorController {
       workerRestartCount: this._workerRestartCount
     })
     this._spawnWorker(sessionId, this._currentCalibration ?? calibration)
-    if (
-      this._nativeCaptureFailed &&
-      this._nativeCaptureRetryCount < NATIVE_CAPTURE_RETRY_DELAYS_MS.length
-    ) {
+    if (this._nativeCaptureFailed) {
       this._scheduleNativeCaptureRetry()
     }
   }
@@ -723,6 +764,8 @@ export class CaptureProcessSupervisorController {
     this._identityModelDescriptor = identityModel
       ? { version: identityModel.version, sha256: identityModel.sha256 }
       : null
+    const workerIdentityModel = this._skipIdentityModelForSession ? null : identityModel
+    this._identityModelLoading = Boolean(workerIdentityModel)
     this._context.liveCoach.setIdentityModelLoaded(false)
     let nativeRuntimeRoot: string | undefined
     if (process.platform === 'win32') {
@@ -736,9 +779,9 @@ export class CaptureProcessSupervisorController {
       type: 'initialize',
       protocolVersion: '1.0.0',
       runtimePaths: nativeRuntimeRoot ? { nativeRuntimeRoot } : {},
-      modelManifest: identityModel ? { 'champion-icon-onnx': identityModel } : {}
+      modelManifest: workerIdentityModel ? { 'champion-icon-onnx': workerIdentityModel } : {}
     })
-    this._startHeartbeatMonitor(child)
+    this._startWorkerInitializationTimeout(child)
   }
 
   private _postWorkerStart(
@@ -746,7 +789,7 @@ export class CaptureProcessSupervisorController {
     calibration: MinimapCalibration,
     backend = this._getEffectiveBackend()
   ): void {
-    if (!this._worker) return
+    if (!this._worker || !this._workerReady) return
     // The worker resets its raw frameDropCount for every start message (including calibration
     // refreshes). Carry the published logical total forward before triggering that reset.
     this._dropCountBase = Math.max(
@@ -757,6 +800,7 @@ export class CaptureProcessSupervisorController {
     const sourceWidth = fingerprint.width ?? 1
     const sourceHeight = fingerprint.height ?? 1
     const championRoster = this._getChampionRoster()
+    const fps = backend === 'desktopCapturer' ? COMPATIBILITY_CAPTURE_FPS : NATIVE_CAPTURE_FPS
     this._worker.postMessage({
       type: 'start',
       sessionId,
@@ -770,7 +814,7 @@ export class CaptureProcessSupervisorController {
       enemyChampionCandidates: championRoster.enemy,
       selfChampionId: championRoster.selfChampionId,
       captureConfig: {
-        fps: 10,
+        fps,
         normalizedRoi: calibration.roi,
         roi: {
           x: Math.round(calibration.roi.x * sourceWidth),
@@ -780,6 +824,80 @@ export class CaptureProcessSupervisorController {
         }
       }
     })
+    if (backend === 'desktopCapturer') {
+      this._nativeCaptureAttemptActive = false
+      this._clearNativeCaptureProbe()
+      if (!this._captureTimer) this._startCaptureLoop()
+    } else {
+      this._nativeCaptureAttemptActive = true
+      this._startNativeCaptureProbe(this._worker)
+    }
+  }
+
+  private _startNativeCaptureProbe(worker: UtilityProcess): void {
+    this._clearNativeCaptureProbe()
+    const lifecycleVersion = this._lifecycleVersion
+    const sessionId = this._currentSessionId
+    const timer = setTimeout(() => {
+      if (
+        this._nativeCaptureProbeTimer !== timer ||
+        !this._isCurrentLifecycle(lifecycleVersion, sessionId) ||
+        this._worker !== worker
+      ) {
+        return
+      }
+      this._nativeCaptureProbeTimer = null
+      this._context.logger.warn('Native capture produced no fresh frame; using compatibility mode')
+      this._activateCompatibilityCapture('原生采集暂时没有画面，已自动切换兼容模式')
+    }, NATIVE_CAPTURE_PROBE_TIMEOUT_MS)
+    this._nativeCaptureProbeTimer = timer
+    timer.unref?.()
+  }
+
+  private _clearNativeCaptureProbe(): void {
+    if (!this._nativeCaptureProbeTimer) return
+    clearTimeout(this._nativeCaptureProbeTimer)
+    this._nativeCaptureProbeTimer = null
+  }
+
+  private _activateCompatibilityCapture(details?: string): void {
+    if (!this._isSupervising || !this._worker || !this._currentSessionId) return
+    const compatibilityAlreadyRunning = this._nativeCaptureFailed && Boolean(this._captureTimer)
+    const shouldResetWorkerToCompatibility =
+      this._nativeCaptureAttemptActive || !compatibilityAlreadyRunning
+    if (!this._nativeCaptureFailed) {
+      this._context.logger.warn('Native capture unavailable; activating compatibility mode')
+    }
+    this._nativeCaptureFailed = true
+    this._nativeCaptureAttemptActive = false
+    this._clearNativeCaptureProbe()
+    this._context.state.setBackend('desktopCapturer')
+    this._context.state.setRoiHealth('unknown')
+    this._context.liveCoach.state.setCaptureState({
+      backend: 'desktopCapturer',
+      roiState: 'unknown'
+    })
+    this._context.liveCoach.refreshRuntimeCapabilities({
+      roiHealth: 'unknown',
+      state: 'running',
+      liveDataHealth: this._context.liveCoach.state.liveData.state,
+      backend: 'desktopCapturer'
+    })
+    if (!this._currentCalibration) {
+      this._currentCalibration = this._calibrationController.getOrCreateCalibration()
+    }
+    if (shouldResetWorkerToCompatibility) {
+      this._postWorkerStart(this._currentSessionId, this._currentCalibration, 'desktopCapturer')
+    }
+    if (details) {
+      this._setPublicError({
+        code: 'capture-stalled',
+        stage: 'minimap-capture',
+        recoverable: true,
+        details
+      })
+    }
+    this._scheduleNativeCaptureRetry()
   }
 
   private async _findGameCaptureSource(thumbnailWidth: number, thumbnailHeight: number) {
@@ -808,7 +926,6 @@ export class CaptureProcessSupervisorController {
     if (
       this._nativeCaptureRetryTimer ||
       this._nativeCaptureRetryInFlight ||
-      this._nativeCaptureRetryCount >= NATIVE_CAPTURE_RETRY_DELAYS_MS.length ||
       !this._isSupervising ||
       !this._worker ||
       !this._currentSessionId
@@ -816,7 +933,10 @@ export class CaptureProcessSupervisorController {
       return
     }
 
-    const retryIndex = this._nativeCaptureRetryCount
+    const retryIndex = Math.min(
+      this._nativeCaptureRetryCount,
+      NATIVE_CAPTURE_RETRY_DELAYS_MS.length - 1
+    )
     const lifecycleVersion = this._lifecycleVersion
     const sessionId = this._currentSessionId
     const worker = this._worker
@@ -831,7 +951,7 @@ export class CaptureProcessSupervisorController {
       ) {
         return
       }
-      this._nativeCaptureRetryCount = retryIndex + 1
+      this._nativeCaptureRetryCount++
       this._nativeCaptureRetryInFlight = true
       void this._retryNativeCapture(lifecycleVersion, sessionId, worker, retryGeneration)
     }, NATIVE_CAPTURE_RETRY_DELAYS_MS[retryIndex])
@@ -905,6 +1025,8 @@ export class CaptureProcessSupervisorController {
 
   private _markNativeCaptureRecovered(): void {
     this._nativeCaptureFailed = false
+    this._nativeCaptureAttemptActive = false
+    this._clearNativeCaptureProbe()
     this._clearNativeCaptureRetry(true)
     if (this._captureTimer) {
       clearInterval(this._captureTimer)
@@ -989,7 +1111,9 @@ export class CaptureProcessSupervisorController {
       clearInterval(this._captureTimer)
     }
 
-    // 10 FPS 采样向 Worker 提供真实画面帧（支持 4K / 2K / 1080p 动态分辨率）
+    // Compatibility capture intentionally runs at a lower rate and bounded thumbnail size so
+    // low-end machines and 4K desktops remain usable while native WGC/DDA is unavailable.
+    const intervalMs = Math.floor(1000 / COMPATIBILITY_CAPTURE_FPS)
     this._captureTimer = setInterval(async () => {
       if (
         this._captureInFlight ||
@@ -1007,7 +1131,10 @@ export class CaptureProcessSupervisorController {
       this._captureInFlight = true
       try {
         // 精准匹配英雄联盟游戏客户端窗口，严禁回退到随机桌面或无关窗口
-        const gameSource = await this._findGameCaptureSource(3840, 2160)
+        const gameSource = await this._findGameCaptureSource(
+          COMPATIBILITY_CAPTURE_SIZE.width,
+          COMPATIBILITY_CAPTURE_SIZE.height
+        )
         if (!this._isCurrentLifecycle(lifecycleVersion, sessionId) || this._worker !== worker) {
           return
         }
@@ -1057,7 +1184,7 @@ export class CaptureProcessSupervisorController {
           this._captureInFlight = false
         }
       }
-    }, 100)
+    }, intervalMs)
   }
 
   private _handleWorkerMessage(msg: WorkerToMainMessage): void {
@@ -1071,7 +1198,19 @@ export class CaptureProcessSupervisorController {
         break
       case 'ready':
         {
+          const wasReady = this._workerReady
+          this._workerReady = true
+          if (!wasReady) {
+            this._stopWorkerInitializationTimeout()
+            if (this._worker) this._startHeartbeatMonitor(this._worker)
+            if (this._isSupervising && this._currentSessionId && this._currentCalibration) {
+              this._postWorkerStart(this._currentSessionId, this._currentCalibration)
+            }
+          }
           const identityReady = Boolean(msg.runtimeVersions['champion-icon-onnx'])
+          if (identityReady || !this._identityModelDescriptor) {
+            this._identityModelLoading = false
+          }
           this._context.liveCoach.setIdentityModelLoaded(
             identityReady,
             this._identityModelDescriptor
@@ -1085,7 +1224,7 @@ export class CaptureProcessSupervisorController {
         }
         break
       case 'status':
-        if (msg.backend === 'wgc' || msg.backend === 'dda') {
+        if ((msg.backend === 'wgc' || msg.backend === 'dda') && msg.fps > 0) {
           this._markNativeCaptureRecovered()
         }
         {
@@ -1143,14 +1282,14 @@ export class CaptureProcessSupervisorController {
           liveDataHealth: this._context.liveCoach.state.liveData.state,
           backend: msg.backend
         })
-        if (msg.backend === 'desktopCapturer') {
-          this._setPublicError({
-            code: 'capture-stalled',
-            stage: 'minimap-capture',
-            recoverable: true,
-            details: '原生 WGC/DDA 不可用；桌面缩略图仅用于诊断，不会启用正式实时分析'
-          })
-        } else if (publishedRoiHealth === 'healthy') {
+        if (publishedRoiHealth === 'healthy') {
+          this._automaticRecalibrationAttempt = 0
+          this._nextAutomaticRecalibrationAt = 0
+          if (msg.backend === 'desktopCapturer' && !this._nativeCaptureAttemptActive) {
+            // A healthy compatibility stream is preferable to periodically resetting tracking
+            // just to probe an optional native acceleration path.
+            this._clearNativeCaptureRetry(false)
+          }
           const lastError = this._context.liveCoach.state.lastError
           if (
             lastError?.stage === 'minimap-capture' ||
@@ -1165,6 +1304,7 @@ export class CaptureProcessSupervisorController {
             recoverable: true,
             details: '小地图区域被遮挡、冻结或标定置信度不足，相关提醒已暂停'
           })
+          this._tryAutomaticRecalibration()
         }
         break
       case 'observation-batch':
@@ -1220,32 +1360,18 @@ export class CaptureProcessSupervisorController {
           )
           this._setPublicError(publicError)
         }
-        this._context.state.setRoiHealth('degraded')
-        this._context.liveCoach.state.setCaptureState({ roiState: 'degraded' })
         if (msg.code === 'LC_ERR_IDENTITY_MODEL_LOAD_FAILED') {
+          this._identityModelLoading = false
           this._context.liveCoach.setIdentityModelLoaded(false)
+        } else {
+          this._context.state.setRoiHealth('degraded')
+          this._context.liveCoach.state.setCaptureState({ roiState: 'degraded' })
         }
         if (
           msg.code === 'LC_ERR_NATIVE_CAPTURE_UNAVAILABLE' ||
           msg.code === 'LC_ERR_NATIVE_CAPTURE_FAILED'
         ) {
-          if (!this._nativeCaptureFailed) {
-            this._context.logger.warn('Native capture failed; activating desktopCapturer fallback')
-          }
-          this._nativeCaptureFailed = true
-          this._context.state.setBackend('desktopCapturer')
-          this._context.liveCoach.state.setCaptureState({ backend: 'desktopCapturer' })
-          this._context.liveCoach.refreshRuntimeCapabilities({
-            roiHealth: 'degraded',
-            state: 'running',
-            liveDataHealth: this._context.liveCoach.state.liveData.state,
-            backend: 'desktopCapturer'
-          })
-          if (!this._currentCalibration) {
-            this._currentCalibration = this._calibrationController.getOrCreateCalibration()
-          }
-          if (!this._captureTimer) this._startCaptureLoop()
-          this._scheduleNativeCaptureRetry()
+          this._activateCompatibilityCapture()
         }
         break
     }
@@ -1279,6 +1405,24 @@ export class CaptureProcessSupervisorController {
     this._heartbeatTimer.unref?.()
   }
 
+  private _startWorkerInitializationTimeout(child: UtilityProcess): void {
+    this._stopWorkerInitializationTimeout()
+    const timer = setTimeout(() => {
+      if (this._worker !== child || this._workerInitializationTimer !== timer) return
+      this._workerInitializationTimer = null
+      this._context.logger.warn('Minimap worker initialization timed out; restarting worker')
+      child.kill()
+    }, WORKER_INITIALIZATION_TIMEOUT_MS)
+    this._workerInitializationTimer = timer
+    timer.unref?.()
+  }
+
+  private _stopWorkerInitializationTimeout(): void {
+    if (!this._workerInitializationTimer) return
+    clearTimeout(this._workerInitializationTimer)
+    this._workerInitializationTimer = null
+  }
+
   private _stopHeartbeatMonitor(): void {
     if (!this._heartbeatTimer) return
     clearInterval(this._heartbeatTimer)
@@ -1302,6 +1446,31 @@ export class CaptureProcessSupervisorController {
     this._context.liveCoach.state.setLastError(sanitizedError)
   }
 
+  private _tryAutomaticRecalibration(): void {
+    if (
+      !this._isSupervising ||
+      this._currentCalibration?.source === 'manual' ||
+      this._recalibrationInFlight ||
+      Date.now() < this._nextAutomaticRecalibrationAt
+    ) {
+      return
+    }
+
+    const delayIndex = Math.min(
+      this._automaticRecalibrationAttempt,
+      AUTOMATIC_RECALIBRATION_DELAYS_MS.length - 1
+    )
+    this._automaticRecalibrationAttempt++
+    this._nextAutomaticRecalibrationAt = Date.now() + AUTOMATIC_RECALIBRATION_DELAYS_MS[delayIndex]
+    this._recalibrationInFlight = true
+    void this._refreshCalibrationFromGameWindow(
+      this._lifecycleVersion,
+      this._currentSessionId
+    ).finally(() => {
+      this._recalibrationInFlight = false
+    })
+  }
+
   private async _refreshCalibrationFromGameWindow(
     lifecycleVersion: number,
     sessionId: string
@@ -1310,7 +1479,13 @@ export class CaptureProcessSupervisorController {
       const source = await this._findGameCaptureSource(1280, 720)
       if (!this._isCurrentLifecycle(lifecycleVersion, sessionId)) return
       if (!source?.thumbnail || source.thumbnail.isEmpty()) return
-      if (process.platform === 'win32' && !this._updateTargetWindowFromSource(source)) return
+      if (
+        process.platform === 'win32' &&
+        !this._updateTargetWindowFromSource(source) &&
+        source.name !== LEAGUE_GAME_WINDOW_TITLE
+      ) {
+        return
+      }
       const size = source.thumbnail.getSize()
       const calibration = this._calibrationController.applyAutomaticDetection(
         source.thumbnail.toBitmap(),

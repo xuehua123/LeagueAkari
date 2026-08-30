@@ -216,24 +216,69 @@ describe('LiveCoachCapabilityController', () => {
     )
   })
 
-  it('fails closed for a known but unauthorized Summoner Rift queue', () => {
+  it.each([0, 490, 9999])(
+    'allows resolved Summoner Rift queue %s in the internal capability policy',
+    (queueId) => {
+      const ctx = createMockContext()
+      const controller = new LiveCoachCapabilityController(ctx)
+
+      controller.evaluateCapabilities(11, queueId, '16.17.1', { roiHealth: 'healthy' })
+
+      expect(ctx.state.setCapability).toHaveBeenLastCalledWith(
+        expect.arrayContaining([
+          'coach.capture.screen',
+          'coach.analyze.minimap-basic',
+          'coach.guidance.item-purchase',
+          'coach.communication.chat'
+        ]),
+        expect.not.objectContaining({
+          queue: 'unsupported-queue',
+          'coach.capture.screen': 'unsupported-queue',
+          'coach.guidance.item-purchase': 'unsupported-queue'
+        })
+      )
+    }
+  )
+
+  it('keeps Live Data and subtitle capabilities available without Windows screen capture', () => {
     const ctx = createMockContext()
     const controller = new LiveCoachCapabilityController(ctx)
+    const platformDescriptor = Object.getOwnPropertyDescriptor(process, 'platform')
 
-    controller.evaluateCapabilities(11, 450, '16.17.1', { roiHealth: 'healthy' })
-
-    expect(ctx.state.setCapability).toHaveBeenLastCalledWith(
-      expect.not.arrayContaining([
-        'coach.capture.screen',
-        'coach.analyze.minimap-basic',
-        'coach.guidance.item-purchase',
-        'coach.communication.chat'
-      ]),
-      expect.objectContaining({
-        'coach.capture.screen': 'unsupported-queue',
-        'coach.guidance.item-purchase': 'unsupported-queue'
+    Object.defineProperty(process, 'platform', {
+      ...platformDescriptor,
+      configurable: true,
+      value: 'darwin'
+    })
+    try {
+      controller.evaluateCapabilities(11, 490, '16.17.1', {
+        roiHealth: 'unknown',
+        liveDataHealth: 'healthy'
       })
-    )
+
+      expect(ctx.state.capability.enabledFeatureIds).toEqual(
+        expect.arrayContaining([
+          'coach.offline-review',
+          'coach.guidance.item-purchase',
+          'coach.guidance.micro',
+          'coach.track.cooldowns',
+          'coach.output.subtitle',
+          'live-game-data'
+        ])
+      )
+      expect(ctx.state.capability.enabledFeatureIds).not.toEqual(
+        expect.arrayContaining(['coach.capture.screen', 'coach.analyze.minimap-basic'])
+      )
+      expect(ctx.state.capability.unavailableReasons).toMatchObject({
+        platform: 'unsupported-platform',
+        'coach.capture.screen': 'unsupported-platform',
+        'coach.analyze.minimap-basic': 'unsupported-platform'
+      })
+    } finally {
+      if (platformDescriptor) {
+        Object.defineProperty(process, 'platform', platformDescriptor)
+      }
+    }
   })
 
   it('requires a valid signed snapshot in public builds and applies per-rule constraints', () => {
@@ -448,7 +493,7 @@ describe('LiveCoachCapabilityController', () => {
     )
   })
 
-  it('keeps desktopCapturer for diagnostics but never enables realtime minimap analysis from it', () => {
+  it('uses healthy desktopCapturer as a compatibility backend and still gates unhealthy ROI', () => {
     const ctx = createMockContext()
     const controller = new LiveCoachCapabilityController(ctx)
 
@@ -458,21 +503,46 @@ describe('LiveCoachCapabilityController', () => {
     })
 
     expect(ctx.state.setCapability).toHaveBeenLastCalledWith(
-      expect.arrayContaining(['coach.capture.screen']),
-      expect.objectContaining({
-        'coach.analyze.minimap-basic': 'capability-disabled',
-        'coach.analyze.minimap-advanced': 'capability-disabled',
-        'coach.analyze.fog-inference': 'capability-disabled'
-      })
-    )
-    expect(ctx.state.setCapability).toHaveBeenLastCalledWith(
-      expect.not.arrayContaining([
+      expect.arrayContaining([
+        'coach.capture.screen',
         'coach.analyze.minimap-basic',
         'coach.analyze.minimap-advanced',
         'coach.analyze.fog-inference'
       ]),
       expect.anything()
     )
+    expect(ctx.state.capability.unavailableReasons).not.toHaveProperty(
+      'coach.analyze.minimap-basic'
+    )
+    expect(ctx.state.capability.unavailableReasons).not.toHaveProperty(
+      'coach.analyze.minimap-advanced'
+    )
+    expect(ctx.state.capability.unavailableReasons).not.toHaveProperty(
+      'coach.analyze.fog-inference'
+    )
+    expect(ctx.state.capability.enabledFeatureIds).not.toContain('coach.analyze.minimap-identity')
+    expect(ctx.state.capability.unavailableReasons).toMatchObject({
+      'coach.analyze.minimap-identity': 'capability-disabled'
+    })
+
+    controller.evaluateCapabilities(11, 420, '16.17.1', {
+      roiHealth: 'degraded',
+      backend: 'desktopCapturer'
+    })
+
+    expect(ctx.state.setCapability).toHaveBeenLastCalledWith(
+      expect.not.arrayContaining([
+        'coach.analyze.minimap-basic',
+        'coach.analyze.minimap-advanced',
+        'coach.analyze.fog-inference'
+      ]),
+      expect.objectContaining({
+        'coach.analyze.minimap-basic': 'roi-occluded',
+        'coach.analyze.minimap-advanced': 'roi-occluded',
+        'coach.analyze.fog-inference': 'roi-occluded'
+      })
+    )
+    expect(ctx.state.capability.enabledFeatureIds).toContain('coach.capture.screen')
   })
 
   it('keeps offline review available when the realtime coach master switch is off', () => {

@@ -102,34 +102,22 @@ const expandedTopics = ref<string[]>([])
 
 const quickStartSteps = computed(() => [
   {
-    section: 'diagnostics',
-    title: t('liveCoach.help.steps.environment.title'),
-    description: t('liveCoach.help.steps.environment.description'),
-    action: t('liveCoach.help.steps.environment.action')
+    section: 'overview',
+    title: t('liveCoach.help.steps.enable.title'),
+    description: t('liveCoach.help.steps.enable.description'),
+    action: t('liveCoach.help.steps.enable.action')
   },
   {
-    section: 'calibration',
-    title: t('liveCoach.help.steps.calibration.title'),
-    description: t('liveCoach.help.steps.calibration.description'),
-    action: t('liveCoach.help.steps.calibration.action')
+    section: 'overview',
+    title: t('liveCoach.help.steps.enterGame.title'),
+    description: t('liveCoach.help.steps.enterGame.description'),
+    action: t('liveCoach.help.steps.enterGame.action')
   },
   {
     section: 'coach',
-    title: t('liveCoach.help.steps.controls.title'),
-    description: t('liveCoach.help.steps.controls.description'),
-    action: t('liveCoach.help.steps.controls.action')
-  },
-  {
-    section: 'reviews',
-    title: t('liveCoach.help.steps.replay.title'),
-    description: t('liveCoach.help.steps.replay.description'),
-    action: t('liveCoach.help.steps.replay.action')
-  },
-  {
-    section: 'privacy',
-    title: t('liveCoach.help.steps.privacy.title'),
-    description: t('liveCoach.help.steps.privacy.description'),
-    action: t('liveCoach.help.steps.privacy.action')
+    title: t('liveCoach.help.steps.personalize.title'),
+    description: t('liveCoach.help.steps.personalize.description'),
+    action: t('liveCoach.help.steps.personalize.action')
   }
 ])
 

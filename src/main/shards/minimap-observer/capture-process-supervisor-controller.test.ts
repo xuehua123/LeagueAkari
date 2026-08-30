@@ -407,7 +407,7 @@ describe('CaptureProcessSupervisorController Deadlock & Gate A Lifecycle Test', 
     expect((supervisor as any)._getEffectiveBackend()).toBe('desktopCapturer')
     expect(supervisor.probeCaptureSupport()).toMatchObject({
       supported: true,
-      realtimeSupported: false,
+      realtimeSupported: true,
       backends: ['desktopCapturer'],
       nativeBackends: [],
       fallbackAvailable: true,
@@ -544,7 +544,8 @@ describe('CaptureProcessSupervisorController Deadlock & Gate A Lifecycle Test', 
       getOrCreateCalibration: vi.fn().mockReturnValue({
         id: 'desktop-fallback',
         roi: { x: 0.82, y: 0.72, width: 0.18, height: 0.28 }
-      })
+      }),
+      getEnvironmentFingerprint: vi.fn().mockReturnValue({ width: 1920, height: 1080 })
     }
     const supervisor = new CaptureProcessSupervisorController(
       ctx,
@@ -557,6 +558,10 @@ describe('CaptureProcessSupervisorController Deadlock & Gate A Lifecycle Test', 
     const automaticCalibrationSpy = vi
       .spyOn(supervisor as any, '_refreshCalibrationFromGameWindow')
       .mockResolvedValue(undefined)
+    ;(supervisor as any)._worker = { postMessage: vi.fn(), kill: vi.fn() }
+    ;(supervisor as any)._workerReady = true
+    ;(supervisor as any)._isSupervising = true
+    ;(supervisor as any)._currentSessionId = 'desktop-fallback-session'
 
     ;(supervisor as any)._handleWorkerMessage({
       type: 'error',
@@ -569,12 +574,12 @@ describe('CaptureProcessSupervisorController Deadlock & Gate A Lifecycle Test', 
     expect(fallbackSpy).toHaveBeenCalledOnce()
     expect(calibrationController.getOrCreateCalibration).toHaveBeenCalledOnce()
     expect(ctx.state.setBackend).toHaveBeenCalledWith('desktopCapturer')
-    expect(ctx.liveCoach.state.setCaptureState).toHaveBeenCalledWith({ roiState: 'degraded' })
     expect(ctx.liveCoach.state.setCaptureState).toHaveBeenCalledWith({
-      backend: 'desktopCapturer'
+      backend: 'desktopCapturer',
+      roiState: 'unknown'
     })
     expect(ctx.liveCoach.refreshRuntimeCapabilities).toHaveBeenCalledWith({
-      roiHealth: 'degraded',
+      roiHealth: 'unknown',
       state: 'running',
       liveDataHealth: 'healthy',
       backend: 'desktopCapturer'
@@ -585,7 +590,92 @@ describe('CaptureProcessSupervisorController Deadlock & Gate A Lifecycle Test', 
     expect(automaticCalibrationSpy).not.toHaveBeenCalled()
   })
 
-  it('retries native capture on one bounded backoff timer and preserves manual calibration', async () => {
+  it('falls back automatically when a native backend produces no fresh frame', async () => {
+    vi.useFakeTimers()
+    try {
+      const ctx = createMockContext()
+      const calibration = {
+        id: 'native-no-frame',
+        source: 'automatic',
+        roi: { x: 0.82, y: 0.72, width: 0.18, height: 0.28 }
+      }
+      const supervisor = new CaptureProcessSupervisorController(
+        ctx,
+        {
+          getOrCreateCalibration: vi.fn().mockReturnValue(calibration),
+          getEnvironmentFingerprint: vi.fn().mockReturnValue({ width: 1920, height: 1080 })
+        } as any,
+        {} as any,
+        () => ({ wgc: true, dda: true })
+      )
+      const worker = { postMessage: vi.fn(), kill: vi.fn() }
+      vi.spyOn(supervisor as any, '_startCaptureLoop').mockImplementation(() => {
+        ;(supervisor as any)._captureTimer = setInterval(() => {}, 200)
+      })
+      ;(supervisor as any)._worker = worker
+      ;(supervisor as any)._workerReady = true
+      ;(supervisor as any)._isSupervising = true
+      ;(supervisor as any)._currentSessionId = 'native-no-frame-session'
+      ;(supervisor as any)._currentCalibration = calibration
+
+      ;(supervisor as any)._postWorkerStart('native-no-frame-session', calibration, 'wgc')
+      ;(supervisor as any)._handleWorkerMessage({
+        type: 'status',
+        backend: 'wgc',
+        resolution: { width: 250, height: 250 },
+        sourceResolution: null,
+        hdr: false,
+        fps: 0,
+        roiHealth: 'unknown'
+      })
+
+      await vi.advanceTimersByTimeAsync(4999)
+      expect((supervisor as any)._nativeCaptureFailed).toBe(false)
+      await vi.advanceTimersByTimeAsync(1)
+
+      expect((supervisor as any)._nativeCaptureFailed).toBe(true)
+      expect(worker.postMessage).toHaveBeenLastCalledWith(
+        expect.objectContaining({ type: 'start', backend: 'desktopCapturer' })
+      )
+      expect(ctx.state.setBackend).toHaveBeenCalledWith('desktopCapturer')
+      expect((supervisor as any)._nativeCaptureRetryTimer).not.toBeNull()
+      supervisor.stopSupervising()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('silently retries automatic calibration after an unhealthy ROI', async () => {
+    const ctx = createMockContext()
+    const supervisor = new CaptureProcessSupervisorController(ctx, {} as any, {} as any)
+    const recalibrate = vi
+      .spyOn(supervisor as any, '_refreshCalibrationFromGameWindow')
+      .mockResolvedValue(undefined)
+    ;(supervisor as any)._isSupervising = true
+    ;(supervisor as any)._currentSessionId = 'auto-recalibration'
+    ;(supervisor as any)._currentCalibration = {
+      id: 'automatic-roi',
+      source: 'automatic',
+      roi: { x: 0.82, y: 0.72, width: 0.18, height: 0.28 }
+    }
+
+    const status = {
+      type: 'status' as const,
+      backend: 'desktopCapturer' as const,
+      resolution: { width: 250, height: 250 },
+      sourceResolution: null,
+      hdr: false,
+      fps: 5,
+      roiHealth: 'degraded' as const
+    }
+    ;(supervisor as any)._handleWorkerMessage(status)
+    await Promise.resolve()
+    ;(supervisor as any)._handleWorkerMessage(status)
+
+    expect(recalibrate).toHaveBeenCalledOnce()
+  })
+
+  it('keeps compatibility frames flowing while probing native capture and stops probing once healthy', async () => {
     vi.useFakeTimers()
     try {
       const ctx = createMockContext()
@@ -632,6 +722,7 @@ describe('CaptureProcessSupervisorController Deadlock & Gate A Lifecycle Test', 
         })
       vi.mocked(getPidsByName).mockClear().mockResolvedValue([72968])
       ;(supervisor as any)._worker = worker
+      ;(supervisor as any)._workerReady = true
       ;(supervisor as any)._isSupervising = true
       ;(supervisor as any)._currentSessionId = 'session-recovery'
       ;(supervisor as any)._currentCalibration = manualCalibration
@@ -649,27 +740,19 @@ describe('CaptureProcessSupervisorController Deadlock & Gate A Lifecycle Test', 
 
       expect(fallbackSpy).toHaveBeenCalledOnce()
       expect((supervisor as any)._nativeCaptureRetryTimer).not.toBeNull()
+      const compatibilityTimer = (supervisor as any)._captureTimer
 
-      const retryDelays = [500, 1000, 2000, 4000]
-      for (const [index, delay] of retryDelays.entries()) {
-        const startsBefore = worker.postMessage.mock.calls.filter(
-          ([message]) => message.type === 'start'
-        ).length
-        await vi.advanceTimersByTimeAsync(delay - 1)
-        expect(
-          worker.postMessage.mock.calls.filter(([message]) => message.type === 'start')
-        ).toHaveLength(startsBefore)
-        await vi.advanceTimersByTimeAsync(1)
-        expect(
-          worker.postMessage.mock.calls.filter(([message]) => message.type === 'start')
-        ).toHaveLength(index + 1)
-        if (index < retryDelays.length - 1) {
-          ;(supervisor as any)._handleWorkerMessage(nativeError)
-          ;(supervisor as any)._handleWorkerMessage(nativeError)
-        }
-      }
-
-      expect(getPidsByName).toHaveBeenCalledTimes(4)
+      const nativeStarts = () =>
+        worker.postMessage.mock.calls.filter(
+          ([message]) => message.type === 'start' && message.backend !== 'desktopCapturer'
+        )
+      await vi.advanceTimersByTimeAsync(14_999)
+      expect(nativeStarts()).toHaveLength(0)
+      expect((supervisor as any)._captureTimer).toBe(compatibilityTimer)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(nativeStarts()).toHaveLength(1)
+      expect((supervisor as any)._captureTimer).toBe(compatibilityTimer)
+      expect(getPidsByName).toHaveBeenCalledOnce()
       expect(worker.postMessage).toHaveBeenLastCalledWith(
         expect.objectContaining({
           type: 'start',
@@ -680,28 +763,28 @@ describe('CaptureProcessSupervisorController Deadlock & Gate A Lifecycle Test', 
           captureConfig: expect.objectContaining({ normalizedRoi: manualCalibration.roi })
         })
       )
-      ;(supervisor as any)._handleWorkerMessage(nativeError)
-      expect((supervisor as any)._nativeCaptureRetryTimer).toBeNull()
-      await vi.advanceTimersByTimeAsync(8000)
-      expect(getPidsByName).toHaveBeenCalledTimes(4)
-      expect(automaticCalibrationSpy).not.toHaveBeenCalled()
-      expect(calibrationController.applyAutomaticDetection).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(5000)
+      expect((supervisor as any)._captureTimer).toBe(compatibilityTimer)
+      expect(worker.postMessage).toHaveBeenLastCalledWith(
+        expect.objectContaining({ type: 'start', backend: 'desktopCapturer' })
+      )
 
       ;(supervisor as any)._handleWorkerMessage({
         type: 'status',
-        backend: 'wgc',
-        fps: 10,
+        backend: 'desktopCapturer',
+        fps: 5,
         roiHealth: 'healthy'
       })
-      expect((supervisor as any)._nativeCaptureRetryCount).toBe(0)
-      expect((supervisor as any)._captureTimer).toBeNull()
+      expect((supervisor as any)._nativeCaptureRetryTimer).toBeNull()
+      expect((supervisor as any)._captureTimer).toBe(compatibilityTimer)
+      await vi.advanceTimersByTimeAsync(120_000)
+      expect(nativeStarts()).toHaveLength(1)
+      expect(getPidsByName).toHaveBeenCalledOnce()
+      expect(automaticCalibrationSpy).not.toHaveBeenCalled()
+      expect(calibrationController.applyAutomaticDetection).not.toHaveBeenCalled()
 
-      ;(supervisor as any)._handleWorkerMessage(nativeError)
-      expect((supervisor as any)._nativeCaptureRetryTimer).not.toBeNull()
       supervisor.stopSupervising()
       expect((supervisor as any)._nativeCaptureRetryTimer).toBeNull()
-      await vi.advanceTimersByTimeAsync(500)
-      expect(getPidsByName).toHaveBeenCalledTimes(4)
     } finally {
       vi.mocked(getPidsByName).mockResolvedValue([])
       vi.useRealTimers()
@@ -757,6 +840,7 @@ describe('CaptureProcessSupervisorController Deadlock & Gate A Lifecycle Test', 
         ;(supervisor as any)._captureTimer = setInterval(() => {}, 100)
       })
       ;(supervisor as any)._worker = oldWorker
+      ;(supervisor as any)._workerReady = true
       ;(supervisor as any)._isSupervising = true
       ;(supervisor as any)._currentSessionId = 'session-worker-restart'
       ;(supervisor as any)._currentCalibration = manualCalibration
@@ -770,8 +854,9 @@ describe('CaptureProcessSupervisorController Deadlock & Gate A Lifecycle Test', 
         recoverable: true
       }
       ;(supervisor as any)._handleWorkerMessage(nativeError)
-      await vi.advanceTimersByTimeAsync(500)
+      await vi.advanceTimersByTimeAsync(15_000)
       expect((supervisor as any)._nativeCaptureRetryInFlight).toBe(true)
+      oldWorker.postMessage.mockClear()
 
       ;(supervisor as any)._handleWorkerMessage(nativeError)
       ;(supervisor as any)._handleWorkerMessage(nativeError)
@@ -779,6 +864,7 @@ describe('CaptureProcessSupervisorController Deadlock & Gate A Lifecycle Test', 
 
       const spawnSpy = vi.spyOn(supervisor as any, '_spawnWorker').mockImplementation(() => {
         ;(supervisor as any)._worker = newWorker
+        ;(supervisor as any)._workerReady = true
       })
       ;(supervisor as any)._handleWorkerExit(
         oldWorker,
@@ -798,7 +884,7 @@ describe('CaptureProcessSupervisorController Deadlock & Gate A Lifecycle Test', 
         expect.objectContaining({ type: 'start' })
       )
 
-      await vi.advanceTimersByTimeAsync(999)
+      await vi.advanceTimersByTimeAsync(29_999)
       expect(newWorker.postMessage).not.toHaveBeenCalled()
       await vi.advanceTimersByTimeAsync(1)
       expect(newWorker.postMessage).toHaveBeenCalledTimes(1)
@@ -957,6 +1043,7 @@ describe('CaptureProcessSupervisorController Deadlock & Gate A Lifecycle Test', 
       true,
       expect.objectContaining({ version: expect.any(String), sha256: expect.any(String) })
     )
+    ctx.state.setRoiHealth.mockClear()
 
     ;(supervisor as any)._handleWorkerMessage({
       type: 'error',
@@ -966,6 +1053,52 @@ describe('CaptureProcessSupervisorController Deadlock & Gate A Lifecycle Test', 
       recoverable: true
     })
     expect(ctx.liveCoach.setIdentityModelLoaded).toHaveBeenLastCalledWith(false)
+    expect(ctx.state.setRoiHealth).not.toHaveBeenCalled()
+  })
+
+  it('starts capture and its native-frame probe only after the worker is ready', () => {
+    vi.useFakeTimers()
+    try {
+      const ctx = createMockContext()
+      const calibration = {
+        id: 'ready-gated-start',
+        source: 'automatic',
+        roi: { x: 0.8, y: 0.7, width: 0.2, height: 0.3 }
+      }
+      const supervisor = new CaptureProcessSupervisorController(
+        ctx,
+        {
+          getEnvironmentFingerprint: vi.fn().mockReturnValue({ width: 1920, height: 1080 })
+        } as any,
+        {} as any,
+        () => ({ wgc: true, dda: false })
+      )
+      const worker = { postMessage: vi.fn(), kill: vi.fn() }
+      ;(supervisor as any)._worker = worker
+      ;(supervisor as any)._workerReady = false
+      ;(supervisor as any)._isSupervising = true
+      ;(supervisor as any)._currentSessionId = 'ready-gated-session'
+      ;(supervisor as any)._currentCalibration = calibration
+
+      ;(supervisor as any)._postWorkerStart('ready-gated-session', calibration, 'wgc')
+      expect(worker.postMessage).not.toHaveBeenCalled()
+      expect((supervisor as any)._nativeCaptureProbeTimer).toBeNull()
+
+      ;(supervisor as any)._handleWorkerMessage({
+        type: 'ready',
+        protocolVersion: '1.0.0',
+        runtimeVersions: { ccl: '1.2.0' },
+        supportedBackends: ['wgc', 'desktopCapturer']
+      })
+
+      expect(worker.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'start', backend: 'wgc' })
+      )
+      expect((supervisor as any)._nativeCaptureProbeTimer).not.toBeNull()
+      supervisor.stopSupervising()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('keeps main-gated frame freshness when worker metrics arrive later', () => {
@@ -1130,9 +1263,16 @@ describe('CaptureProcessSupervisorController Deadlock & Gate A Lifecycle Test', 
     )
   })
 
-  it('immediately withdraws realtime capability when the worker falls back to diagnostic capture', () => {
+  it('keeps realtime capability and clears capture errors in healthy compatibility mode', () => {
     const ctx = createMockContext()
     const supervisor = new CaptureProcessSupervisorController(ctx, {} as any, {} as any)
+    ctx.liveCoach.state.setLastError({
+      code: 'capture-stalled',
+      stage: 'minimap-capture',
+      recoverable: true,
+      details: 'native unavailable'
+    })
+    ctx.liveCoach.state.setLastError.mockClear()
 
     ;(supervisor as any)._handleWorkerMessage({
       type: 'status',
@@ -1149,13 +1289,7 @@ describe('CaptureProcessSupervisorController Deadlock & Gate A Lifecycle Test', 
       liveDataHealth: 'healthy',
       backend: 'desktopCapturer'
     })
-    expect(ctx.liveCoach.state.setLastError).toHaveBeenCalledWith(
-      expect.objectContaining({
-        code: 'capture-stalled',
-        stage: 'minimap-capture',
-        recoverable: true
-      })
-    )
+    expect(ctx.liveCoach.state.setLastError).toHaveBeenCalledWith(null)
   })
 
   it('kills an unresponsive worker after the heartbeat deadline', () => {
@@ -1440,15 +1574,18 @@ describe('CaptureProcessSupervisorController Deadlock & Gate A Lifecycle Test', 
       const resolveModelSpy = vi
         .spyOn(supervisor as any, '_resolveIdentityModel')
         .mockReturnValue(identityModel)
-      const spawnSpy = vi
-        .spyOn(supervisor as any, '_spawnWorker')
-        .mockImplementation((...args: unknown[]) => {
-          const [sessionId, calibration] = args as [string, typeof initialCalibration]
-          ;(supervisor as any)._dropCountBase = ctx.liveCoach.state.capture.dropCount
-          ;(supervisor as any)._worker = newWorker
-          ;(supervisor as any)._initializeWorker(newWorker)
-          ;(supervisor as any)._postWorkerStart(sessionId, calibration)
+      const spawnSpy = vi.spyOn(supervisor as any, '_spawnWorker').mockImplementation(() => {
+        ;(supervisor as any)._dropCountBase = ctx.liveCoach.state.capture.dropCount
+        ;(supervisor as any)._worker = newWorker
+        ;(supervisor as any)._workerReady = false
+        ;(supervisor as any)._initializeWorker(newWorker)
+        ;(supervisor as any)._handleWorkerMessage({
+          type: 'ready',
+          protocolVersion: '1.0.0',
+          runtimeVersions: { ccl: '1.2.0' },
+          supportedBackends: ['wgc', 'desktopCapturer']
         })
+      })
 
       await supervisor.startSupervising('game-1001', initialCalibration as any, '16.16.1')
 

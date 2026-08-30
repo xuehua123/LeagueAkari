@@ -14,7 +14,8 @@ import {
 const workerMocks = vi.hoisted(() => ({
   processFrame: vi.fn(),
   deriveEvents: vi.fn(),
-  loadNativeRuntime: vi.fn()
+  loadNativeRuntime: vi.fn(),
+  loadChampionClassifier: vi.fn()
 }))
 
 vi.mock('../../native/trusted-native-runtime', () => ({
@@ -22,7 +23,7 @@ vi.mock('../../native/trusted-native-runtime', () => ({
 }))
 
 vi.mock('./champion-onnx-classifier', () => ({
-  ChampionOnnxClassifier: { load: vi.fn() }
+  ChampionOnnxClassifier: { load: workerMocks.loadChampionClassifier }
 }))
 
 vi.mock('./minimap-cv', () => ({
@@ -32,6 +33,25 @@ vi.mock('./minimap-cv', () => ({
 
 const liveSessionId = 'live-session'
 const replaySessionId = 'replay-session'
+const identityModelDescriptor = {
+  modelName: 'champion-icons',
+  architecture: 'bootstrap-linear' as const,
+  format: 'onnx' as const,
+  version: '16.17.1-test.1',
+  sha256: 'a'.repeat(64),
+  path: 'champion-icons.onnx',
+  opset: 17 as const,
+  inputName: 'input',
+  outputName: 'scores',
+  inputShape: [1, 3, 32, 32] as [1, 3, number, number],
+  preprocessing: 'per-channel-standardize-l2' as const,
+  outputLayout: 'prototype-scores' as const,
+  cropRatios: [0.1],
+  championIds: [1],
+  variantsPerChampion: 1,
+  confidenceThreshold: 0.7,
+  top2MarginThreshold: 0.1
+}
 
 function createEntity(observedAt: number): MinimapEntityObservation {
   return {
@@ -85,6 +105,7 @@ describe('Minimap Observer worker live frame boundaries', () => {
       }
     ])
     workerMocks.loadNativeRuntime.mockReset()
+    workerMocks.loadChampionClassifier.mockReset()
 
     await handleMainMessage({
       type: 'start',
@@ -204,6 +225,193 @@ describe('Minimap Observer worker live frame boundaries', () => {
     )
     expect(messages).not.toContainEqual(
       expect.objectContaining({ type: 'error', code: 'LC_ERR_NATIVE_CAPTURE_UNAVAILABLE' })
+    )
+  })
+
+  it('reports basic readiness before an optional identity model finishes loading', async () => {
+    const modelLoad = createDeferred<any>()
+    const classifier = {
+      getManifest: vi.fn().mockReturnValue({
+        version: '16.17.1-test.1',
+        runtimeVersion: '1.29.0',
+        executionProvider: 'cpu'
+      }),
+      dispose: vi.fn().mockResolvedValue(undefined)
+    }
+    workerMocks.loadChampionClassifier.mockReturnValue(modelLoad.promise)
+
+    await handleMainMessage({
+      type: 'initialize',
+      protocolVersion: '1.0.0',
+      runtimePaths: {},
+      modelManifest: { 'champion-icon-onnx': identityModelDescriptor }
+    })
+
+    expect(messages).toContainEqual(
+      expect.objectContaining({
+        type: 'ready',
+        runtimeVersions: { ccl: '1.2.0' }
+      })
+    )
+    expect(workerMocks.loadChampionClassifier).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(250)
+    expect(workerMocks.loadChampionClassifier).toHaveBeenCalledWith(identityModelDescriptor)
+    modelLoad.resolve(classifier)
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(messages).toContainEqual(
+      expect.objectContaining({
+        type: 'ready',
+        runtimeVersions: expect.objectContaining({
+          ccl: '1.2.0',
+          'champion-icon-onnx': '16.17.1-test.1'
+        })
+      })
+    )
+
+    await handleMainMessage({
+      type: 'initialize',
+      protocolVersion: '1.0.0',
+      runtimePaths: {},
+      modelManifest: {}
+    })
+  })
+
+  it('times out only the optional identity model while keeping the basic worker ready', async () => {
+    await handleMainMessage({
+      type: 'stop',
+      sessionId: liveSessionId,
+      reason: 'model-timeout-test'
+    })
+    messages = []
+    const modelLoad = createDeferred<any>()
+    const classifier = {
+      getManifest: vi.fn(),
+      dispose: vi.fn().mockResolvedValue(undefined)
+    }
+    workerMocks.loadChampionClassifier.mockReturnValue(modelLoad.promise)
+
+    await handleMainMessage({
+      type: 'initialize',
+      protocolVersion: '1.0.0',
+      runtimePaths: {},
+      modelManifest: { 'champion-icon-onnx': identityModelDescriptor }
+    })
+
+    expect(messages).toContainEqual(
+      expect.objectContaining({ type: 'ready', runtimeVersions: { ccl: '1.2.0' } })
+    )
+    await vi.advanceTimersByTimeAsync(10_250)
+    expect(messages).toContainEqual(
+      expect.objectContaining({
+        type: 'error',
+        code: 'LC_ERR_IDENTITY_MODEL_LOAD_FAILED',
+        recoverable: true
+      })
+    )
+
+    modelLoad.resolve(classifier)
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(classifier.dispose).toHaveBeenCalledOnce()
+  })
+
+  it('tries the other supported native backend when the preferred backend cannot start', async () => {
+    const dispose = vi.fn()
+    const CaptureSession = vi.fn(function ({ backend }: { backend: 'wgc' | 'dda' }) {
+      if (backend === 'wgc') throw new Error('WGC unavailable for this window')
+      return { captureFrame: vi.fn().mockReturnValue(null), dispose }
+    })
+    workerMocks.loadNativeRuntime.mockReturnValue({
+      capture: {
+        load: vi.fn(),
+        isWgcSupported: vi.fn().mockReturnValue(true),
+        isDdaSupported: vi.fn().mockReturnValue(true),
+        CaptureSession
+      }
+    })
+
+    await handleMainMessage({
+      type: 'initialize',
+      protocolVersion: '1.0.0',
+      runtimePaths: { nativeRuntimeRoot: 'D:\\trusted-native-runtime' },
+      modelManifest: {}
+    })
+    await handleMainMessage({
+      type: 'start',
+      sessionId: liveSessionId,
+      patch: '16.17.1',
+      targetHwnd: 123,
+      targetPid: 456,
+      backend: 'wgc',
+      captureConfig: {
+        fps: 10,
+        roi: { x: 0, y: 0, width: 1, height: 1 },
+        normalizedRoi: { x: 0.8, y: 0.8, width: 0.2, height: 0.2 }
+      },
+      detectors: []
+    })
+
+    expect(CaptureSession.mock.calls.map(([options]) => options.backend)).toEqual(['wgc', 'dda'])
+    expect(messages).not.toContainEqual(
+      expect.objectContaining({ type: 'error', code: 'LC_ERR_NATIVE_CAPTURE_UNAVAILABLE' })
+    )
+  })
+
+  it('keeps compatibility frames labeled correctly during a silent native probe', async () => {
+    const CaptureSession = vi.fn(function () {
+      return {
+        captureFrame: vi.fn().mockReturnValue(null),
+        dispose: vi.fn()
+      }
+    })
+    workerMocks.loadNativeRuntime.mockReturnValue({
+      capture: {
+        load: vi.fn(),
+        isWgcSupported: vi.fn().mockReturnValue(true),
+        isDdaSupported: vi.fn().mockReturnValue(false),
+        CaptureSession
+      }
+    })
+    await handleMainMessage({
+      type: 'initialize',
+      protocolVersion: '1.0.0',
+      runtimePaths: { nativeRuntimeRoot: 'D:\\trusted-native-runtime' },
+      modelManifest: {}
+    })
+    await handleMainMessage({
+      type: 'start',
+      sessionId: liveSessionId,
+      patch: '16.17.1',
+      targetHwnd: 123,
+      targetPid: 456,
+      backend: 'wgc',
+      captureConfig: {
+        fps: 10,
+        roi: { x: 0, y: 0, width: 1, height: 1 },
+        normalizedRoi: { x: 0.8, y: 0.8, width: 0.2, height: 0.2 }
+      },
+      detectors: []
+    })
+    messages = []
+    vi.setSystemTime(1000)
+    await handleMainMessage({
+      type: 'frame-buffer',
+      buffer: new Uint8Array([1, 2, 3, 255]),
+      pixelFormat: 'bgra',
+      width: 1,
+      height: 1,
+      sourceWidth: 1920,
+      sourceHeight: 1080,
+      observedAt: 1000,
+      sequence: 1
+    })
+    await runDetectionTick()
+
+    expect(messages).toContainEqual(
+      expect.objectContaining({ type: 'status', backend: 'desktopCapturer' })
     )
   })
 
@@ -354,22 +562,22 @@ describe('Minimap Observer worker live frame boundaries', () => {
     })
     const oldTick = runDetectionTick()
 
-    vi.setSystemTime(450)
+    vi.setSystemTime(850)
     await handleMainMessage({
       type: 'frame-buffer',
       buffer: newBuffer,
       pixelFormat: 'rgba',
       width: 2,
       height: 2,
-      observedAt: 450,
+      observedAt: 850,
       sequence: 2
     })
-    vi.setSystemTime(500)
+    vi.setSystemTime(900)
     deferred.resolve({ health: 'healthy', entities: [createEntity(100)] })
     await oldTick
 
     const oldBatch = observationBatches(messages).at(-1)?.batch
-    expect(oldBatch?.frame).toEqual(expect.objectContaining({ observedAt: 100, ageMs: 400 }))
+    expect(oldBatch?.frame).toEqual(expect.objectContaining({ observedAt: 100, ageMs: 800 }))
     expect(oldBatch).toEqual(
       expect.objectContaining({ health: 'unknown', entities: [], events: [] })
     )
@@ -384,18 +592,18 @@ describe('Minimap Observer worker live frame boundaries', () => {
     await runDetectionTick()
 
     const newBatch = observationBatches(messages).at(-1)?.batch
-    expect(newBatch?.frame).toEqual(expect.objectContaining({ observedAt: 450, ageMs: 50 }))
+    expect(newBatch?.frame).toEqual(expect.objectContaining({ observedAt: 850, ageMs: 50 }))
     expect(newBatch?.health).toBe('healthy')
     expect(workerMocks.processFrame.mock.calls[1]?.slice(0, 5)).toEqual([
       newBuffer,
       2,
       2,
-      450,
+      850,
       'rgba'
     ])
   })
 
-  it('does not apply the live 300ms freshness gate to offline replay frames', async () => {
+  it('does not apply the live freshness gate to offline replay frames', async () => {
     const deferred = createDeferred<{
       health: 'healthy'
       entities: MinimapEntityObservation[]

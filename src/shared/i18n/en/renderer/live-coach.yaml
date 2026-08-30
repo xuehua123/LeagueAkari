@@ -7,7 +7,6 @@ liveCoach:
     voice: Voice
     reviews: Reviews
     privacy: Privacy
-    diagnostics: Diagnostics
     help: Help & Quick Start
   overlay:
     activeTitle: AI Coach Active
@@ -46,10 +45,16 @@ liveCoach:
     mainSwitchDesc: Enable it once. The coach automatically detects and starts in Summoner's Rift custom, Practice Tool, normal, and ranked games.
     quickStart:
       readyTitle: You're ready—just enter a game
-      readyDescription: The coach starts automatically in Summoner's Rift custom, Practice Tool, normal, or ranked games. No manual session setup is needed; use windowed or borderless mode.
+      readyDescription: The coach starts automatically in Summoner's Rift custom, Practice Tool, normal, or ranked games. No manual session setup or environment check is needed.
+      autoAdaptingTitle: Automatically adapting to this game
+      autoAdaptingDescription: A game was detected. The coach is connecting to the game view and locating the minimap automatically; this usually takes only a few seconds.
       runningCustomTitle: AI Coach is running in your custom or Practice Tool game
       runningTitle: AI Coach is running
       runningDescription: The session started automatically. The coach uses subtitles and short local speech when it has a clear recommendation, and stays quiet when evidence is weak.
+      compatibilityTitle: Running in compatibility mode
+      compatibilityDescription: The game view is connected through a compatible capture path. Subtitles, speech, and visual analysis continue normally.
+      recoveringTitle: Reconnecting automatically
+      recoveringDescription: The game-view connection is temporarily unstable. The coach is retrying automatically and will continue when it recovers; no action is needed.
       shadowTitle: Shadow mode is active, so no cue will be shown or played
       shadowDescription: Shadow mode only records acceptance data. Select Restore Automatic Voice Mode to return to normal coaching.
       pausedTitle: AI Coach is paused
@@ -59,16 +64,15 @@ liveCoach:
       mutedTitle: AI Coach is muted
       mutedDescription: Subtitles remain visible, but speech is off. Select Restore Automatic Voice Mode to restore short local speech.
       speechUnavailableTitle: Automatic start is ready, but local speech is unavailable
-      speechUnavailableDescription: Subtitles still work. Open Diagnostics to check the Windows Chinese voice and output device.
-      partialTitle: Session connected, but visual AI is not running
-      partialDescription: Only Live Data cues are available. Minimap visual analysis is unavailable; open Diagnostics for details.
+      speechUnavailableDescription: Subtitles still work and the coach will keep running. To restore speech, choose an available voice and output device in Voice settings.
+      partialTitle: Basic coaching is running
+      partialDescription: Available match cues will continue, and visual analysis will resume automatically when the environment recovers.
       blockedTitle: 'Not started: one requirement is not ready'
-      blockedDescription: 'Current reason: {{reason}}. Open Diagnostics for the exact fix.'
+      blockedDescription: 'Current reason: {{reason}}. AI Coach will continue automatically when the requirement is ready.'
       waitingForGame: Waiting for the game window and live match data
     restoreSimpleMode: Restore Automatic Voice Mode
     simpleModeRestored: Automatic start, normal cues, and local speech are restored
     resumeNow: Resume Now
-    openDiagnostics: Open Diagnostics
     sessionStatus: Session Status
     latestCue: Live Cue Preview
     noCue: No tactical cue currently active
@@ -305,29 +309,21 @@ liveCoach:
     startOffline: Continue to Offline Analysis
   help:
     title: Help & Quick Start
-    phaseTitle: Prepare before entering a live match
-    phaseDescription: This page provides the recommended setup order and troubleshooting entry points. Diagnostics and the current capability state are authoritative; opening Help does not mean the environment passed.
+    phaseTitle: Enable once, then start a game
+    phaseDescription: No capture precheck or manual session setup is required. AI Coach connects and prepares automatically after you enter a supported Summoner's Rift game.
     steps:
-      environment:
-        title: 1. Check the environment
-        description: Check capture, local voices, and shortcut support, then test game-window capture once you are in a match.
-        action: Open Diagnostics
-      calibration:
-        title: 2. Confirm the minimap region
-        description: Request a one-time preview and confirm the outline covers the full minimap. Adjust and save it when confidence is insufficient.
-        action: Open Calibration
-      controls:
-        title: 3. Configure in-game controls
-        description: Configure pause, mute, repeat, recalibration, and overlay shortcuts, then choose subtitle, sound, or speech output.
+      enable:
+        title: 1. Enable AI Coach
+        description: Turn on the main switch once in Overview. Automatic start, overlay subtitles, and short local speech are enabled by default.
+        action: Back to Overview
+      enterGame:
+        title: 2. Enter a game
+        description: Summoner's Rift custom, Practice Tool, normal, and ranked games are supported. The coach connects and starts automatically after detecting the game.
+        action: View Current Status
+      personalize:
+        title: 3. Personalize only if needed
+        description: The defaults are ready to use. Open settings only when you want to change cues, shortcuts, or the overlay.
         action: Open Coach Settings
-      replay:
-        title: 4. Try an offline review first
-        description: Load the clearly labeled sample or import a local JSON, MP4, MKV, or WebM file to learn the timeline and cue states.
-        action: Open Tactical Reviews
-      privacy:
-        title: 5. Review the data boundaries
-        description: See how frames, minimap ROI, structured data, and diagnostics are handled, plus the exact scope of withdrawal, export, and deletion.
-        action: Open Privacy
     boundariesTitle: Keep these boundaries in mind
     boundaryObservation: Currently visible minimap content is directly observed. Fog regions, routes, and intent are time-limited probability estimates.
     boundaryControl: The coach never clicks, buys, casts, or sends game input automatically. Communication phrases still require confirmation and manual paste.
@@ -916,7 +912,7 @@ liveCoach:
         rerunCheck: Rerun the failed item. If it still fails, keep real-time coaching disabled and export a diagnostics report.
         grantCapturePermission: Grant local screen-capture permission, restart the app, and rerun the check.
         verifyCaptureInGame: Confirm the current privacy notice and enter a supported match. Permission is confirmed only while WGC or DDA is actually running.
-        installNativeCapture: Repair or reinstall the Windows native runtime; the desktop preview is diagnostic-only.
+        installNativeCapture: The app will continue with compatible capture automatically; repair or reinstall the Windows native runtime for higher performance.
         useSupportedCaptureEnvironment: Use a supported Windows game-window environment or switch to offline review.
         enterGameAndRerun: Enter a supported match, keep the game window visible, then rerun the failed items.
         useSupportedResolution: Switch the game/display to 1920×1080 or 2560×1440 before calibration.
@@ -1010,7 +1006,7 @@ liveCoach:
     exportReportDone: Diagnostics report exported.
     exportReportFailed: Unable to export the diagnostics report.
     systemTestResult: 'Capture backend: {{capture}}; local voices: {{voices}}; global shortcuts: {{shortcuts}}.'
-    diagnosticOnly: calibration preview only; real-time capture unavailable
+    diagnosticOnly: compatibility capture mode is active
     unavailableValue: unavailable
     speechTestText: Live AI Coach local speech self-test passed.
     speechTestPassed: Local TTS playback succeeded.

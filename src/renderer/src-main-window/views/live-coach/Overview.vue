@@ -44,14 +44,6 @@
             >
               {{ t('liveCoach.overview.resumeNow') }}
             </NButton>
-            <NButton
-              v-if="quickStartStatus.showDiagnostics"
-              size="small"
-              secondary
-              @click="openDiagnostics"
-            >
-              {{ t('liveCoach.overview.openDiagnostics') }}
-            </NButton>
           </div>
         </NAlert>
 
@@ -667,9 +659,15 @@ const primaryUnavailableReason = computed<CoachUnavailableReason | null>(
 const visualCoachAvailable = computed(
   () =>
     coachStore.capability.enabledFeatureIds.includes('coach.analyze.minimap-basic') &&
-    coachStore.capture.backend !== 'desktopCapturer' &&
     coachStore.capture.backend !== 'unavailable' &&
     coachStore.lastError?.code !== 'capture-stalled'
+)
+
+const compatibilityModeHealthy = computed(
+  () =>
+    coachStore.capture.backend === 'desktopCapturer' &&
+    coachStore.capture.state === 'running' &&
+    coachStore.capture.roiState === 'healthy'
 )
 
 const quickStartStatus = computed(() => {
@@ -677,56 +675,70 @@ const quickStartStatus = computed(() => {
     return {
       type: 'warning' as const,
       titleKey: 'liveCoach.overview.quickStart.shadowTitle',
-      descriptionKey: 'liveCoach.overview.quickStart.shadowDescription',
-      showDiagnostics: false
+      descriptionKey: 'liveCoach.overview.quickStart.shadowDescription'
     }
   }
   if (coachStore.session.state === 'paused') {
     return {
       type: 'warning' as const,
       titleKey: 'liveCoach.overview.quickStart.pausedTitle',
-      descriptionKey: 'liveCoach.overview.quickStart.pausedDescription',
-      showDiagnostics: false
+      descriptionKey: 'liveCoach.overview.quickStart.pausedDescription'
     }
   }
-  if (['degraded', 'disabled'].includes(coachStore.session.state)) {
+  if (['starting', 'calibrating'].includes(coachStore.session.state)) {
+    return {
+      type: 'info' as const,
+      titleKey: 'liveCoach.overview.quickStart.autoAdaptingTitle',
+      descriptionKey: 'liveCoach.overview.quickStart.autoAdaptingDescription'
+    }
+  }
+  if (coachStore.session.state === 'disabled') {
     return {
       type: 'warning' as const,
       titleKey: 'liveCoach.overview.quickStart.blockedTitle',
-      descriptionKey: 'liveCoach.overview.quickStart.blockedDescription',
-      showDiagnostics: true
+      descriptionKey: 'liveCoach.overview.quickStart.blockedDescription'
     }
   }
   if (!coachStore.settings.autoStartEnabled) {
     return {
       type: 'warning' as const,
       titleKey: 'liveCoach.overview.quickStart.manualTitle',
-      descriptionKey: 'liveCoach.overview.quickStart.manualDescription',
-      showDiagnostics: false
+      descriptionKey: 'liveCoach.overview.quickStart.manualDescription'
     }
   }
   if (coachStore.settings.muted) {
     return {
       type: 'warning' as const,
       titleKey: 'liveCoach.overview.quickStart.mutedTitle',
-      descriptionKey: 'liveCoach.overview.quickStart.mutedDescription',
-      showDiagnostics: false
+      descriptionKey: 'liveCoach.overview.quickStart.mutedDescription'
     }
   }
   if (speechOutputEnabled.value && coachStore.speech.state === 'unavailable') {
     return {
       type: 'warning' as const,
       titleKey: 'liveCoach.overview.quickStart.speechUnavailableTitle',
-      descriptionKey: 'liveCoach.overview.quickStart.speechUnavailableDescription',
-      showDiagnostics: true
+      descriptionKey: 'liveCoach.overview.quickStart.speechUnavailableDescription'
+    }
+  }
+  if (compatibilityModeHealthy.value && ['active', 'degraded'].includes(coachStore.session.state)) {
+    return {
+      type: 'success' as const,
+      titleKey: 'liveCoach.overview.quickStart.compatibilityTitle',
+      descriptionKey: 'liveCoach.overview.quickStart.compatibilityDescription'
+    }
+  }
+  if (coachStore.session.state === 'degraded') {
+    return {
+      type: 'warning' as const,
+      titleKey: 'liveCoach.overview.quickStart.recoveringTitle',
+      descriptionKey: 'liveCoach.overview.quickStart.recoveringDescription'
     }
   }
   if (coachStore.session.state === 'active' && !visualCoachAvailable.value) {
     return {
       type: 'warning' as const,
       titleKey: 'liveCoach.overview.quickStart.partialTitle',
-      descriptionKey: 'liveCoach.overview.quickStart.partialDescription',
-      showDiagnostics: true
+      descriptionKey: 'liveCoach.overview.quickStart.partialDescription'
     }
   }
   if (coachStore.session.state === 'active') {
@@ -736,15 +748,13 @@ const quickStartStatus = computed(() => {
         coachStore.session.queueId === 0
           ? 'liveCoach.overview.quickStart.runningCustomTitle'
           : 'liveCoach.overview.quickStart.runningTitle',
-      descriptionKey: 'liveCoach.overview.quickStart.runningDescription',
-      showDiagnostics: false
+      descriptionKey: 'liveCoach.overview.quickStart.runningDescription'
     }
   }
   return {
     type: 'info' as const,
     titleKey: 'liveCoach.overview.quickStart.readyTitle',
-    descriptionKey: 'liveCoach.overview.quickStart.readyDescription',
-    showDiagnostics: false
+    descriptionKey: 'liveCoach.overview.quickStart.readyDescription'
   }
 })
 
@@ -921,10 +931,6 @@ async function restoreSimpleMode(notify = true) {
     if (notify) message.error(error instanceof Error ? error.message : String(error))
     if (!notify) throw error
   }
-}
-
-function openDiagnostics() {
-  void router.push({ name: 'live-coach', params: { section: 'diagnostics' } })
 }
 
 function unavailableReasonLabel(reason: CoachUnavailableReason | null) {

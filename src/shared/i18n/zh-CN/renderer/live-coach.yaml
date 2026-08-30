@@ -7,7 +7,6 @@ liveCoach:
     voice: 语音设置
     reviews: 战术复盘
     privacy: 隐私与授权
-    diagnostics: 运行诊断
     help: 帮助与快速上手
   overlay:
     activeTitle: AI 教练实时监测中
@@ -46,10 +45,16 @@ liveCoach:
     mainSwitchDesc: 开启一次即可；进入召唤师峡谷自定义、训练、匹配或排位对局后，教练会自动识别并开始。
     quickStart:
       readyTitle: 已设置好，直接进入一局即可
-      readyDescription: 进入召唤师峡谷自定义、训练、匹配或排位对局后会自动开始，无需手动创建会话；请使用窗口化或无边框模式。
+      readyDescription: 进入召唤师峡谷自定义、训练、匹配或排位对局后会自动开始，无需手动创建会话或提前检查环境。
+      autoAdaptingTitle: 正在自动适配当前对局
+      autoAdaptingDescription: 已检测到对局，正在自动连接游戏画面并识别小地图，通常几秒内即可完成。
       runningCustomTitle: AI 教练正在自定义或训练对局中运行
       runningTitle: AI 教练正在运行
       runningDescription: 会话已经自动建立，教练会在有明确时机时通过字幕和短语音提醒；没有可靠建议时会保持安静。
+      compatibilityTitle: 兼容模式运行中
+      compatibilityDescription: 游戏画面已通过兼容方式连接，AI 教练会照常提供字幕、语音和画面分析。
+      recoveringTitle: 正在自动恢复连接
+      recoveringDescription: 游戏画面连接暂时不稳定，系统正在自动重试；无需操作，恢复后会自动继续。
       shadowTitle: 当前是影子模式，不会显示或播放任何提醒
       shadowDescription: 影子模式只用于记录验收数据。点击“恢复自动语音模式”即可切回正常教练。
       pausedTitle: AI 教练已暂停
@@ -59,16 +64,15 @@ liveCoach:
       mutedTitle: AI 教练当前已静音
       mutedDescription: 仍会显示字幕，但不会播放语音。点击“恢复自动语音模式”即可恢复本地短语音。
       speechUnavailableTitle: 可以自动开始，但本地语音暂不可用
-      speechUnavailableDescription: 字幕仍可正常使用；点击“运行诊断”检查 Windows 中文语音和输出设备。
-      partialTitle: 会话已建立，但画面 AI 未运行
-      partialDescription: 当前仅有 Live Data 提示，小地图画面分析不可用；请打开运行诊断查看原因。
+      speechUnavailableDescription: 字幕仍可正常使用，AI 教练会继续运行；如需语音，可在“语音设置”中选择可用音色和输出设备。
+      partialTitle: 基础提示正在运行
+      partialDescription: 当前会继续提供可用的对局提示，画面分析会在环境恢复后自动继续。
       blockedTitle: 还没启动：当前有一项条件未满足
-      blockedDescription: '当前原因：{{reason}}。点击“运行诊断”可以直接查看处理办法。'
+      blockedDescription: '当前原因：{{reason}}。条件满足后，AI 教练会自动继续。'
       waitingForGame: 正在等待游戏窗口和对局数据
     restoreSimpleMode: 恢复自动语音模式
     simpleModeRestored: 已恢复自动启动、正常提醒和本地短语音
     resumeNow: 立即恢复
-    openDiagnostics: 运行诊断
     sessionStatus: 当前会话状态
     latestCue: 实时提示预览
     noCue: 当前暂无正在播报的战术提示
@@ -303,29 +307,21 @@ liveCoach:
     startOffline: 前往离线分析
   help:
     title: 帮助与快速上手
-    phaseTitle: 先完成准备，再进入真实对局
-    phaseDescription: 本页提供准备顺序和故障排查入口；是否真正可用以“运行诊断”和当前能力状态为准，打开帮助本身不代表环境已经通过。
+    phaseTitle: 开启一次，进入对局后自动开始
+    phaseDescription: 无需预先检查采集环境或手动创建会话。AI 教练会在进入受支持的召唤师峡谷对局后自动连接并准备。
     steps:
-      environment:
-        title: 1. 检查运行环境
-        description: 检查采集后端、本地音色和快捷键支持；进入对局后再测试一次游戏窗口采集。
-        action: 打开运行诊断
-      calibration:
-        title: 2. 确认小地图区域
-        description: 请求一次性预览，确认框线完整覆盖小地图；置信度不足时手动调整并保存。
-        action: 打开小地图标定
-      controls:
-        title: 3. 设置局内控制
-        description: 配置暂停、静音、重复提示、重新标定和悬浮窗调整快捷键，并选择字幕、声音或语音输出。
-        action: 打开提醒策略
-      replay:
-        title: 4. 先体验离线复盘
-        description: 加载明确标记的标准演示，或导入本机 JSON、MP4、MKV、WebM 文件熟悉时间线和提示状态。
-        action: 打开战术复盘
-      privacy:
-        title: 5. 查看数据边界
-        description: 查看画面、小地图 ROI、结构化数据和诊断信息如何处理，并了解授权撤回、导出和删除的实际范围。
-        action: 打开隐私与授权
+      enable:
+        title: 1. 开启 AI 教练
+        description: 在概览打开总开关一次，默认会同时启用自动开始、悬浮字幕和本地短语音。
+        action: 返回概览
+      enterGame:
+        title: 2. 直接进入一局
+        description: 支持召唤师峡谷自定义、训练、匹配和排位；检测到对局后会自动连接并开始。
+        action: 查看当前状态
+      personalize:
+        title: 3. 需要时再个性化
+        description: 默认设置可以直接使用；只有想调整提醒、快捷键或悬浮窗时才需要进入设置。
+        action: 打开提醒设置
     boundariesTitle: 使用时记住这些边界
     boundaryObservation: 小地图当前可见内容是直接观测；迷雾区域、路线和意图只是带有效期的概率推断。
     boundaryControl: 教练不会点击、购买、施法或自动向游戏发送输入；沟通短语也需要你逐次确认并自行粘贴。
@@ -912,7 +908,7 @@ liveCoach:
         rerunCheck: 重新检查失败项；若仍失败，保持实时教练关闭并导出诊断报告。
         grantCapturePermission: 授予本机屏幕采集权限，重启应用后重新检查。
         verifyCaptureInGame: 完成当前隐私确认后进入受支持对局；只有 WGC/DDA 实际运行时才确认采集权限。
-        installNativeCapture: 修复或重新安装 Windows 原生运行时；桌面预览只用于诊断。
+        installNativeCapture: 应用会自动使用兼容采集继续运行；修复或重新安装 Windows 原生运行时可获得更高性能。
         useSupportedCaptureEnvironment: 使用受支持的 Windows 游戏窗口环境，或改用离线复盘。
         enterGameAndRerun: 进入受支持对局并保持游戏窗口可见，再重检未就绪项。
         useSupportedResolution: 标定前把游戏或显示器切换为 1920×1080 或 2560×1440。
@@ -1006,7 +1002,7 @@ liveCoach:
     exportReportDone: 诊断报告已导出。
     exportReportFailed: 无法导出诊断报告。
     systemTestResult: '采集后端：{{capture}}；本地音色：{{voices}} 个；全局快捷键：{{shortcuts}}。'
-    diagnosticOnly: 仅支持标定预览，实时采集不可用
+    diagnosticOnly: 正在使用兼容采集模式
     unavailableValue: 不可用
     speechTestText: 实时语音 AI 教练本地语音自检通过。
     speechTestPassed: 本地 TTS 播放成功。

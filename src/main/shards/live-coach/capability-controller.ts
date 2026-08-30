@@ -39,6 +39,13 @@ const PATCH_LOCKED_CAPABILITIES = new Set<CoachCapabilityId>([
 ])
 
 const REALTIME_CAPABILITIES = PHASE_ONE_CAPABILITY_IDS.filter((id) => id !== 'coach.offline-review')
+const WINDOWS_CAPTURE_CAPABILITIES = new Set<CoachCapabilityId>([
+  'coach.capture.screen',
+  'coach.analyze.minimap-basic',
+  'coach.analyze.minimap-advanced',
+  'coach.analyze.minimap-identity',
+  'coach.analyze.fog-inference'
+])
 const GATE_B_CAPABILITIES = new Set<CoachCapabilityId>([
   'coach.output.subtitle',
   'coach.output.sound',
@@ -190,7 +197,7 @@ export class LiveCoachCapabilityController {
 
     if (process.platform !== 'win32') {
       unavailable['platform'] = 'unsupported-platform'
-      for (const capabilityId of REALTIME_CAPABILITIES) {
+      for (const capabilityId of WINDOWS_CAPTURE_CAPABILITIES) {
         unavailable[capabilityId] = 'unsupported-platform'
       }
     }
@@ -224,17 +231,9 @@ export class LiveCoachCapabilityController {
       workerStatus?.roiHealth === 'degraded' ||
       workerStatus?.roiHealth === 'occluded'
     ) {
-      unavailable['coach.analyze.minimap-basic'] = 'roi-occluded'
-      unavailable['coach.analyze.minimap-advanced'] = 'roi-occluded'
-      unavailable['coach.analyze.fog-inference'] = 'roi-occluded'
-    }
-
-    // desktopCapturer 仅保留给标定预览、诊断和回归，不作为正式实时视觉分析来源。
-    if (workerStatus?.backend === 'desktopCapturer') {
-      unavailable['coach.analyze.minimap-basic'] = 'capability-disabled'
-      unavailable['coach.analyze.minimap-advanced'] = 'capability-disabled'
-      unavailable['coach.analyze.minimap-identity'] = 'capability-disabled'
-      unavailable['coach.analyze.fog-inference'] = 'capability-disabled'
+      unavailable['coach.analyze.minimap-basic'] ??= 'roi-occluded'
+      unavailable['coach.analyze.minimap-advanced'] ??= 'roi-occluded'
+      unavailable['coach.analyze.fog-inference'] ??= 'roi-occluded'
     }
 
     const liveDataDomains = workerStatus?.liveDataDomains

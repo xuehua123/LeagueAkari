@@ -56,6 +56,7 @@ let nativeCaptureRequest: Extract<MainToWorkerMessage, { type: 'start' }> | null
 let nativeCaptureMode: 'auto' | 'wgc' | 'dda' | null = null
 let nativeRuntimeRoot: string | undefined
 let championClassifier: ChampionOnnxClassifier | null = null
+let championClassifierLoadGeneration = 0
 let detectionTickProcessing = false
 
 function disposeNativeCaptureSession() {
@@ -80,7 +81,8 @@ function createNativeCaptureSession(
     runtimeRoot: nativeRuntimeRoot
   })
   native.capture.load()
-  const candidates: Array<'wgc' | 'dda'> = backend === 'auto' ? ['wgc', 'dda'] : [backend]
+  const candidates: Array<'wgc' | 'dda'> =
+    backend === 'auto' ? ['wgc', 'dda'] : backend === 'wgc' ? ['wgc', 'dda'] : ['dda', 'wgc']
   let lastError: unknown = null
   for (const candidate of candidates) {
     try {
@@ -124,7 +126,11 @@ function sendMessage(msg: WorkerToMainMessage) {
   process.parentPort?.postMessage(msg)
 }
 
-const MAX_LIVE_FRAME_AGE_MS = 300
+// Electron compatibility capture and first-run antivirus/model overhead can exceed 300 ms on
+// low-end PCs. Keep the safety gate bounded, but allow enough headroom for a 5 FPS fallback frame.
+const MAX_LIVE_FRAME_AGE_MS = 750
+const OPTIONAL_IDENTITY_MODEL_LOAD_DELAY_MS = 250
+const OPTIONAL_IDENTITY_MODEL_LOAD_TIMEOUT_MS = 10_000
 
 export function finalizeLiveObservationFreshness(
   observedAt: number,
@@ -565,6 +571,7 @@ export async function handleMainMessage(rawMsg: unknown): Promise<void> {
   switch (msg.type) {
     case 'initialize': {
       workerLifecycleVersion++
+      const classifierLoadGeneration = ++championClassifierLoadGeneration
       // UtilityProcess does not preserve Electron's development `process.defaultApp` marker.
       // Resolve the trusted root in main and pass it here instead of guessing dev/packaged mode.
       nativeRuntimeRoot = msg.runtimePaths.nativeRuntimeRoot
@@ -586,33 +593,72 @@ export async function handleMainMessage(rawMsg: unknown): Promise<void> {
         }
       }
       const runtimeVersions: Record<string, string> = { ccl: '1.2.0' }
-      if (championClassifier) {
-        await championClassifier.dispose().catch(() => undefined)
-      }
+      const previousClassifier = championClassifier
       championClassifier = null
+      if (previousClassifier) void previousClassifier.dispose().catch(() => undefined)
       const descriptor = msg.modelManifest['champion-icon-onnx']
-      if (descriptor) {
-        try {
-          championClassifier = await ChampionOnnxClassifier.load(descriptor)
-          const manifest = championClassifier.getManifest()
-          runtimeVersions['champion-icon-onnx'] = manifest.version
-          runtimeVersions.onnxruntime = `${manifest.runtimeVersion}/${manifest.executionProvider}`
-        } catch (error: any) {
-          sendMessage({
-            type: 'error',
-            code: 'LC_ERR_IDENTITY_MODEL_LOAD_FAILED',
-            stage: 'model-load',
-            details: error?.message || String(error),
-            recoverable: true
-          })
-        }
-      }
+      // Basic CCL and compatibility capture must become usable immediately. Champion identity is
+      // optional and may be slow on first run due to antivirus or ONNX provider initialization.
       sendMessage({
         type: 'ready',
         protocolVersion: '1.0.0',
         runtimeVersions,
         supportedBackends
       })
+      if (descriptor) {
+        const loadDelay = setTimeout(() => {
+          if (classifierLoadGeneration !== championClassifierLoadGeneration) return
+          let settled = false
+          const loadPromise = Promise.resolve().then(() => ChampionOnnxClassifier.load(descriptor))
+          const loadTimeout = setTimeout(() => {
+            if (settled || classifierLoadGeneration !== championClassifierLoadGeneration) return
+            settled = true
+            sendMessage({
+              type: 'error',
+              code: 'LC_ERR_IDENTITY_MODEL_LOAD_FAILED',
+              stage: 'model-load',
+              details: 'Optional identity model initialization timed out',
+              recoverable: true
+            })
+          }, OPTIONAL_IDENTITY_MODEL_LOAD_TIMEOUT_MS)
+          loadTimeout.unref?.()
+          void loadPromise.then(
+            (classifier) => {
+              if (settled || classifierLoadGeneration !== championClassifierLoadGeneration) {
+                void classifier.dispose().catch(() => undefined)
+                return
+              }
+              settled = true
+              clearTimeout(loadTimeout)
+              championClassifier = classifier
+              const manifest = classifier.getManifest()
+              sendMessage({
+                type: 'ready',
+                protocolVersion: '1.0.0',
+                runtimeVersions: {
+                  ...runtimeVersions,
+                  'champion-icon-onnx': manifest.version,
+                  onnxruntime: `${manifest.runtimeVersion}/${manifest.executionProvider}`
+                },
+                supportedBackends
+              })
+            },
+            (error: any) => {
+              if (settled || classifierLoadGeneration !== championClassifierLoadGeneration) return
+              settled = true
+              clearTimeout(loadTimeout)
+              sendMessage({
+                type: 'error',
+                code: 'LC_ERR_IDENTITY_MODEL_LOAD_FAILED',
+                stage: 'model-load',
+                details: error?.message || String(error),
+                recoverable: true
+              })
+            }
+          )
+        }, OPTIONAL_IDENTITY_MODEL_LOAD_DELAY_MS)
+        loadDelay.unref?.()
+      }
       break
     }
 
@@ -745,6 +791,7 @@ export async function handleMainMessage(rawMsg: unknown): Promise<void> {
       captureSourceWidth = msg.sourceWidth ?? null
       captureSourceHeight = msg.sourceHeight ?? null
       captureHdr = null
+      activeBackend = 'desktopCapturer'
       latestFramePending = true
       break
     }
@@ -798,6 +845,7 @@ export async function handleMainMessage(rawMsg: unknown): Promise<void> {
 
     case 'shutdown': {
       workerLifecycleVersion++
+      championClassifierLoadGeneration++
       disposeNativeCaptureSession()
       nativeCaptureRequest = null
       nativeCaptureMode = null

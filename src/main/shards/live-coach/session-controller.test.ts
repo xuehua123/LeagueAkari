@@ -219,19 +219,66 @@ describe('LiveCoachSessionController Lifecycle & Exit Cleanup Test', () => {
     expect(scheduler.reset).toHaveBeenCalledWith(true)
   })
 
-  it('does not enter an active session while the realtime capture capability is closed', () => {
+  it('starts a session without screen capture so non-visual capabilities can continue', () => {
+    const ctx = createMockContext()
+    ctx.state.capability.enabledFeatureIds = ['live-game-data', 'coach.output.subtitle']
+    const capabilityController = { evaluateCapabilities: vi.fn(), isGateAEnabled: true } as any
+    const scheduler = { reset: vi.fn(), submitCues: vi.fn() } as any
+    const controller = new LiveCoachSessionController(ctx, capabilityController, scheduler)
+
+    controller.startSession('live-data-session', 11, 490, '16.17.1')
+
+    expect(ctx.state.setSessionInfo).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'live-data-session', queueId: 490, state: 'active' })
+    )
+    expect(ctx.state.reset).not.toHaveBeenCalledWith('degraded')
+  })
+
+  it('keeps the session degraded when every realtime capability is disabled', () => {
     const ctx = createMockContext()
     ctx.state.capability.enabledFeatureIds = ['coach.offline-review']
     const capabilityController = { evaluateCapabilities: vi.fn(), isGateAEnabled: false } as any
     const scheduler = { reset: vi.fn(), submitCues: vi.fn() } as any
     const controller = new LiveCoachSessionController(ctx, capabilityController, scheduler)
 
-    controller.startSession('blocked-session', 11, 420, '16.16.1')
+    controller.startSession('disabled-realtime-session', 11, 0, '16.17.1')
 
-    expect(ctx.state.setSessionInfo).not.toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'blocked-session', state: 'active' })
-    )
     expect(ctx.state.reset).toHaveBeenCalledWith('degraded')
+    expect(ctx.state.session.state).toBe('degraded')
+    expect(ctx.state.setSessionInfo).not.toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'disabled-realtime-session', state: 'active' })
+    )
+  })
+
+  it('leaves platform support to the capability layer during gameflow auto-start', () => {
+    const ctx = createMockContext()
+    ctx.state.capability.enabledFeatureIds = ['live-game-data', 'coach.output.subtitle']
+    const capabilityController = { evaluateCapabilities: vi.fn(), isGateAEnabled: true } as any
+    const scheduler = { reset: vi.fn(), submitCues: vi.fn() } as any
+    const controller = new LiveCoachSessionController(ctx, capabilityController, scheduler)
+    const platformDescriptor = Object.getOwnPropertyDescriptor(process, 'platform')
+
+    Object.defineProperty(process, 'platform', {
+      ...platformDescriptor,
+      configurable: true,
+      value: 'darwin'
+    })
+    try {
+      controller.init()
+      ctx.setGameflow('InProgress', {
+        map: { id: 11 },
+        gameData: { gameId: 49001, queue: { id: 490 } }
+      })
+
+      expect(ctx.state.setSessionInfo).toHaveBeenCalledWith(
+        expect.objectContaining({ id: '49001', queueId: 490, state: 'active' })
+      )
+    } finally {
+      controller.dispose()
+      if (platformDescriptor) {
+        Object.defineProperty(process, 'platform', platformDescriptor)
+      }
+    }
   })
 
   it('rejects a direct/manual session start when privacy consent has not been completed', () => {

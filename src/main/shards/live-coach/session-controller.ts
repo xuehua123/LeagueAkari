@@ -200,11 +200,6 @@ export class LiveCoachSessionController {
             return
           }
 
-          if (process.platform !== 'win32') {
-            this._enterDegradedState('unsupported-platform', mapId, queueId, patch)
-            return
-          }
-
           const sessionId = resolveLiveGameSessionId(session?.gameData?.gameId)
           const hasRunningSession = ['active', 'shadow', 'paused'].includes(
             this._context.state.session.state
@@ -298,11 +293,14 @@ export class LiveCoachSessionController {
       this._enterDegradedState('queue-unresolved', mapId, queueId, patch)
       return
     }
-    if (!this._context.state.capability.enabledFeatureIds.includes('coach.capture.screen')) {
-      this._enterDegradedState('realtime-capture-unavailable', mapId, queueId, patch)
+    if (
+      !this._context.state.capability.enabledFeatureIds.some(
+        (capabilityId) => capabilityId !== 'coach.offline-review'
+      )
+    ) {
+      this._enterDegradedState('realtime-capability-unavailable', mapId, queueId, patch)
       return
     }
-
     if (
       this._context.state.session.id === sessionId &&
       (this._context.state.session.state === 'active' ||

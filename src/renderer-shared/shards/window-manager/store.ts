@@ -134,3 +134,25 @@ export const useCdTimerWindowStore = defineStore(
     }
   }
 )
+
+export const useCoachOverlayWindowStore = defineStore(
+  'shard:window-manager-renderer/coach-overlay-window',
+  () => {
+    const settings = shallowReactive({
+      enabled: true,
+      opacity: 0.92,
+      pinned: true,
+      showShortcut: null as string | null,
+      locked: true
+    })
+
+    const basicWindowState = useBasicWindowStates()
+    const interactive = ref(false)
+
+    return {
+      settings,
+      interactive,
+      ...basicWindowState
+    }
+  }
+)

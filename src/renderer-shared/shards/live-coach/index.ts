@@ -25,6 +25,7 @@ import { CURRENT_LIVE_COACH_PRIVACY_NOTICE_VERSION } from '@shared/types/live-co
 import { AkariIpcRenderer } from '../ipc'
 import { PiniaMobxUtilsRenderer } from '../pinia-mobx-utils'
 import { SettingUtilsRenderer } from '../setting-utils'
+import { MAIN_SHARD_NAMESPACE_COACH_OVERLAY_WINDOW } from '../window-manager/context'
 import {
   LIVE_COACH_MAIN_NAMESPACE,
   LIVE_COACH_RENDERER_NAMESPACE,
@@ -39,8 +40,7 @@ export class LiveCoachRenderer implements IAkariShardInitDispose {
   static readonly MUTE_SHORTCUT_TARGET_ID = 'live-coach-main/mute'
   static readonly REPEAT_SHORTCUT_TARGET_ID = 'live-coach-main/repeat'
   static readonly RECALIBRATE_SHORTCUT_TARGET_ID = 'minimap-observer-main/recalibrate'
-  static readonly OVERLAY_SHORTCUT_TARGET_ID =
-    'window-manager-main/coach-overlay-window/interaction'
+  static readonly OVERLAY_SHORTCUT_TARGET_ID = `${MAIN_SHARD_NAMESPACE_COACH_OVERLAY_WINDOW}/interaction`
   static readonly COMMUNICATION_CONFIRM_SHORTCUT_TARGET_ID = 'live-coach-main/communication-confirm'
 
   private readonly _context: LiveCoachRendererContext
@@ -231,23 +231,57 @@ export class LiveCoachRenderer implements IAkariShardInitDispose {
 
   async setOverlayEnabled(value: boolean) {
     await Promise.all([
-      this._context.settingUtils.set('window-manager-main/coach-overlay-window', 'enabled', value),
+      this._context.settingUtils.set(MAIN_SHARD_NAMESPACE_COACH_OVERLAY_WINDOW, 'enabled', value),
       this._context.settingUtils.set(LIVE_COACH_MAIN_NAMESPACE, 'overlayEnabled', value)
     ])
   }
 
   async setOverlayOpacity(value: number) {
     await Promise.all([
-      this._context.settingUtils.set('window-manager-main/coach-overlay-window', 'opacity', value),
+      this._context.settingUtils.set(MAIN_SHARD_NAMESPACE_COACH_OVERLAY_WINDOW, 'opacity', value),
       this._context.settingUtils.set(LIVE_COACH_MAIN_NAMESPACE, 'overlayOpacity', value)
     ])
   }
 
   async setOverlayLocked(value: boolean) {
     await Promise.all([
-      this._context.settingUtils.set('window-manager-main/coach-overlay-window', 'locked', value),
+      this._context.settingUtils.set(MAIN_SHARD_NAMESPACE_COACH_OVERLAY_WINDOW, 'locked', value),
       this._context.settingUtils.set(LIVE_COACH_MAIN_NAMESPACE, 'overlayLocked', value)
     ])
+  }
+
+  async beginOverlayAdjustment(): Promise<boolean> {
+    try {
+      await this.setOverlayEnabled(true)
+      await this.setOverlayLocked(false)
+      const entered = await this._ipc.call<boolean>(
+        MAIN_SHARD_NAMESPACE_COACH_OVERLAY_WINDOW,
+        'setInteractionMode',
+        true
+      )
+      if (!entered) {
+        await this.setOverlayLocked(true)
+      }
+      return entered
+    } catch (error) {
+      await Promise.allSettled([
+        this.setOverlayLocked(true),
+        this._ipc.call(MAIN_SHARD_NAMESPACE_COACH_OVERLAY_WINDOW, 'setInteractionMode', false)
+      ])
+      throw error
+    }
+  }
+
+  async finishOverlayAdjustment(): Promise<void> {
+    try {
+      await this.setOverlayLocked(true)
+    } catch (error) {
+      await this._ipc
+        .call(MAIN_SHARD_NAMESPACE_COACH_OVERLAY_WINDOW, 'setInteractionMode', false)
+        .catch(() => undefined)
+      throw error
+    }
+    await this._ipc.call(MAIN_SHARD_NAMESPACE_COACH_OVERLAY_WINDOW, 'setInteractionMode', false)
   }
 
   setMinimapSide(value: 'auto' | 'left' | 'right') {

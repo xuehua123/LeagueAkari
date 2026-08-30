@@ -1,13 +1,101 @@
 import { CURRENT_LIVE_COACH_PRIVACY_NOTICE_VERSION } from '@shared/types/live-coach'
 import { describe, expect, it, vi } from 'vitest'
 
-import { CaptureProcessSupervisorController } from './capture-process-supervisor-controller'
+import { getPidsByName } from '../../native'
+import {
+  CaptureProcessSupervisorController,
+  selectLeagueGameCaptureSource
+} from './capture-process-supervisor-controller'
 
 vi.mock('../../native', () => ({
   getPidsByName: vi.fn().mockResolvedValue([])
 }))
 
 describe('CaptureProcessSupervisorController Deadlock & Gate A Lifecycle Test', () => {
+  it('prefers the real game window when Tencent LeagueClientUx has a confusing title', () => {
+    const inspectTarget = vi.fn(({ targetHwnd }: { targetHwnd?: number | null }) => ({
+      targetPid: targetHwnd === 21499982 ? 72968 : 54608
+    }))
+    const sources = [
+      { id: 'window:2819402:0', name: 'League of Legends' },
+      { id: 'window:21499982:0', name: 'League of Legends (TM) Client' }
+    ]
+
+    expect(
+      selectLeagueGameCaptureSource(sources as any, new Set([72968]), inspectTarget as any)
+    ).toBe(sources[1])
+  })
+
+  it('keeps exact game-title priority when target inspection is unavailable', () => {
+    const sources = [
+      { id: 'window:2819402:0', name: 'League of Legends' },
+      { id: 'window:21499982:0', name: 'League of Legends (TM) Client' }
+    ]
+
+    expect(selectLeagueGameCaptureSource(sources as any, new Set([72968]), () => null)).toBe(
+      sources[1]
+    )
+  })
+
+  it('does not mistake an unverified LeagueClientUx title for the game window', () => {
+    const sources = [{ id: 'window:2819402:0', name: 'League of Legends' }]
+
+    expect(
+      selectLeagueGameCaptureSource(
+        sources as any,
+        new Set([72968]),
+        () =>
+          ({
+            targetPid: 54608
+          }) as any
+      )
+    ).toBeNull()
+  })
+
+  it('rejects an exact-title window when inspection proves it belongs to another process', () => {
+    const sources = [{ id: 'window:21499982:0', name: 'League of Legends (TM) Client' }]
+
+    expect(
+      selectLeagueGameCaptureSource(
+        sources as any,
+        new Set([72968]),
+        () =>
+          ({
+            targetPid: 54608
+          }) as any
+      )
+    ).toBeNull()
+  })
+
+  it('does not commit a target when inspection is unavailable or owns a different PID', () => {
+    const ctx = createMockContext()
+    const setTargetEnvironment = vi.fn()
+    const inspectTarget = vi.fn()
+    const supervisor = new CaptureProcessSupervisorController(
+      ctx,
+      { setTargetEnvironment } as any,
+      {} as any,
+      () => ({ wgc: true, dda: true }),
+      inspectTarget
+    )
+    ;(supervisor as any)._targetPids = new Set([72968])
+    ;(supervisor as any)._targetHwnd = 111
+    ;(supervisor as any)._targetPid = 222
+    const source = { id: 'window:21499982:0', name: 'League of Legends (TM) Client' }
+
+    inspectTarget.mockReturnValueOnce(null)
+    expect((supervisor as any)._updateTargetWindowFromSource(source)).toBe(false)
+    expect((supervisor as any)._targetHwnd).toBe(111)
+    expect((supervisor as any)._targetPid).toBe(222)
+    expect(setTargetEnvironment).not.toHaveBeenCalled()
+
+    inspectTarget.mockReturnValueOnce({ targetPid: 54608 })
+    expect((supervisor as any)._updateTargetWindowFromSource(source)).toBe(false)
+    expect((supervisor as any)._targetHwnd).toBe(111)
+    expect((supervisor as any)._targetPid).toBe(222)
+    expect(setTargetEnvironment).not.toHaveBeenCalled()
+  })
+
   function createMockContext() {
     let enabled = true
     let canCapture = true
@@ -385,6 +473,7 @@ describe('CaptureProcessSupervisorController Deadlock & Gate A Lifecycle Test', 
         toBitmap: () => new Uint8Array(1280 * 720 * 4)
       }
     })
+    vi.mocked(getPidsByName).mockResolvedValueOnce([10])
 
     await expect(supervisor.requestCalibrationPreview(false)).resolves.toMatchObject({
       calibration,
@@ -465,7 +554,9 @@ describe('CaptureProcessSupervisorController Deadlock & Gate A Lifecycle Test', 
     const fallbackSpy = vi
       .spyOn(supervisor as any, '_startCaptureLoop')
       .mockImplementation(() => {})
-    vi.spyOn(supervisor as any, '_refreshCalibrationFromGameWindow').mockResolvedValue(undefined)
+    const automaticCalibrationSpy = vi
+      .spyOn(supervisor as any, '_refreshCalibrationFromGameWindow')
+      .mockResolvedValue(undefined)
 
     ;(supervisor as any)._handleWorkerMessage({
       type: 'error',
@@ -491,6 +582,243 @@ describe('CaptureProcessSupervisorController Deadlock & Gate A Lifecycle Test', 
     expect(ctx.liveCoach.state.setLastError).toHaveBeenCalledWith(
       expect.objectContaining({ code: 'capture-stalled', stage: 'minimap-capture' })
     )
+    expect(automaticCalibrationSpy).not.toHaveBeenCalled()
+  })
+
+  it('retries native capture on one bounded backoff timer and preserves manual calibration', async () => {
+    vi.useFakeTimers()
+    try {
+      const ctx = createMockContext()
+      const manualCalibration = {
+        id: 'manual-recovery',
+        source: 'manual',
+        roi: { x: 0.8, y: 0.7, width: 0.2, height: 0.3 }
+      }
+      const calibrationController = {
+        getOrCreateCalibration: vi.fn().mockReturnValue(manualCalibration),
+        getEnvironmentFingerprint: vi.fn().mockReturnValue({ width: 1920, height: 1080 }),
+        setTargetEnvironment: vi.fn().mockReturnValue(false),
+        applyAutomaticDetection: vi.fn()
+      }
+      const inspectTarget = vi.fn(() => ({
+        targetPid: 72968,
+        displayId: '\\\\.\\DISPLAY1',
+        windowBounds: { x: 0, y: 0, width: 1920, height: 1080 },
+        clientBounds: { x: 0, y: 0, width: 1920, height: 1080 },
+        monitorBounds: { x: 0, y: 0, width: 1920, height: 1080 },
+        dpiScale: 1,
+        hdr: false,
+        windowMode: 'borderless'
+      }))
+      const supervisor = new CaptureProcessSupervisorController(
+        ctx,
+        calibrationController as any,
+        {} as any,
+        () => ({ wgc: true, dda: true }),
+        inspectTarget as any
+      )
+      const worker = { postMessage: vi.fn(), kill: vi.fn() }
+      const automaticCalibrationSpy = vi
+        .spyOn(supervisor as any, '_refreshCalibrationFromGameWindow')
+        .mockResolvedValue(undefined)
+      vi.spyOn(supervisor as any, '_findGameCaptureSource').mockResolvedValue({
+        id: 'window:21499982:0',
+        name: 'League of Legends (TM) Client'
+      })
+      const fallbackSpy = vi
+        .spyOn(supervisor as any, '_startCaptureLoop')
+        .mockImplementation(() => {
+          ;(supervisor as any)._captureTimer = setInterval(() => {}, 100)
+        })
+      vi.mocked(getPidsByName).mockClear().mockResolvedValue([72968])
+      ;(supervisor as any)._worker = worker
+      ;(supervisor as any)._isSupervising = true
+      ;(supervisor as any)._currentSessionId = 'session-recovery'
+      ;(supervisor as any)._currentCalibration = manualCalibration
+      ;(supervisor as any)._lifecycleVersion = 7
+
+      const nativeError = {
+        type: 'error',
+        code: 'LC_ERR_NATIVE_CAPTURE_FAILED',
+        stage: 'capture',
+        details: 'native capture failed',
+        recoverable: true
+      }
+      ;(supervisor as any)._handleWorkerMessage(nativeError)
+      ;(supervisor as any)._handleWorkerMessage(nativeError)
+
+      expect(fallbackSpy).toHaveBeenCalledOnce()
+      expect((supervisor as any)._nativeCaptureRetryTimer).not.toBeNull()
+
+      const retryDelays = [500, 1000, 2000, 4000]
+      for (const [index, delay] of retryDelays.entries()) {
+        const startsBefore = worker.postMessage.mock.calls.filter(
+          ([message]) => message.type === 'start'
+        ).length
+        await vi.advanceTimersByTimeAsync(delay - 1)
+        expect(
+          worker.postMessage.mock.calls.filter(([message]) => message.type === 'start')
+        ).toHaveLength(startsBefore)
+        await vi.advanceTimersByTimeAsync(1)
+        expect(
+          worker.postMessage.mock.calls.filter(([message]) => message.type === 'start')
+        ).toHaveLength(index + 1)
+        if (index < retryDelays.length - 1) {
+          ;(supervisor as any)._handleWorkerMessage(nativeError)
+          ;(supervisor as any)._handleWorkerMessage(nativeError)
+        }
+      }
+
+      expect(getPidsByName).toHaveBeenCalledTimes(4)
+      expect(worker.postMessage).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          type: 'start',
+          sessionId: 'session-recovery',
+          targetPid: 72968,
+          targetHwnd: 21499982,
+          backend: 'wgc',
+          captureConfig: expect.objectContaining({ normalizedRoi: manualCalibration.roi })
+        })
+      )
+      ;(supervisor as any)._handleWorkerMessage(nativeError)
+      expect((supervisor as any)._nativeCaptureRetryTimer).toBeNull()
+      await vi.advanceTimersByTimeAsync(8000)
+      expect(getPidsByName).toHaveBeenCalledTimes(4)
+      expect(automaticCalibrationSpy).not.toHaveBeenCalled()
+      expect(calibrationController.applyAutomaticDetection).not.toHaveBeenCalled()
+
+      ;(supervisor as any)._handleWorkerMessage({
+        type: 'status',
+        backend: 'wgc',
+        fps: 10,
+        roiHealth: 'healthy'
+      })
+      expect((supervisor as any)._nativeCaptureRetryCount).toBe(0)
+      expect((supervisor as any)._captureTimer).toBeNull()
+
+      ;(supervisor as any)._handleWorkerMessage(nativeError)
+      expect((supervisor as any)._nativeCaptureRetryTimer).not.toBeNull()
+      supervisor.stopSupervising()
+      expect((supervisor as any)._nativeCaptureRetryTimer).toBeNull()
+      await vi.advanceTimersByTimeAsync(500)
+      expect(getPidsByName).toHaveBeenCalledTimes(4)
+    } finally {
+      vi.mocked(getPidsByName).mockResolvedValue([])
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps one retry in flight and resumes the remaining budget after the worker restarts', async () => {
+    vi.useFakeTimers()
+    let resolveFirstLookup: (pids: number[]) => void = () => {}
+    try {
+      const ctx = createMockContext()
+      const manualCalibration = {
+        id: 'manual-worker-restart',
+        source: 'manual',
+        roi: { x: 0.8, y: 0.7, width: 0.2, height: 0.3 }
+      }
+      const calibrationController = {
+        getOrCreateCalibration: vi.fn().mockReturnValue(manualCalibration),
+        getEnvironmentFingerprint: vi.fn().mockReturnValue({ width: 1920, height: 1080 }),
+        setTargetEnvironment: vi.fn().mockReturnValue(false)
+      }
+      const inspectTarget = vi.fn(() => ({
+        targetPid: 72968,
+        displayId: '\\\\.\\DISPLAY1',
+        windowBounds: { x: 0, y: 0, width: 1920, height: 1080 },
+        clientBounds: { x: 0, y: 0, width: 1920, height: 1080 },
+        monitorBounds: { x: 0, y: 0, width: 1920, height: 1080 },
+        dpiScale: 1,
+        hdr: false,
+        windowMode: 'borderless'
+      }))
+      const supervisor = new CaptureProcessSupervisorController(
+        ctx,
+        calibrationController as any,
+        {} as any,
+        () => ({ wgc: true, dda: true }),
+        inspectTarget as any
+      )
+      const oldWorker = { postMessage: vi.fn(), kill: vi.fn() }
+      const newWorker = { postMessage: vi.fn(), kill: vi.fn() }
+      const firstLookup = new Promise<number[]>((resolve) => {
+        resolveFirstLookup = resolve
+      })
+      vi.mocked(getPidsByName)
+        .mockClear()
+        .mockImplementationOnce(() => firstLookup)
+        .mockResolvedValue([72968])
+      vi.spyOn(supervisor as any, '_findGameCaptureSource').mockResolvedValue({
+        id: 'window:21499982:0',
+        name: 'League of Legends (TM) Client'
+      })
+      vi.spyOn(supervisor as any, '_startCaptureLoop').mockImplementation(() => {
+        ;(supervisor as any)._captureTimer = setInterval(() => {}, 100)
+      })
+      ;(supervisor as any)._worker = oldWorker
+      ;(supervisor as any)._isSupervising = true
+      ;(supervisor as any)._currentSessionId = 'session-worker-restart'
+      ;(supervisor as any)._currentCalibration = manualCalibration
+      ;(supervisor as any)._lifecycleVersion = 9
+
+      const nativeError = {
+        type: 'error',
+        code: 'LC_ERR_NATIVE_CAPTURE_FAILED',
+        stage: 'capture',
+        details: 'native capture failed',
+        recoverable: true
+      }
+      ;(supervisor as any)._handleWorkerMessage(nativeError)
+      await vi.advanceTimersByTimeAsync(500)
+      expect((supervisor as any)._nativeCaptureRetryInFlight).toBe(true)
+
+      ;(supervisor as any)._handleWorkerMessage(nativeError)
+      ;(supervisor as any)._handleWorkerMessage(nativeError)
+      expect((supervisor as any)._nativeCaptureRetryTimer).toBeNull()
+
+      const spawnSpy = vi.spyOn(supervisor as any, '_spawnWorker').mockImplementation(() => {
+        ;(supervisor as any)._worker = newWorker
+      })
+      ;(supervisor as any)._handleWorkerExit(
+        oldWorker,
+        1,
+        'session-worker-restart',
+        manualCalibration
+      )
+
+      expect(spawnSpy).toHaveBeenCalledOnce()
+      expect((supervisor as any)._nativeCaptureRetryCount).toBe(1)
+      expect((supervisor as any)._nativeCaptureRetryInFlight).toBe(false)
+      expect((supervisor as any)._nativeCaptureRetryTimer).not.toBeNull()
+
+      resolveFirstLookup([72968])
+      await Promise.resolve()
+      expect(oldWorker.postMessage).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'start' })
+      )
+
+      await vi.advanceTimersByTimeAsync(999)
+      expect(newWorker.postMessage).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(1)
+      expect(newWorker.postMessage).toHaveBeenCalledTimes(1)
+      expect(newWorker.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'start',
+          backend: 'wgc',
+          targetPid: 72968,
+          targetHwnd: 21499982
+        })
+      )
+      expect((supervisor as any)._nativeCaptureFailed).toBe(true)
+      expect(getPidsByName).toHaveBeenCalledTimes(2)
+
+      supervisor.stopSupervising()
+    } finally {
+      resolveFirstLookup([])
+      vi.mocked(getPidsByName).mockResolvedValue([])
+      vi.useRealTimers()
+    }
   })
 
   it('logs only stable worker error fields and never raw worker details', () => {
@@ -749,6 +1077,7 @@ describe('CaptureProcessSupervisorController Deadlock & Gate A Lifecycle Test', 
     )
     ;(supervisor as any)._targetHwnd = 123
     ;(supervisor as any)._targetPid = 10
+    ;(supervisor as any)._targetPids = new Set([10])
     ;(supervisor as any)._isSupervising = true
     ;(supervisor as any)._currentSessionId = 'display-move'
     const recalibrate = vi
@@ -939,8 +1268,20 @@ describe('CaptureProcessSupervisorController Deadlock & Gate A Lifecycle Test', 
       ctx,
       calibrationController,
       {} as any,
-      () => ({ wgc: false, dda: false })
+      () => ({ wgc: false, dda: false }),
+      () =>
+        ({
+          targetPid: 10,
+          displayId: '\\\\.\\DISPLAY1',
+          windowBounds: { x: 0, y: 0, width: 1920, height: 1080 },
+          clientBounds: { x: 0, y: 0, width: 1920, height: 1080 },
+          monitorBounds: { x: 0, y: 0, width: 1920, height: 1080 },
+          dpiScale: 1,
+          hdr: false,
+          windowMode: 'borderless'
+        }) as any
     )
+    vi.mocked(getPidsByName).mockResolvedValueOnce([10])
     vi.spyOn(supervisor as any, '_findGameCaptureSource').mockResolvedValue({
       id: 'window:123:0',
       thumbnail: {
@@ -991,6 +1332,8 @@ describe('CaptureProcessSupervisorController Deadlock & Gate A Lifecycle Test', 
       ;(supervisor as any)._currentCalibration = calibration
       ;(supervisor as any)._worker = oldWorker
       ;(supervisor as any)._captureTimer = setInterval(oldCaptureTick, 100)
+      ;(supervisor as any)._nativeCaptureRetryTimer = setTimeout(() => {}, 500)
+      ;(supervisor as any)._nativeCaptureRetryCount = 2
       ;(supervisor as any)._startHeartbeatMonitor(oldWorker)
       ;(supervisor as any)._handleWorkerMessage({
         type: 'metrics',
@@ -1009,6 +1352,7 @@ describe('CaptureProcessSupervisorController Deadlock & Gate A Lifecycle Test', 
           expect(oldWorker.kill).toHaveBeenCalledOnce()
           expect((supervisor as any)._worker).toBeNull()
           expect((supervisor as any)._captureTimer).toBeNull()
+          expect((supervisor as any)._nativeCaptureRetryTimer).toBeNull()
           expect((supervisor as any)._heartbeatTimer).toBeNull()
           ;(supervisor as any)._dropCountBase = ctx.liveCoach.state.capture.dropCount
           ;(supervisor as any)._worker = newWorker
@@ -1114,7 +1458,7 @@ describe('CaptureProcessSupervisorController Deadlock & Gate A Lifecycle Test', 
       expect(newWorker.postMessage).toHaveBeenCalledWith({
         type: 'initialize',
         protocolVersion: '1.0.0',
-        runtimePaths: {},
+        runtimePaths: process.platform === 'win32' ? { nativeRuntimeRoot: expect.any(String) } : {},
         modelManifest: { 'champion-icon-onnx': identityModel }
       })
 

@@ -99,7 +99,7 @@ describe('LiveCoachIpcHandlers privacy gate', () => {
     expect(result.sidecar.sessionId).toBe(sample.session.metadata.sessionId)
   })
 
-  it('manually starts a supported custom game while its queue metadata is still resolving', async () => {
+  it('manually starts a Tencent custom game with its regional queue id', async () => {
     const calls: Record<string, (...args: any[]) => any> = {}
     const context = {
       namespace: 'live-coach-main',
@@ -123,7 +123,11 @@ describe('LiveCoachIpcHandlers privacy gate', () => {
             phase: 'InProgress',
             session: {
               map: { id: 11, gameMode: 'CLASSIC' },
-              gameData: { gameId: 9001, isCustomGame: true }
+              gameData: {
+                gameId: 9001,
+                isCustomGame: true,
+                queue: { id: 3100, isCustom: true, gameMode: 'CLASSIC', mapId: 11 }
+              }
             }
           }
         }

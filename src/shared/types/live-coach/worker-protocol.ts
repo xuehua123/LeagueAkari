@@ -26,6 +26,7 @@ export interface MainToWorkerInitMessage {
   type: 'initialize'
   protocolVersion: string
   runtimePaths: {
+    nativeRuntimeRoot?: string
     onnxRuntimeDll?: string
     directMlDll?: string
   }
@@ -148,6 +149,7 @@ export const mainToWorkerMessageSchema = z.discriminatedUnion('type', [
     type: z.literal('initialize'),
     protocolVersion: z.string(),
     runtimePaths: z.object({
+      nativeRuntimeRoot: z.string().min(1).optional(),
       onnxRuntimeDll: z.string().optional(),
       directMlDll: z.string().optional()
     }),

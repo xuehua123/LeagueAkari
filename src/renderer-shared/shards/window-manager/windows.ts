@@ -2,6 +2,7 @@ import { BaseAkariWindowRenderer } from './base-akari-window'
 import {
   MAIN_SHARD_NAMESPACE_AUX_WINDOW,
   MAIN_SHARD_NAMESPACE_CD_TIMER_WINDOW,
+  MAIN_SHARD_NAMESPACE_COACH_OVERLAY_WINDOW,
   MAIN_SHARD_NAMESPACE_MAIN_WINDOW,
   MAIN_SHARD_NAMESPACE_ONGOING_GAME_WINDOW,
   MAIN_SHARD_NAMESPACE_OPGG_WINDOW,
@@ -10,6 +11,7 @@ import {
 import {
   useAuxWindowStore,
   useCdTimerWindowStore,
+  useCoachOverlayWindowStore,
   useMainWindowStore,
   useOngoingGameWindowStore,
   useOpggWindowStore
@@ -185,5 +187,27 @@ export class AkariCdTimerWindow extends BaseAkariWindowRenderer<
   // 一份复制后的逻辑, 嗯. 就这样吧
   sendInGame(text: string) {
     return this._context.ipc.call(MAIN_SHARD_NAMESPACE_CD_TIMER_WINDOW, 'sendInGame', text)
+  }
+}
+
+export class AkariCoachOverlayWindow extends BaseAkariWindowRenderer<
+  ReturnType<typeof useCoachOverlayWindowStore>,
+  ReturnType<typeof useCoachOverlayWindowStore>['settings']
+> {
+  constructor(_context: WindowManagerRendererContext) {
+    super(
+      _context,
+      MAIN_SHARD_NAMESPACE_COACH_OVERLAY_WINDOW,
+      () => useCoachOverlayWindowStore(),
+      () => useCoachOverlayWindowStore().settings
+    )
+  }
+
+  setInteractionMode(interactive: boolean): Promise<boolean> {
+    return this._context.ipc.call(
+      MAIN_SHARD_NAMESPACE_COACH_OVERLAY_WINDOW,
+      'setInteractionMode',
+      interactive
+    )
   }
 }

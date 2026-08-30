@@ -184,6 +184,15 @@
             <NButton size="small" @click="handleTestSpeech">
               {{ t('liveCoach.overview.testSpeech', '测试语音播报') }}
             </NButton>
+            <NButton
+              size="small"
+              secondary
+              type="info"
+              :loading="overlayAdjustmentPending"
+              @click="handleBeginOverlayAdjustment"
+            >
+              {{ t('liveCoach.overview.adjustOverlay') }}
+            </NButton>
           </div>
         </NCard>
 
@@ -609,6 +618,7 @@ const route = useRoute()
 const router = useRouter()
 const pendingCueId = ref<string | null>(null)
 const communicationPendingId = ref<string | null>(null)
+const overlayAdjustmentPending = ref(false)
 const latestReplayAnalysis = ref<ReplayAnalysisHistoryEntry | null>(null)
 const uiNow = ref(Date.now())
 let uiClockTimer: ReturnType<typeof setInterval> | null = null
@@ -652,6 +662,14 @@ const simpleModeNeedsRestore = computed(
 
 const primaryUnavailableReason = computed<CoachUnavailableReason | null>(
   () => Object.values(coachStore.capability.unavailable)[0] ?? null
+)
+
+const visualCoachAvailable = computed(
+  () =>
+    coachStore.capability.enabledFeatureIds.includes('coach.analyze.minimap-basic') &&
+    coachStore.capture.backend !== 'desktopCapturer' &&
+    coachStore.capture.backend !== 'unavailable' &&
+    coachStore.lastError?.code !== 'capture-stalled'
 )
 
 const quickStartStatus = computed(() => {
@@ -700,6 +718,14 @@ const quickStartStatus = computed(() => {
       type: 'warning' as const,
       titleKey: 'liveCoach.overview.quickStart.speechUnavailableTitle',
       descriptionKey: 'liveCoach.overview.quickStart.speechUnavailableDescription',
+      showDiagnostics: true
+    }
+  }
+  if (coachStore.session.state === 'active' && !visualCoachAvailable.value) {
+    return {
+      type: 'warning' as const,
+      titleKey: 'liveCoach.overview.quickStart.partialTitle',
+      descriptionKey: 'liveCoach.overview.quickStart.partialDescription',
       showDiagnostics: true
     }
   }
@@ -1013,6 +1039,27 @@ const handleTestSpeech = async () => {
     message.success(t('liveCoach.voice.testSucceeded'))
   } catch (err: any) {
     message.error(t('liveCoach.overview.testSpeechFailed', { error: err.message }))
+  }
+}
+
+const handleBeginOverlayAdjustment = async () => {
+  if (overlayAdjustmentPending.value) return
+  overlayAdjustmentPending.value = true
+  try {
+    const entered = await coachShard.beginOverlayAdjustment()
+    if (!entered) {
+      message.warning(t('liveCoach.overview.overlayAdjustmentUnavailable'))
+      return
+    }
+    message.success(t('liveCoach.overview.overlayAdjustmentStarted'))
+  } catch (error) {
+    message.error(
+      t('liveCoach.overview.overlayAdjustmentFailed', {
+        error: error instanceof Error ? error.message : String(error)
+      })
+    )
+  } finally {
+    overlayAdjustmentPending.value = false
   }
 }
 </script>

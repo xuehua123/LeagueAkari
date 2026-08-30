@@ -13,7 +13,12 @@ import {
 
 const workerMocks = vi.hoisted(() => ({
   processFrame: vi.fn(),
-  deriveEvents: vi.fn()
+  deriveEvents: vi.fn(),
+  loadNativeRuntime: vi.fn()
+}))
+
+vi.mock('../../native/trusted-native-runtime', () => ({
+  loadTrustedNativeRuntime: workerMocks.loadNativeRuntime
 }))
 
 vi.mock('./champion-onnx-classifier', () => ({
@@ -79,6 +84,7 @@ describe('Minimap Observer worker live frame boundaries', () => {
         payload: {}
       }
     ])
+    workerMocks.loadNativeRuntime.mockReset()
 
     await handleMainMessage({
       type: 'start',
@@ -138,6 +144,67 @@ describe('Minimap Observer worker live frame boundaries', () => {
       sourceResolution: { width: 1920, height: 1080 },
       hdr: null
     })
+  })
+
+  it('uses the trusted runtime root supplied by main for native capture', async () => {
+    const captureFrame = vi.fn().mockReturnValue({
+      buffer: new Uint8Array([1, 2, 3, 255]),
+      width: 1,
+      height: 1,
+      sourceWidth: 1920,
+      sourceHeight: 1080,
+      observedAt: 100,
+      backend: 'wgc',
+      hdr: false
+    })
+    const dispose = vi.fn()
+    const CaptureSession = vi.fn(function () {
+      return { captureFrame, dispose }
+    })
+    workerMocks.loadNativeRuntime.mockReturnValue({
+      capture: {
+        load: vi.fn(),
+        isWgcSupported: vi.fn().mockReturnValue(true),
+        isDdaSupported: vi.fn().mockReturnValue(false),
+        CaptureSession
+      }
+    })
+
+    await handleMainMessage({
+      type: 'initialize',
+      protocolVersion: '1.0.0',
+      runtimePaths: { nativeRuntimeRoot: 'D:\\trusted-native-runtime' },
+      modelManifest: {}
+    })
+    await handleMainMessage({
+      type: 'start',
+      sessionId: liveSessionId,
+      patch: '16.16.1',
+      targetHwnd: 123,
+      targetPid: 456,
+      backend: 'wgc',
+      captureConfig: {
+        fps: 10,
+        roi: { x: 0, y: 0, width: 1, height: 1 },
+        normalizedRoi: { x: 0.8, y: 0.8, width: 0.2, height: 0.2 }
+      },
+      detectors: []
+    })
+    vi.setSystemTime(100)
+    await runDetectionTick()
+
+    expect(workerMocks.loadNativeRuntime).toHaveBeenCalledWith({
+      runtimeRoot: 'D:\\trusted-native-runtime'
+    })
+    expect(CaptureSession).toHaveBeenCalledWith(
+      expect.objectContaining({ backend: 'wgc', targetHwnd: 123, targetPid: 456 })
+    )
+    expect(messages).toContainEqual(
+      expect.objectContaining({ type: 'ready', supportedBackends: ['wgc', 'desktopCapturer'] })
+    )
+    expect(messages).not.toContainEqual(
+      expect.objectContaining({ type: 'error', code: 'LC_ERR_NATIVE_CAPTURE_UNAVAILABLE' })
+    )
   })
 
   it('drops a stale source once and reports zero processed FPS for it', async () => {

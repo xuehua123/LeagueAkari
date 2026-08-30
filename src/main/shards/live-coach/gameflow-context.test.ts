@@ -15,6 +15,18 @@ describe('resolveLiveCoachGameflowContext', () => {
     ).toEqual({ mapId: 11, queueId: 0, gameMode: 'CLASSIC', isCustomGame: true })
   })
 
+  it('normalizes the Tencent custom queue id before capability evaluation', () => {
+    expect(
+      resolveLiveCoachGameflowContext({
+        map: { id: 11, gameMode: 'CLASSIC' },
+        gameData: {
+          isCustomGame: true,
+          queue: { id: 3100, isCustom: true, gameMode: 'CLASSIC', mapId: 11 }
+        }
+      } as any)
+    ).toEqual({ mapId: 11, queueId: 0, gameMode: 'CLASSIC', isCustomGame: true })
+  })
+
   it('recovers queue 0 from the custom-game flag while the queue object is incomplete', () => {
     expect(
       resolveLiveCoachGameflowContext({

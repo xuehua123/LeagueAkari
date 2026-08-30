@@ -602,7 +602,7 @@ describe('LiveCoachSessionController Lifecycle & Exit Cleanup Test', () => {
     controller.dispose()
   })
 
-  it("auto-starts a Summoner's Rift custom game before LCU finishes resolving its queue", () => {
+  it("auto-starts a Tencent Summoner's Rift custom game with its regional queue id", () => {
     const ctx = createMockContext()
     const capabilityController = { evaluateCapabilities: vi.fn(), isGateAEnabled: true } as any
     const scheduler = { reset: vi.fn(), submitCues: vi.fn() } as any
@@ -611,7 +611,11 @@ describe('LiveCoachSessionController Lifecycle & Exit Cleanup Test', () => {
 
     ctx.setGameflow('InProgress', {
       map: { id: 11, gameMode: 'CLASSIC' },
-      gameData: { gameId: 234567, isCustomGame: true }
+      gameData: {
+        gameId: 234567,
+        isCustomGame: true,
+        queue: { id: 3100, isCustom: true, gameMode: 'CLASSIC', mapId: 11 }
+      }
     })
 
     expect(ctx.state.session.state).toBe('active')

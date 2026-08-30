@@ -9,6 +9,7 @@ export const MAIN_SHARD_NAMESPACE_AUX_WINDOW = 'window-manager-main/aux-window'
 export const MAIN_SHARD_NAMESPACE_OPGG_WINDOW = 'window-manager-main/opgg-window'
 export const MAIN_SHARD_NAMESPACE_ONGOING_GAME_WINDOW = 'window-manager-main/ongoing-game-window'
 export const MAIN_SHARD_NAMESPACE_CD_TIMER_WINDOW = 'window-manager-main/cd-timer-window'
+export const MAIN_SHARD_NAMESPACE_COACH_OVERLAY_WINDOW = 'window-manager-main/coach-overlay-window'
 
 export interface WindowManagerRendererContext {
   ipc: AkariIpcRenderer

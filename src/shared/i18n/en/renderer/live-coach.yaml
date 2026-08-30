@@ -11,8 +11,14 @@ liveCoach:
     help: Help & Quick Start
   overlay:
     activeTitle: AI Coach Active
+    partialTitle: AI Coach is using Live Data only; visual analysis is not running
     pausedTitle: AI Coach Paused
     idleTitle: AI Coach Idle
+    adjustmentBadge: Adjust
+    adjustmentTitle: Adjusting Overlay Position and Size
+    adjustmentHint: Drag this header to move; drag the window edge to resize
+    finishAdjustment: Finish and Lock
+    finishAdjustmentFailed: 'Could not lock the overlay: {{error}}'
     pauseReason:
       user-pause: Paused from the main page
       global-shortcut: Paused with the global shortcut
@@ -54,6 +60,8 @@ liveCoach:
       mutedDescription: Subtitles remain visible, but speech is off. Select Restore Automatic Voice Mode to restore short local speech.
       speechUnavailableTitle: Automatic start is ready, but local speech is unavailable
       speechUnavailableDescription: Subtitles still work. Open Diagnostics to check the Windows Chinese voice and output device.
+      partialTitle: Session connected, but visual AI is not running
+      partialDescription: Only Live Data cues are available. Minimap visual analysis is unavailable; open Diagnostics for details.
       blockedTitle: 'Not started: one requirement is not ready'
       blockedDescription: 'Current reason: {{reason}}. Open Diagnostics for the exact fix.'
       waitingForGame: Waiting for the game window and live match data
@@ -100,6 +108,10 @@ liveCoach:
     resumeSession: Resume Coach
     stopSession: Stop Current Session
     testSpeech: Test Speech
+    adjustOverlay: Adjust Overlay
+    overlayAdjustmentStarted: The overlay is unlocked. Drag its header to move it or its edge to resize it, then select “Finish and Lock” in the overlay.
+    overlayAdjustmentUnavailable: Overlay adjustment mode is temporarily unavailable. Please try again.
+    overlayAdjustmentFailed: 'Could not adjust the overlay: {{error}}'
     manualSessionStarted: Coach started from the current live match.
     manualSessionFailed: 'Unable to start: {{error}}'
     sessionPaused: Coach paused. Real-time capture and output have stopped.

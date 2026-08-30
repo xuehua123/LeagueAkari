@@ -11,8 +11,14 @@ liveCoach:
     help: 帮助与快速上手
   overlay:
     activeTitle: AI 教练实时监测中
+    partialTitle: AI 教练仅 Live Data，画面分析未运行
     pausedTitle: AI 教练已暂停
     idleTitle: AI 教练空闲
+    adjustmentBadge: 调整
+    adjustmentTitle: 悬浮窗位置与大小调整中
+    adjustmentHint: 拖动此顶栏移动，拖动窗口边缘缩放
+    finishAdjustment: 完成并锁定
+    finishAdjustmentFailed: '无法锁定悬浮窗：{{error}}'
     pauseReason:
       user-pause: 主页面手动暂停
       global-shortcut: 全局快捷键暂停
@@ -54,6 +60,8 @@ liveCoach:
       mutedDescription: 仍会显示字幕，但不会播放语音。点击“恢复自动语音模式”即可恢复本地短语音。
       speechUnavailableTitle: 可以自动开始，但本地语音暂不可用
       speechUnavailableDescription: 字幕仍可正常使用；点击“运行诊断”检查 Windows 中文语音和输出设备。
+      partialTitle: 会话已建立，但画面 AI 未运行
+      partialDescription: 当前仅有 Live Data 提示，小地图画面分析不可用；请打开运行诊断查看原因。
       blockedTitle: 还没启动：当前有一项条件未满足
       blockedDescription: '当前原因：{{reason}}。点击“运行诊断”可以直接查看处理办法。'
       waitingForGame: 正在等待游戏窗口和对局数据
@@ -99,6 +107,10 @@ liveCoach:
     resumeSession: 恢复教练
     stopSession: 结束当前会话
     testSpeech: 测试语音播报
+    adjustOverlay: 调整悬浮窗
+    overlayAdjustmentStarted: 悬浮窗已解锁；拖动顶栏移动、拖动边缘缩放，完成后点击窗内的“完成并锁定”。
+    overlayAdjustmentUnavailable: 暂时无法打开悬浮窗调整模式，请稍后重试。
+    overlayAdjustmentFailed: '无法调整悬浮窗：{{error}}'
     manualSessionStarted: 已根据当前真实对局启动教练。
     manualSessionFailed: '启动失败：{{error}}'
     sessionPaused: 教练已暂停，实时采集与播报均已停止。

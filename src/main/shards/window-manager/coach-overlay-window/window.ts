@@ -1,5 +1,6 @@
 import { is } from '@electron-toolkit/utils'
 import { GameClientMain } from '@main/shards/game-client'
+import { AkariIpcError } from '@main/shards/ipc'
 import icon from '@resources/LA_ICON.ico?asset'
 import { comparer } from 'mobx'
 import { z } from 'zod'
@@ -84,17 +85,28 @@ export class AkariCoachOverlayWindow extends BaseAkariWindow<
     this._window.setIgnoreMouseEvents(!this.state.interactive, { forward: true })
   }
 
-  public async setInteractionMode(interactive: boolean): Promise<void> {
+  public async setInteractionMode(
+    interactive: boolean,
+    allowWhenGameNotForeground: boolean = false
+  ): Promise<boolean> {
     const requestGeneration = ++this._interactionRequestGeneration
     if (!interactive) {
       this.state.setInteractive(false)
       this._applyOverlayWindowBehavior()
-      return
+      return true
     }
 
-    const canInteract = is.dev || (await GameClientMain.isGameClientForeground())
+    const canInteract =
+      allowWhenGameNotForeground || is.dev || (await GameClientMain.isGameClientForeground())
     if (requestGeneration !== this._interactionRequestGeneration || !canInteract) {
-      return
+      return false
+    }
+
+    if (!this._window || this._window.isDestroyed()) {
+      this.createWindow()
+    }
+    if (!this._window || this._window.isDestroyed()) {
+      return false
     }
 
     if (!this.state.show) {
@@ -103,10 +115,34 @@ export class AkariCoachOverlayWindow extends BaseAkariWindow<
     this.state.setInteractive(true)
     this._applyOverlayWindowBehavior()
     this._window?.focus()
+    return true
   }
 
   public override async onInit(): Promise<void> {
     await super.onInit()
+
+    this._ipc.onCall(this._namespace, 'setInteractionMode', (event, interactive: unknown) => {
+      if (typeof interactive !== 'boolean') {
+        throw new AkariIpcError(
+          'interactive must be a boolean',
+          'CoachOverlayInteractionModeInvalid'
+        )
+      }
+
+      const isMainWindowSender = event.sender === this._windowManager.mainWindow.window?.webContents
+      const isCoachOverlaySender = event.sender === this._window?.webContents
+      const isAllowedSender = isMainWindowSender || (!interactive && isCoachOverlaySender)
+      if (!isAllowedSender) {
+        throw new AkariIpcError(
+          'sender cannot change coach overlay interaction mode',
+          'CoachOverlayInteractionModeSenderNotAllowed'
+        )
+      }
+
+      // Renderer-triggered adjustment starts while League Akari itself is foreground, so this
+      // trusted UI path must not reuse the in-game shortcut's foreground requirement.
+      return this.setInteractionMode(interactive, true)
+    })
 
     // 1. 监听全局初始化完成和开关，自动创建/销毁窗口
     this._mobxUtils.reaction(
@@ -141,7 +177,12 @@ export class AkariCoachOverlayWindow extends BaseAkariWindow<
             this._applyOverlayWindowBehavior()
           })
 
-          this.hide()
+          if (this.state.interactive) {
+            this.show()
+            this._window.focus()
+          } else {
+            this.hide()
+          }
         }
       },
       { fireImmediately: true, equals: comparer.shallow }

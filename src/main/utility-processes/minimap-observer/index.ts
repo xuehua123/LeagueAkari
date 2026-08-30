@@ -54,6 +54,7 @@ let captureHdr: boolean | null = null
 let nativeCaptureSession: { captureFrame(timeoutMs?: number): any; dispose(): void } | null = null
 let nativeCaptureRequest: Extract<MainToWorkerMessage, { type: 'start' }> | null = null
 let nativeCaptureMode: 'auto' | 'wgc' | 'dda' | null = null
+let nativeRuntimeRoot: string | undefined
 let championClassifier: ChampionOnnxClassifier | null = null
 let detectionTickProcessing = false
 
@@ -75,7 +76,9 @@ function createNativeCaptureSession(
   if (!normalizedRoi) {
     throw new Error('Native capture requires a normalized ROI')
   }
-  const native = loadTrustedNativeRuntime<typeof import('league-akari-native-win32')>()
+  const native = loadTrustedNativeRuntime<typeof import('league-akari-native-win32')>({
+    runtimeRoot: nativeRuntimeRoot
+  })
   native.capture.load()
   const candidates: Array<'wgc' | 'dda'> = backend === 'auto' ? ['wgc', 'dda'] : [backend]
   let lastError: unknown = null
@@ -562,13 +565,18 @@ export async function handleMainMessage(rawMsg: unknown): Promise<void> {
   switch (msg.type) {
     case 'initialize': {
       workerLifecycleVersion++
+      // UtilityProcess does not preserve Electron's development `process.defaultApp` marker.
+      // Resolve the trusted root in main and pass it here instead of guessing dev/packaged mode.
+      nativeRuntimeRoot = msg.runtimePaths.nativeRuntimeRoot
       replaySessionActive = false
       replayFrameQueue.clear()
       resetTrackingState()
       const supportedBackends = ['desktopCapturer']
       if (process.platform === 'win32') {
         try {
-          const native = loadTrustedNativeRuntime<typeof import('league-akari-native-win32')>()
+          const native = loadTrustedNativeRuntime<typeof import('league-akari-native-win32')>({
+            runtimeRoot: nativeRuntimeRoot
+          })
           native.capture.load()
           if (native.capture.isWgcSupported()) supportedBackends.unshift('wgc')
           if (native.capture.isDdaSupported())

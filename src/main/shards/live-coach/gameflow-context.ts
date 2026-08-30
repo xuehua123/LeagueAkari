@@ -23,10 +23,11 @@ function normalizeGameMode(value: unknown): string | null {
 /**
  * Resolves the LCU gameflow fields used by Live Coach from one shared source of truth.
  *
- * Custom games can briefly expose their authoritative custom-game flags before the queue
- * object is complete. In that case, Summoner's Rift custom and Practice Tool sessions use
- * Riot's canonical custom queue id (0). Explicit tutorial or unknown special modes remain
- * fail-closed instead of being mistaken for a supported custom match.
+ * Custom games are normalized to Riot's canonical custom queue id (0). Some regional
+ * clients expose a concrete local queue id (for example Tencent uses 3100 for Summoner's
+ * Rift custom games), but capability policies intentionally describe custom games with 0.
+ * Explicit tutorial or unknown special modes remain fail-closed instead of being mistaken
+ * for a supported custom match.
  */
 export function resolveLiveCoachGameflowContext(
   session: GameflowSession | null | undefined
@@ -51,10 +52,9 @@ export function resolveLiveCoachGameflowContext(
       normalizeNonNegativeInteger(session?.map?.id) ?? normalizeNonNegativeInteger(queue?.mapId),
     queueId: isUnsupportedCustomMode
       ? null
-      : (explicitQueueId ??
-        (isCustomGame && gameMode !== null && SUPPORTED_CUSTOM_GAME_MODES.has(gameMode)
-          ? CUSTOM_QUEUE_ID
-          : null)),
+      : isCustomGame && gameMode !== null && SUPPORTED_CUSTOM_GAME_MODES.has(gameMode)
+        ? CUSTOM_QUEUE_ID
+        : explicitQueueId,
     gameMode,
     isCustomGame
   }

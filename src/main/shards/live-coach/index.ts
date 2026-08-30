@@ -36,6 +36,7 @@ import { CueSchedulerController } from './cue-scheduler-controller'
 import { LiveCoachIpcHandlers } from './ipc-handlers'
 import { LocalSoundExecutor } from './local-sound-executor'
 import { LocalSpeechExecutor } from './local-speech-executor'
+import { shouldShowCoachOverlay } from './overlay-visibility'
 import { ReplayHistoryController, resolveReplayHistoryDirectory } from './replay-history'
 import { ReplayImportController } from './replay-import-controller'
 import { LiveCoachSessionController } from './session-controller'
@@ -451,15 +452,16 @@ export class LiveCoachMain implements IAkariShardInitDispose {
       () => ({
         coachEnabled: this.settings.enabled,
         overlayEnabled: this.settings.overlayEnabled,
+        overlayInteractive: this._windowManager.coachOverlayWindow.state.interactive,
         sessionState: this.state.session.state,
         windowReady: this._windowManager.coachOverlayWindow.state.ready
       }),
-      ({ coachEnabled, overlayEnabled, sessionState, windowReady }) => {
-        const shouldShow =
-          windowReady &&
-          coachEnabled &&
-          overlayEnabled &&
-          (sessionState === 'active' || sessionState === 'paused')
+      (snapshot) => {
+        if (!snapshot.windowReady) {
+          return
+        }
+
+        const shouldShow = shouldShowCoachOverlay(snapshot)
         if (shouldShow) {
           this._windowManager.coachOverlayWindow.show()
         } else {

@@ -3,9 +3,13 @@
     <div
       class="box-border flex h-full w-full flex-col justify-between rounded-lg border p-3 shadow-lg backdrop-blur-md transition-all duration-300"
       :class="[
-        coachStore.session.state === 'active'
-          ? 'border-blue-500/40 bg-black/60 text-white'
-          : 'border-gray-700/40 bg-black/40 text-gray-300'
+        isAdjustmentMode
+          ? 'border-amber-400/80 bg-black/80 text-white shadow-amber-500/20'
+          : isVisualCoachPartial
+            ? 'border-amber-400/60 bg-black/65 text-white'
+            : coachStore.session.state === 'active'
+              ? 'border-blue-500/40 bg-black/60 text-white'
+              : 'border-gray-700/40 bg-black/40 text-gray-300'
       ]"
     >
       <SetupInAppScope />
@@ -13,44 +17,76 @@
       <div
         class="overlay-drag-handle flex items-center justify-between border-b border-white/10 pb-1 text-xs"
       >
-        <div class="flex items-center gap-1.5 font-medium">
-          <span
-            class="h-2 w-2 animate-pulse rounded-full"
-            :class="[
-              coachStore.session.state === 'active'
-                ? 'bg-emerald-400'
-                : coachStore.session.state === 'paused'
-                  ? 'bg-amber-400'
-                  : 'bg-gray-400'
-            ]"
-          ></span>
-          <span>
-            {{
-              coachStore.session.state === 'active'
-                ? t('liveCoach.overlay.activeTitle', 'AI 教练实时监测中')
-                : coachStore.session.state === 'paused'
-                  ? t('liveCoach.overlay.pausedTitle', 'AI 教练已暂停')
-                  : t('liveCoach.overlay.idleTitle', 'AI 教练空闲')
-            }}
-            <template
-              v-if="coachStore.session.state === 'paused' && coachStore.session.pauseReason"
+        <template v-if="isAdjustmentMode">
+          <div class="flex min-w-0 items-center gap-2 pr-2">
+            <span
+              class="shrink-0 rounded bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-black"
             >
-              ·
+              {{ t('liveCoach.overlay.adjustmentBadge') }}
+            </span>
+            <div class="min-w-0">
+              <div class="truncate font-semibold text-amber-200">
+                {{ t('liveCoach.overlay.adjustmentTitle') }}
+              </div>
+              <div class="truncate text-[10px] text-white/65">
+                {{ t('liveCoach.overlay.adjustmentHint') }}
+              </div>
+            </div>
+          </div>
+          <NButton
+            class="overlay-interaction-control shrink-0"
+            size="tiny"
+            type="warning"
+            :loading="finishingAdjustment"
+            @click="handleFinishAdjustment"
+          >
+            {{ t('liveCoach.overlay.finishAdjustment') }}
+          </NButton>
+        </template>
+        <template v-else>
+          <div class="flex items-center gap-1.5 font-medium">
+            <span
+              class="h-2 w-2 animate-pulse rounded-full"
+              :class="[
+                isVisualCoachPartial
+                  ? 'bg-amber-400'
+                  : coachStore.session.state === 'active'
+                    ? 'bg-emerald-400'
+                    : coachStore.session.state === 'paused'
+                      ? 'bg-amber-400'
+                      : 'bg-gray-400'
+              ]"
+            ></span>
+            <span>
               {{
-                t(
-                  `liveCoach.overlay.pauseReason.${coachStore.session.pauseReason}`,
-                  coachStore.session.pauseReason
-                )
+                isVisualCoachPartial
+                  ? t('liveCoach.overlay.partialTitle')
+                  : coachStore.session.state === 'active'
+                    ? t('liveCoach.overlay.activeTitle', 'AI 教练实时监测中')
+                    : coachStore.session.state === 'paused'
+                      ? t('liveCoach.overlay.pausedTitle', 'AI 教练已暂停')
+                      : t('liveCoach.overlay.idleTitle', 'AI 教练空闲')
               }}
-            </template>
-          </span>
-        </div>
-        <div class="font-mono text-[10px] text-white/50 uppercase">
-          {{
-            coachStore.capture.backend || t('liveCoach.overlay.backendUnavailable', '采集不可用')
-          }}
-          · {{ coachStore.capture.fps }} FPS
-        </div>
+              <template
+                v-if="coachStore.session.state === 'paused' && coachStore.session.pauseReason"
+              >
+                ·
+                {{
+                  t(
+                    `liveCoach.overlay.pauseReason.${coachStore.session.pauseReason}`,
+                    coachStore.session.pauseReason
+                  )
+                }}
+              </template>
+            </span>
+          </div>
+          <div class="font-mono text-[10px] text-white/50 uppercase">
+            {{
+              coachStore.capture.backend || t('liveCoach.overlay.backendUnavailable', '采集不可用')
+            }}
+            · {{ coachStore.capture.fps }} FPS
+          </div>
+        </template>
       </div>
 
       <!-- 中间内容：提示与观察 -->
@@ -150,13 +186,30 @@
 </template>
 
 <script setup lang="ts">
+import { useInstance } from '@renderer-shared/shards'
+import { LiveCoachRenderer } from '@renderer-shared/shards/live-coach'
 import { useLiveCoachStore } from '@renderer-shared/shards/live-coach/store'
 import { SetupInAppScope } from '@renderer-shared/shards/setup-in-app-scope/setup-in-app-scope-component'
+import { useCoachOverlayWindowStore } from '@renderer-shared/shards/window-manager/store'
 import { useTranslation } from 'i18next-vue'
+import { NButton, useMessage } from 'naive-ui'
 import { computed, onBeforeUnmount, ref } from 'vue'
 
 const { t } = useTranslation()
+const message = useMessage()
 const coachStore = useLiveCoachStore()
+const coachShard = useInstance(LiveCoachRenderer)
+const overlayWindowStore = useCoachOverlayWindowStore()
+const isAdjustmentMode = computed(() => overlayWindowStore.interactive)
+const isVisualCoachPartial = computed(
+  () =>
+    coachStore.session.state === 'active' &&
+    (!coachStore.capability.enabledFeatureIds.includes('coach.analyze.minimap-basic') ||
+      coachStore.capture.backend === 'desktopCapturer' ||
+      coachStore.capture.backend === 'unavailable' ||
+      coachStore.lastError?.code === 'capture-stalled')
+)
+const finishingAdjustment = ref(false)
 const now = ref(Date.now())
 const clockTimer = setInterval(() => {
   now.value = Date.now()
@@ -181,11 +234,31 @@ const outputStatus = computed(() => {
   return labels.length ? labels.join('+') : t('liveCoach.overlay.outputOff', '无输出')
 })
 
+async function handleFinishAdjustment() {
+  if (finishingAdjustment.value) return
+  finishingAdjustment.value = true
+  try {
+    await coachShard.finishOverlayAdjustment()
+  } catch (error) {
+    message.error(
+      t('liveCoach.overlay.finishAdjustmentFailed', {
+        error: error instanceof Error ? error.message : String(error)
+      })
+    )
+  } finally {
+    finishingAdjustment.value = false
+  }
+}
+
 onBeforeUnmount(() => clearInterval(clockTimer))
 </script>
 
 <style scoped>
 .overlay-drag-handle {
   -webkit-app-region: drag;
+}
+
+.overlay-interaction-control {
+  -webkit-app-region: no-drag;
 }
 </style>

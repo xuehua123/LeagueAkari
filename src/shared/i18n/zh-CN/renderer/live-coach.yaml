@@ -40,6 +40,35 @@ liveCoach:
     optionPrefix: '建议选项:'
     rolePrimary: 首选
     roleAlternative: 备选
+    compactAdjustmentHint: 拖动 / 边缘缩放
+    compactLock: 锁定
+    compactState:
+      active: 运行
+      partial: 基础模式
+      paused: 暂停
+      idle: 待机
+    recovering: 画面恢复中
+    mutedShort: 静音
+    observing: 观察中
+    waitingMatch: 等待对局
+    attentionRequired: AI 教练需要处理
+    recoveringShort: 恢复中
+    attentionShort: 需处理
+    badge:
+      error: 异
+      warning: 危
+      opportunity: 机
+      information: 情
+      system: 系
+      review: 复
+      cooldown: 计
+      fog: 雾
+      item: 装
+    enemyTrack: '敌{{number}}'
+    itemGuidance: 出装建议
+    missingGoldShort: '差 {{gold}}g'
+    affordableShort: 可买
+    readyShort: 就绪
   overview:
     mainSwitch: 实时语音 AI 教练
     mainSwitchDesc: 开启一次即可；进入召唤师峡谷自定义、训练、匹配或排位对局后，教练会自动识别并开始。
@@ -533,7 +562,7 @@ liveCoach:
     communicationConfirmShortcut: 确认最新沟通建议
     communicationConfirmShortcutDesc: 仅复制最新有效建议的短语，不会自动向游戏发送输入。
     overlayLockedTitle: 锁定悬浮窗位置与大小
-    overlayLockedDesc: 开启后按住调整快捷键也不会移动或缩放窗口。
+    overlayLockedDesc: 关闭后会立即显示悬浮窗，可直接拖动或拉动边缘缩放；完成后在悬浮窗中锁定。
   voice:
     title: 语音播报与 TTS 设置
     enableSwitch: 启用本地语音播报

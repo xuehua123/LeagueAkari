@@ -410,7 +410,8 @@
               </div>
               <NSwitch
                 :value="coachStore.settings.overlayLocked"
-                @update:value="(value) => coachShard.setOverlayLocked(value)"
+                :loading="overlayLockPending"
+                @update:value="handleOverlayLockedChange"
               />
             </div>
           </div>
@@ -532,6 +533,7 @@ const { t } = useTranslation()
 const coachStore = useLiveCoachStore()
 const coachShard = useInstance(LiveCoachRenderer)
 const message = useMessage()
+const overlayLockPending = ref(false)
 
 const customChampionId = ref<number | null>(null)
 const customItemIds = ref('')
@@ -651,5 +653,29 @@ function handleOutputModeChange(values: Array<string | number>) {
       value === 'sound' || value === 'subtitle' || value === 'speech'
   )
   coachShard.setOutputMode(modes)
+}
+
+async function handleOverlayLockedChange(locked: boolean) {
+  if (overlayLockPending.value) return
+  overlayLockPending.value = true
+  try {
+    if (locked) {
+      await coachShard.finishOverlayAdjustment()
+      return
+    }
+
+    const entered = await coachShard.beginOverlayAdjustment()
+    if (!entered) {
+      message.warning(t('liveCoach.overview.overlayAdjustmentUnavailable'))
+    }
+  } catch (error) {
+    message.error(
+      t('liveCoach.overview.overlayAdjustmentFailed', {
+        error: error instanceof Error ? error.message : String(error)
+      })
+    )
+  } finally {
+    overlayLockPending.value = false
+  }
 }
 </script>

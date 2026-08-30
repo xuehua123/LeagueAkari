@@ -40,6 +40,35 @@ liveCoach:
     optionPrefix: 'Suggestion:'
     rolePrimary: Primary
     roleAlternative: Alternative
+    compactAdjustmentHint: Drag / resize from edge
+    compactLock: Lock
+    compactState:
+      active: Live
+      partial: Basic
+      paused: Paused
+      idle: Standby
+    recovering: Restoring video
+    mutedShort: Muted
+    observing: Watching
+    waitingMatch: Waiting for match
+    attentionRequired: AI Coach needs attention
+    recoveringShort: Restoring
+    attentionShort: Check
+    badge:
+      error: '!!'
+      warning: '!'
+      opportunity: GO
+      information: INFO
+      system: SYS
+      review: REV
+      cooldown: CD
+      fog: FOG
+      item: BUY
+    enemyTrack: 'Enemy {{number}}'
+    itemGuidance: Item guidance
+    missingGoldShort: '{{gold}}g short'
+    affordableShort: Buy
+    readyShort: Ready
   overview:
     mainSwitch: Live AI Coach
     mainSwitchDesc: Enable it once. The coach automatically detects and starts in Summoner's Rift custom, Practice Tool, normal, and ranked games.
@@ -535,7 +564,7 @@ liveCoach:
     communicationConfirmShortcut: Confirm Latest Communication Suggestion
     communicationConfirmShortcutDesc: Copies the latest valid suggestion only and never sends input to the game automatically.
     overlayLockedTitle: Lock Overlay Position & Size
-    overlayLockedDesc: When enabled, holding the adjustment shortcut will not move or resize the window.
+    overlayLockedDesc: Turn off to show the overlay and immediately drag or resize it; lock it from the overlay when finished.
   voice:
     title: Voice & TTS Settings
     enableSwitch: Enable Local TTS Speech

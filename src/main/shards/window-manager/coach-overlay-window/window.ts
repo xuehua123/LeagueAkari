@@ -2,11 +2,13 @@ import { is } from '@electron-toolkit/utils'
 import { GameClientMain } from '@main/shards/game-client'
 import { AkariIpcError } from '@main/shards/ipc'
 import icon from '@resources/LA_ICON.ico?asset'
+import { screen } from 'electron'
 import { comparer } from 'mobx'
 import { z } from 'zod'
 
 import { BaseAkariWindow } from '../base-akari-window'
 import type { WindowManagerMainContext } from '../context'
+import { repositionWindowIfInvisible } from '../window-position-service'
 import { CoachOverlayWindowSettings, CoachOverlayWindowState } from './state'
 
 export class AkariCoachOverlayWindow extends BaseAkariWindow<
@@ -19,11 +21,12 @@ export class AkariCoachOverlayWindow extends BaseAkariWindow<
   static readonly BASE_WIDTH = 420
   static readonly BASE_HEIGHT = 168
   static readonly MIN_WIDTH = 320
-  static readonly MIN_HEIGHT = 80
+  static readonly MIN_HEIGHT = 144
   static readonly INTERACTION_SHORTCUT_TARGET_ID =
     'window-manager-main/coach-overlay-window/interaction'
 
   private _interactionRequestGeneration = 0
+  private readonly _handleDisplayConfigurationChange = () => this._ensureWindowVisible()
 
   constructor(_context: WindowManagerMainContext) {
     const state = new CoachOverlayWindowState()
@@ -85,6 +88,12 @@ export class AkariCoachOverlayWindow extends BaseAkariWindow<
     this._window.setIgnoreMouseEvents(!this.state.interactive, { forward: true })
   }
 
+  private _ensureWindowVisible() {
+    if (this._window && !this._window.isDestroyed()) {
+      repositionWindowIfInvisible(this._window)
+    }
+  }
+
   public async setInteractionMode(
     interactive: boolean,
     allowWhenGameNotForeground: boolean = false
@@ -93,6 +102,7 @@ export class AkariCoachOverlayWindow extends BaseAkariWindow<
     if (!interactive) {
       this.state.setInteractive(false)
       this._applyOverlayWindowBehavior()
+      this._ensureWindowVisible()
       return true
     }
 
@@ -114,12 +124,16 @@ export class AkariCoachOverlayWindow extends BaseAkariWindow<
     }
     this.state.setInteractive(true)
     this._applyOverlayWindowBehavior()
+    this._ensureWindowVisible()
     this._window?.focus()
     return true
   }
 
   public override async onInit(): Promise<void> {
     await super.onInit()
+
+    screen.on('display-removed', this._handleDisplayConfigurationChange)
+    screen.on('display-metrics-changed', this._handleDisplayConfigurationChange)
 
     this._ipc.onCall(this._namespace, 'setInteractionMode', (event, interactive: unknown) => {
       if (typeof interactive !== 'boolean') {
@@ -175,6 +189,7 @@ export class AkariCoachOverlayWindow extends BaseAkariWindow<
 
           this._window.on('show', () => {
             this._applyOverlayWindowBehavior()
+            this._ensureWindowVisible()
           })
 
           if (this.state.interactive) {
@@ -190,9 +205,20 @@ export class AkariCoachOverlayWindow extends BaseAkariWindow<
 
     this._mobxUtils.reaction(
       () => [this.state.interactive, this.settings.locked],
-      () => this._applyOverlayWindowBehavior(),
+      () => {
+        this._applyOverlayWindowBehavior()
+        if (this.settings.locked) {
+          this._ensureWindowVisible()
+        }
+      },
       { fireImmediately: true, equals: comparer.shallow }
     )
+  }
+
+  public override async onDispose(): Promise<void> {
+    screen.off('display-removed', this._handleDisplayConfigurationChange)
+    screen.off('display-metrics-changed', this._handleDisplayConfigurationChange)
+    await super.onDispose()
   }
 
   public override hide(): void {

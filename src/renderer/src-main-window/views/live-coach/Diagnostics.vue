@@ -1,7 +1,7 @@
 <template>
   <div class="h-full w-full">
     <NScrollbar class="relative h-full max-w-full">
-      <div class="mx-auto flex w-full max-w-6xl flex-col gap-4 p-6">
+      <div class="mx-auto box-border flex w-full max-w-6xl flex-col gap-4 p-6">
         <NCard size="small" :title="t('liveCoach.diagnostics.title', '运行诊断与状态监控')">
           <div class="space-y-3">
             <div

@@ -675,6 +675,89 @@ describe('CaptureProcessSupervisorController Deadlock & Gate A Lifecycle Test', 
     expect(recalibrate).toHaveBeenCalledOnce()
   })
 
+  it('keeps an unconfirmed automatic template unknown and retries even when CV sees texture', () => {
+    const ctx = createMockContext()
+    const supervisor = new CaptureProcessSupervisorController(ctx, {} as any, {} as any)
+    const recalibrate = vi
+      .spyOn(supervisor as any, '_refreshCalibrationFromGameWindow')
+      .mockResolvedValue(undefined)
+    ;(supervisor as any)._isSupervising = true
+    ;(supervisor as any)._currentSessionId = 'unconfirmed-auto-recalibration'
+    ;(supervisor as any)._currentCalibration = {
+      id: 'unconfirmed-template',
+      source: 'automatic',
+      confidence: 0,
+      roi: { x: 0.82, y: 0.72, width: 0.18, height: 0.28 }
+    }
+
+    ;(supervisor as any)._handleWorkerMessage({
+      type: 'status',
+      backend: 'desktopCapturer',
+      resolution: { width: 256, height: 256 },
+      sourceResolution: { width: 1920, height: 1080 },
+      hdr: false,
+      fps: 5,
+      roiHealth: 'healthy'
+    })
+
+    expect(ctx.state.setRoiHealth).toHaveBeenLastCalledWith('unknown')
+    expect(ctx.liveCoach.refreshRuntimeCapabilities).toHaveBeenCalledWith(
+      expect.objectContaining({ roiHealth: 'unknown' })
+    )
+    expect(recalibrate).toHaveBeenCalledOnce()
+  })
+
+  it('drops observation facts until an automatic minimap boundary is confirmed', () => {
+    const ctx = createMockContext()
+    const handleObservationBatch = vi.fn()
+    const supervisor = new CaptureProcessSupervisorController(
+      ctx,
+      {} as any,
+      { handleObservationBatch } as any
+    )
+    const publishObservationBatch = vi.fn()
+    supervisor.onObservationBatch(publishObservationBatch)
+    const recalibrate = vi
+      .spyOn(supervisor as any, '_refreshCalibrationFromGameWindow')
+      .mockResolvedValue(undefined)
+    ;(supervisor as any)._isSupervising = true
+    ;(supervisor as any)._currentSessionId = 'unconfirmed-observation-gate'
+    ;(supervisor as any)._currentCalibration = {
+      id: 'unconfirmed-template',
+      source: 'automatic',
+      confidence: 0,
+      roi: { x: 0.82, y: 0.72, width: 0.18, height: 0.28 }
+    }
+
+    ;(supervisor as any)._handleWorkerMessage({
+      type: 'observation-batch',
+      batch: {
+        sessionId: 'unconfirmed-observation-gate',
+        health: 'healthy',
+        frame: { observedAt: 1_000, receivedAt: 1_010, sequence: 1, ageMs: 10 },
+        entities: [
+          {
+            trackId: 'false-enemy',
+            kind: 'enemy',
+            lifecycle: 'confirmed',
+            confidence: 0.99
+          }
+        ],
+        events: [],
+        modelVersions: {}
+      }
+    })
+
+    expect(ctx.state.setRoiHealth).toHaveBeenLastCalledWith('unknown')
+    expect(ctx.liveCoach.state.setCaptureState).toHaveBeenLastCalledWith({
+      roiState: 'unknown',
+      confidence: null
+    })
+    expect(publishObservationBatch).not.toHaveBeenCalled()
+    expect(handleObservationBatch).not.toHaveBeenCalled()
+    expect(recalibrate).toHaveBeenCalledOnce()
+  })
+
   it('keeps compatibility frames flowing while probing native capture and stops probing once healthy', async () => {
     vi.useFakeTimers()
     try {
@@ -1179,19 +1262,10 @@ describe('CaptureProcessSupervisorController Deadlock & Gate A Lifecycle Test', 
     expect(recalibrate).toHaveBeenCalledOnce()
   })
 
-  it('recalibrates when the inspected target moves to another display at the same resolution', async () => {
+  it('reselects calibration and rebuilds capture when a manual target moves displays', async () => {
     const ctx = createMockContext()
     let displayId = '\\\\.\\DISPLAY1'
-    let previousEnvironment = ''
-    const calibrationController = {
-      setTargetEnvironment: vi.fn((environment: unknown) => {
-        const next = JSON.stringify(environment)
-        const changed = next !== previousEnvironment
-        previousEnvironment = next
-        return changed
-      })
-    }
-    const inspect = vi.fn(() => ({
+    const createEnvironment = () => ({
       targetPid: 10,
       displayId,
       windowBounds: { x: 0, y: 0, width: 1920, height: 1080 },
@@ -1200,7 +1274,24 @@ describe('CaptureProcessSupervisorController Deadlock & Gate A Lifecycle Test', 
       dpiScale: displayId.endsWith('1') ? 1 : 1.5,
       hdr: null,
       windowMode: 'unknown' as const
-    }))
+    })
+    let previousEnvironment = JSON.stringify(createEnvironment())
+    const replacementCalibration = {
+      id: 'display-2-fallback',
+      source: 'automatic',
+      confidence: 0,
+      roi: { x: 0.84, y: 0.72, width: 0.16, height: 0.28 }
+    }
+    const calibrationController = {
+      setTargetEnvironment: vi.fn((environment: unknown) => {
+        const next = JSON.stringify(environment)
+        const changed = next !== previousEnvironment
+        previousEnvironment = next
+        return changed
+      }),
+      getOrCreateCalibration: vi.fn().mockReturnValue(replacementCalibration)
+    }
+    const inspect = vi.fn(createEnvironment)
     const supervisor = new CaptureProcessSupervisorController(
       ctx,
       calibrationController as any,
@@ -1213,9 +1304,18 @@ describe('CaptureProcessSupervisorController Deadlock & Gate A Lifecycle Test', 
     ;(supervisor as any)._targetPids = new Set([10])
     ;(supervisor as any)._isSupervising = true
     ;(supervisor as any)._currentSessionId = 'display-move'
+    ;(supervisor as any)._lastCaptureResolution = { width: 1920, height: 1080 }
+    ;(supervisor as any)._currentCalibration = {
+      id: 'display-1-manual',
+      source: 'manual',
+      roi: { x: 0.82, y: 0.72, width: 0.18, height: 0.28 }
+    }
     const recalibrate = vi
       .spyOn(supervisor as any, '_refreshCalibrationFromGameWindow')
       .mockResolvedValue(undefined)
+    const restartCapture = vi
+      .spyOn(supervisor as any, '_postWorkerStart')
+      .mockImplementation(() => {})
     const status = {
       type: 'status' as const,
       backend: 'wgc' as const,
@@ -1226,22 +1326,54 @@ describe('CaptureProcessSupervisorController Deadlock & Gate A Lifecycle Test', 
       roiHealth: 'healthy' as const
     }
 
-    ;(supervisor as any)._handleWorkerMessage(status)
-    await Promise.resolve()
-    recalibrate.mockClear()
-    ;(supervisor as any)._currentCalibration = { id: 'display-1-calibration' }
-    ctx.liveCoach.state.setCaptureState.mockClear()
     displayId = '\\\\.\\DISPLAY2'
     ;(supervisor as any)._handleWorkerMessage(status)
 
     expect(calibrationController.setTargetEnvironment).toHaveBeenLastCalledWith(
       expect.objectContaining({ displayId: '\\\\.\\DISPLAY2', dpiScale: 1.5, hdr: null })
     )
+    expect(calibrationController.getOrCreateCalibration).toHaveBeenCalledOnce()
     expect(recalibrate).toHaveBeenCalledOnce()
-    expect((supervisor as any)._currentCalibration).toBeNull()
+    expect((supervisor as any)._currentCalibration).toBe(replacementCalibration)
+    expect(restartCapture).toHaveBeenCalledWith('display-move', replacementCalibration)
     expect(ctx.liveCoach.state.setCaptureState).toHaveBeenCalledWith(
       expect.objectContaining({ roiState: 'unknown', confidence: null })
     )
+  })
+
+  it('keeps a matching manual calibration for a source-only resize on the same display', () => {
+    const ctx = createMockContext()
+    const manualCalibration = {
+      id: 'same-display-manual',
+      source: 'manual',
+      roi: { x: 0.82, y: 0.72, width: 0.18, height: 0.28 }
+    }
+    const supervisor = new CaptureProcessSupervisorController(ctx, {} as any, {} as any)
+    ;(supervisor as any)._isSupervising = true
+    ;(supervisor as any)._currentSessionId = 'same-display-resize'
+    ;(supervisor as any)._currentCalibration = manualCalibration
+    ;(supervisor as any)._lastCaptureResolution = { width: 1920, height: 1080 }
+    vi.spyOn(supervisor as any, '_refreshTargetEnvironment').mockReturnValue(false)
+    const restartCapture = vi
+      .spyOn(supervisor as any, '_postWorkerStart')
+      .mockImplementation(() => {})
+    const recalibrate = vi
+      .spyOn(supervisor as any, '_refreshCalibrationFromGameWindow')
+      .mockResolvedValue(undefined)
+
+    ;(supervisor as any)._handleWorkerMessage({
+      type: 'status',
+      backend: 'wgc',
+      resolution: { width: 320, height: 320 },
+      sourceResolution: { width: 2560, height: 1440 },
+      hdr: false,
+      fps: 10,
+      roiHealth: 'healthy'
+    })
+
+    expect((supervisor as any)._currentCalibration).toBe(manualCalibration)
+    expect(restartCapture).not.toHaveBeenCalled()
+    expect(recalibrate).not.toHaveBeenCalled()
   })
 
   it('does not publish the cropped ROI as the game resolution', () => {
@@ -1380,9 +1512,9 @@ describe('CaptureProcessSupervisorController Deadlock & Gate A Lifecycle Test', 
     }
   })
 
-  it('detects the minimap side from the live game window before auto capture starts', async () => {
+  it('measures an exact game window before default-side capture when native inspection is unavailable', async () => {
     const ctx = createMockContext()
-    ctx.liveCoach.settings.minimapSide = 'auto'
+    ctx.liveCoach.settings.minimapSide = 'right'
     const fallbackCalibration = {
       id: 'fallback-right',
       source: 'automatic',
@@ -1403,21 +1535,12 @@ describe('CaptureProcessSupervisorController Deadlock & Gate A Lifecycle Test', 
       calibrationController,
       {} as any,
       () => ({ wgc: false, dda: false }),
-      () =>
-        ({
-          targetPid: 10,
-          displayId: '\\\\.\\DISPLAY1',
-          windowBounds: { x: 0, y: 0, width: 1920, height: 1080 },
-          clientBounds: { x: 0, y: 0, width: 1920, height: 1080 },
-          monitorBounds: { x: 0, y: 0, width: 1920, height: 1080 },
-          dpiScale: 1,
-          hdr: false,
-          windowMode: 'borderless'
-        }) as any
+      () => null
     )
     vi.mocked(getPidsByName).mockResolvedValueOnce([10])
     vi.spyOn(supervisor as any, '_findGameCaptureSource').mockResolvedValue({
       id: 'window:123:0',
+      name: 'League of Legends (TM) Client',
       thumbnail: {
         isEmpty: () => false,
         getSize: () => ({ width: 1280, height: 720 }),

@@ -859,11 +859,11 @@ liveCoach:
         realtimeBackendMissing: A one-time desktop preview is available, but no native real-time backend was found.
         captureUnsupported: No supported game-window capture path is available.
         resolutionUnknown: Resolution requires a running game-window preview or active capture state.
-        resolutionSupported: This resolution is in the frozen Phase 1 16:9 support matrix.
-        resolutionUnsupported: Phase 1 is validated only for 1920×1080 and 2560×1440.
+        resolutionSupported: This resolution uses normalized coordinates and automatic scaling.
+        resolutionUnsupported: The captured frame is too small or invalid for reliable observation.
         dpiUnknown: Display scaling requires a current environment fingerprint.
-        dpiSupported: Display scaling is inside the Phase 1 100%–150% range.
-        dpiUnsupported: Display scaling is outside the Phase 1 100%–150% range.
+        dpiSupported: The current Windows display scale is converted automatically.
+        dpiUnsupported: A valid Windows display scale could not be determined.
         hdrUnknown: HDR/SDR state has not been confirmed for the current game environment.
         hdrNotDetectable: The current fingerprint API does not reliably detect whether Windows HDR is enabled, so an SDR-looking value cannot pass automatically.
         sdrSupported: The current environment fingerprint reports SDR.
@@ -915,8 +915,8 @@ liveCoach:
         installNativeCapture: The app will continue with compatible capture automatically; repair or reinstall the Windows native runtime for higher performance.
         useSupportedCaptureEnvironment: Use a supported Windows game-window environment or switch to offline review.
         enterGameAndRerun: Enter a supported match, keep the game window visible, then rerun the failed items.
-        useSupportedResolution: Switch the game/display to 1920×1080 or 2560×1440 before calibration.
-        useSupportedDpi: Use Windows display scaling from 100% to 150%, then recalibrate.
+        useSupportedResolution: Resize the game window to at least 320×240, then re-enter the match.
+        useSupportedDpi: Restore a valid Windows display-scale setting, then re-enter the match.
         preferSdr: Use SDR for Phase 1 release validation; HDR remains partially verified.
         confirmSdrManually: Confirm Windows HDR is off before real-time coaching; this build cannot verify that setting automatically.
         disableHdr: Disable HDR before starting real-time coaching.

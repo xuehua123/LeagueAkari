@@ -1,7 +1,7 @@
 <template>
   <div class="h-full w-full">
     <NScrollbar class="relative h-full max-w-full">
-      <div class="mx-auto flex w-full max-w-6xl flex-col gap-4 p-6">
+      <div class="mx-auto box-border flex w-full max-w-6xl flex-col gap-4 p-6">
         <NCard size="small" :title="t('liveCoach.calibration.title')">
           <div class="space-y-3">
             <div class="text-sm text-gray-500">{{ t('liveCoach.calibration.desc') }}</div>
@@ -69,6 +69,7 @@
                   : t('liveCoach.calibration.previewEmpty')
               "
               :roi-aria-label="t('liveCoach.calibration.roiAriaLabel')"
+              :source-size="preview?.sourceSize ?? preview?.thumbnailSize"
             />
 
             <div v-if="preview" class="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">

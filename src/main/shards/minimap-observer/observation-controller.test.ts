@@ -58,12 +58,12 @@ describe('MinimapObservationController', () => {
     )
   })
 
-  it('includes IPC delivery time and strips current facts once frame age exceeds 300ms', () => {
-    vi.spyOn(Date, 'now').mockReturnValue(1_301)
+  it('keeps compatibility frames usable within the shared 750ms freshness budget', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_500)
     const context = createContext(1)
     const controller = new MinimapObservationController(context)
     const batch = createBatch()
-    batch.frame = { observedAt: 1_000, receivedAt: 1_200, sequence: 1, ageMs: 200 }
+    batch.frame = { observedAt: 1_000, receivedAt: 1_300, sequence: 1, ageMs: 300 }
     batch.entities = [
       {
         trackId: 'enemy-1',
@@ -90,7 +90,46 @@ describe('MinimapObservationController', () => {
 
     controller.handleObservationBatch(batch)
 
-    expect(context.state.setFrameAgeMs).toHaveBeenCalledWith(301)
+    expect(context.state.setFrameAgeMs).toHaveBeenCalledWith(500)
+    expect(context.state.setRoiHealth).toHaveBeenCalledWith('healthy')
+    expect(context.liveCoach.state.setCaptureState).toHaveBeenCalledWith(
+      expect.not.objectContaining({ dropCount: 8 })
+    )
+    expect(context.liveCoach.feedMinimapObservationBatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        health: 'healthy',
+        entities: batch.entities,
+        events: batch.events,
+        frame: expect.objectContaining({ receivedAt: 1_500, ageMs: 500 })
+      })
+    )
+  })
+
+  it('includes IPC delivery time and strips current facts once frame age exceeds 750ms', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_751)
+    const context = createContext(1)
+    const controller = new MinimapObservationController(context)
+    const batch = createBatch()
+    batch.frame = { observedAt: 1_000, receivedAt: 1_500, sequence: 1, ageMs: 500 }
+    batch.entities = [
+      {
+        trackId: 'enemy-1',
+        kind: 'enemy',
+        team: 'enemy',
+        championId: 103,
+        point: { x: 0.5, y: 0.5 },
+        regionId: 'mid_lane',
+        confidence: 0.95,
+        lifecycle: 'confirmed',
+        firstObservedAt: 1_000,
+        lastObservedAt: 1_000,
+        expiresAt: 6_000
+      }
+    ]
+
+    controller.handleObservationBatch(batch)
+
+    expect(context.state.setFrameAgeMs).toHaveBeenCalledWith(751)
     expect(context.state.setRoiHealth).toHaveBeenCalledWith('unknown')
     expect(context.liveCoach.state.setCaptureState).toHaveBeenCalledWith(
       expect.objectContaining({ dropCount: 8 })
@@ -100,17 +139,17 @@ describe('MinimapObservationController', () => {
         health: 'unknown',
         entities: [],
         events: [],
-        frame: expect.objectContaining({ receivedAt: 1_301, ageMs: 301 })
+        frame: expect.objectContaining({ receivedAt: 1_751, ageMs: 751 })
       })
     )
   })
 
   it('does not double-count a frame that the worker already marked stale', () => {
-    vi.spyOn(Date, 'now').mockReturnValue(1_301)
+    vi.spyOn(Date, 'now').mockReturnValue(1_751)
     const context = createContext(1)
     const controller = new MinimapObservationController(context)
     const batch = createBatch()
-    batch.frame = { observedAt: 1_000, receivedAt: 1_301, sequence: 1, ageMs: 301 }
+    batch.frame = { observedAt: 1_000, receivedAt: 1_751, sequence: 1, ageMs: 751 }
     batch.health = 'unknown'
 
     controller.handleObservationBatch(batch)

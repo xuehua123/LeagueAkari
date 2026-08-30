@@ -14,9 +14,9 @@
         size="medium"
       >
         <NTab v-for="tab in tabs" :key="tab.key" :name="tab.key" :tab="tab.name">
-          <div class="flex items-center gap-1">
-            <NIcon class="text-base" :component="tab.icon" />
-            <span class="font-bold">{{ tab.name }}</span>
+          <div class="flex items-center gap-1" :title="tab.name">
+            <NIcon class="tab-icon text-base" :component="tab.icon" />
+            <span class="tab-label font-bold">{{ tab.name }}</span>
           </div>
         </NTab>
       </NTabs>
@@ -135,6 +135,30 @@ watch(
 </script>
 
 <style scoped>
+@media (max-width: 960px) {
+  .tab-icon {
+    display: none;
+  }
+}
+
+@media (max-width: 800px) {
+  .tab-icon {
+    display: inline-flex;
+  }
+
+  .tab-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+}
+
 .move-from-left-fade-enter-active {
   position: relative;
   transition:

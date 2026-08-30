@@ -1,8 +1,6 @@
-import { MinimapObservationBatch } from '@shared/types/live-coach'
+import { MAX_LIVE_MINIMAP_FRAME_AGE_MS, MinimapObservationBatch } from '@shared/types/live-coach'
 
 import type { MinimapObserverMainContext } from './context'
-
-const MAX_LIVE_FRAME_AGE_MS = 300
 
 export class MinimapObservationController {
   constructor(private readonly _context: MinimapObserverMainContext) {}
@@ -12,9 +10,9 @@ export class MinimapObservationController {
     const deliveryAgeMs = Math.max(0, receivedAt - batch.frame.receivedAt)
     const age = Math.max(0, batch.frame.ageMs + deliveryAgeMs, receivedAt - batch.frame.observedAt)
     const expiredDuringDelivery =
-      batch.frame.ageMs <= MAX_LIVE_FRAME_AGE_MS && age > MAX_LIVE_FRAME_AGE_MS
+      batch.frame.ageMs <= MAX_LIVE_MINIMAP_FRAME_AGE_MS && age > MAX_LIVE_MINIMAP_FRAME_AGE_MS
     const freshnessCheckedBatch: MinimapObservationBatch =
-      age > MAX_LIVE_FRAME_AGE_MS
+      age > MAX_LIVE_MINIMAP_FRAME_AGE_MS
         ? {
             ...batch,
             frame: { ...batch.frame, receivedAt, ageMs: age },

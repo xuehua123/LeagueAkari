@@ -5,6 +5,56 @@ import {
   ObservationLifecycle
 } from '../../../shared/types/live-coach'
 
+/** All pixel-sized CV thresholds and identity patches are defined at this square baseline. */
+export const MINIMAP_ANALYSIS_EDGE = 256
+
+export interface MinimapAnalysisFrame {
+  buffer: Uint8Array
+  width: number
+  height: number
+}
+
+/**
+ * Normalizes a calibrated minimap ROI before any pixel-sized CV rule runs. Native WGC/DDA return
+ * source-resolution crops while desktopCapturer returns bounded thumbnails; analyzing both at one
+ * edge keeps connected-component areas and 16x16 identity patches resolution independent.
+ */
+export function normalizeMinimapFrameForAnalysis(
+  buffer: Uint8Array,
+  width: number,
+  height: number
+): MinimapAnalysisFrame {
+  if (width === MINIMAP_ANALYSIS_EDGE && height === MINIMAP_ANALYSIS_EDGE) {
+    return { buffer, width, height }
+  }
+
+  const normalized = new Uint8Array(MINIMAP_ANALYSIS_EDGE * MINIMAP_ANALYSIS_EDGE * 4)
+  for (let destinationY = 0; destinationY < MINIMAP_ANALYSIS_EDGE; destinationY++) {
+    const sourceY = Math.min(
+      height - 1,
+      Math.floor(((destinationY + 0.5) * height) / MINIMAP_ANALYSIS_EDGE)
+    )
+    for (let destinationX = 0; destinationX < MINIMAP_ANALYSIS_EDGE; destinationX++) {
+      const sourceX = Math.min(
+        width - 1,
+        Math.floor(((destinationX + 0.5) * width) / MINIMAP_ANALYSIS_EDGE)
+      )
+      const sourceIndex = (sourceY * width + sourceX) * 4
+      const destinationIndex = (destinationY * MINIMAP_ANALYSIS_EDGE + destinationX) * 4
+      normalized[destinationIndex] = buffer[sourceIndex]
+      normalized[destinationIndex + 1] = buffer[sourceIndex + 1]
+      normalized[destinationIndex + 2] = buffer[sourceIndex + 2]
+      normalized[destinationIndex + 3] = buffer[sourceIndex + 3]
+    }
+  }
+
+  return {
+    buffer: normalized,
+    width: MINIMAP_ANALYSIS_EDGE,
+    height: MINIMAP_ANALYSIS_EDGE
+  }
+}
+
 export interface TrackedEntity {
   trackId: string
   kind: MinimapEntityKind
@@ -507,15 +557,20 @@ export async function processMinimapFrameWithState(
     return { health: 'unknown', entities: [] }
   }
 
+  const analysisFrame = normalizeMinimapFrameForAnalysis(buffer, width, height)
+  const analysisBuffer = analysisFrame.buffer
+  const analysisWidth = analysisFrame.width
+  const analysisHeight = analysisFrame.height
+
   // 2. 真实网格像素方差与亮度检测（黑帧/遮挡/静止画面判定）
   let sumLuma = 0
-  const pixelCount = width * height
+  const pixelCount = analysisWidth * analysisHeight
   const isBgra = pixelFormat === 'bgra'
 
-  for (let i = 0; i < buffer.length; i += 4) {
-    const b = buffer[i]
-    const g = buffer[i + 1]
-    const r = buffer[i + 2]
+  for (let i = 0; i < analysisBuffer.length; i += 4) {
+    const b = analysisBuffer[i]
+    const g = analysisBuffer[i + 1]
+    const r = analysisBuffer[i + 2]
     const red = isBgra ? r : b
     const blue = isBgra ? b : r
     sumLuma += 0.299 * red + 0.587 * g + 0.114 * blue
@@ -523,10 +578,10 @@ export async function processMinimapFrameWithState(
   const meanLuma = sumLuma / pixelCount
 
   let sumVariance = 0
-  for (let i = 0; i < buffer.length; i += 4) {
-    const b = buffer[i]
-    const g = buffer[i + 1]
-    const r = buffer[i + 2]
+  for (let i = 0; i < analysisBuffer.length; i += 4) {
+    const b = analysisBuffer[i]
+    const g = analysisBuffer[i + 1]
+    const r = analysisBuffer[i + 2]
     const red = isBgra ? r : b
     const blue = isBgra ? b : r
     const luma = 0.299 * red + 0.587 * g + 0.114 * blue
@@ -542,7 +597,7 @@ export async function processMinimapFrameWithState(
   // 2.2 纹理画面静止/冻结死帧检测 (Frame Content Freeze Detection)
   // 即使主进程单调递增 sequence，若物理画面像素连续 15 帧完全不变，说明采集流已挂起或游戏画面卡死
   if (cvState) {
-    const currentHash = computeFrameHash(buffer)
+    const currentHash = computeFrameHash(analysisBuffer)
     if (currentHash === cvState.lastFrameHash) {
       cvState.consecutiveFrozenFrames++
       if (cvState.consecutiveFrozenFrames >= 15) {
@@ -555,7 +610,12 @@ export async function processMinimapFrameWithState(
   }
 
   // 3. 运行连通域聚类算法 (CCL)
-  const detections = extractConnectedComponents(buffer, width, height, pixelFormat)
+  const detections = extractConnectedComponents(
+    analysisBuffer,
+    analysisWidth,
+    analysisHeight,
+    pixelFormat
+  )
 
   // 4. 实体追踪与生命周期状态机 (Object Tracking)
   const activeIds = new Set<string>()
@@ -607,9 +667,9 @@ export async function processMinimapFrameWithState(
       )
       if (identityCandidates && identityCandidates.length > 0) {
         const classResult = await classifyChampionPatch(
-          buffer,
-          width,
-          height,
+          analysisBuffer,
+          analysisWidth,
+          analysisHeight,
           det.x,
           det.y,
           pixelFormat,

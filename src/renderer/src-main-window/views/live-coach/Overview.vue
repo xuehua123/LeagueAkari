@@ -1,7 +1,7 @@
 <template>
   <div class="h-full w-full">
     <NScrollbar class="relative h-full max-w-full">
-      <div class="mx-auto flex w-full max-w-6xl flex-col gap-4 p-6">
+      <div class="mx-auto box-border flex w-full max-w-6xl flex-col gap-4 p-6">
         <!-- 主开关卡片 -->
         <NCard size="small" :title="t('liveCoach.overview.mainSwitch', '实时语音 AI 教练')">
           <template #header-extra>
@@ -391,7 +391,7 @@
             {{ t('liveCoach.overview.noCooldowns') }}
           </div>
 
-          <div class="grid gap-2 sm:grid-cols-[140px_1fr_130px_120px_auto]">
+          <div class="grid gap-2 md:grid-cols-[140px_1fr_130px_120px_auto]">
             <NSelect v-model:value="cooldownKind" size="small" :options="cooldownKindOptions" />
             <NInput
               v-model:value="cooldownLabel"

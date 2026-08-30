@@ -2,6 +2,10 @@ import { z } from 'zod'
 
 import { CoachClock, coachClockSchema } from './evidence'
 
+// Shared worker-to-main freshness budget. Compatibility capture runs at 5 FPS and first-run 4K
+// processing can exceed 300 ms on low-end Windows PCs, while frames older than this remain unsafe.
+export const MAX_LIVE_MINIMAP_FRAME_AGE_MS = 750
+
 export type ObservationLifecycle = 'candidate' | 'confirmed' | 'invalidated' | 'expired' | 'unknown'
 
 export type MinimapEntityKind =

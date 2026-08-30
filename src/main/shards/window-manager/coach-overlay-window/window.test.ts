@@ -1,4 +1,5 @@
 import { GameClientMain } from '@main/shards/game-client'
+import { screen } from 'electron'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { shouldShowCoachOverlay } from '../../live-coach/overlay-visibility'
@@ -52,6 +53,15 @@ vi.mock('electron', () => ({
   },
   shell: {
     openExternal: vi.fn()
+  },
+  screen: {
+    getAllDisplays: vi.fn(() => [
+      {
+        workArea: { x: 0, y: 0, width: 1920, height: 1080 }
+      }
+    ]),
+    on: vi.fn(),
+    off: vi.fn()
   }
 }))
 
@@ -106,10 +116,15 @@ function createContext() {
   return context
 }
 
-function createWindowDouble() {
+function createWindowDouble(
+  bounds: Electron.Rectangle = { x: 100, y: 100, width: 420, height: 168 }
+) {
   return {
     webContents: {},
     isDestroyed: vi.fn(() => false),
+    isMinimized: vi.fn(() => false),
+    getBounds: vi.fn(() => bounds),
+    setBounds: vi.fn(),
     setSkipTaskbar: vi.fn(),
     setAlwaysOnTop: vi.fn(),
     setFocusable: vi.fn(),
@@ -133,6 +148,10 @@ describe('AkariCoachOverlayWindow interaction mode', () => {
     await expect(overlayWindow.setInteractionMode(true)).resolves.toBe(false)
 
     expect(overlayWindow.state.interactive).toBe(false)
+  })
+
+  it('keeps the resize floor above the readable adjustment layout height', () => {
+    expect(AkariCoachOverlayWindow.MIN_HEIGHT).toBeGreaterThanOrEqual(140)
   })
 
   it('registers a trusted UI path that enters adjustment and restores passthrough', async () => {
@@ -200,6 +219,40 @@ describe('AkariCoachOverlayWindow interaction mode', () => {
       )
     ).rejects.toMatchObject({ code: 'CoachOverlayInteractionModeInvalid' })
     expect(overlayWindow.state.interactive).toBe(true)
+  })
+
+  it('returns the overlay to a visible work area after display topology changes', async () => {
+    const context = createContext()
+    const overlayWindow = new AkariCoachOverlayWindow(context as any)
+    vi.spyOn(overlayWindow, 'createWindow').mockImplementation(() => {})
+    await overlayWindow.onInit()
+
+    const nativeWindow = createWindowDouble({ x: 2400, y: 1200, width: 420, height: 168 })
+    ;(overlayWindow as any)._window = nativeWindow
+    const screenOnCalls = vi.mocked(screen.on).mock.calls as Array<
+      [string, (...args: unknown[]) => void]
+    >
+    const displayRemovedHandler = screenOnCalls.find(
+      ([eventName]) => eventName === 'display-removed'
+    )?.[1] as (() => void) | undefined
+    const displayMetricsChangedHandler = screenOnCalls.find(
+      ([eventName]) => eventName === 'display-metrics-changed'
+    )?.[1]
+
+    expect(displayRemovedHandler).toBeTypeOf('function')
+    expect(displayMetricsChangedHandler).toBe(displayRemovedHandler)
+    displayRemovedHandler?.()
+
+    expect(nativeWindow.setBounds).toHaveBeenCalledWith({
+      x: 1500,
+      y: 912,
+      width: 420,
+      height: 168
+    })
+
+    await overlayWindow.onDispose()
+    expect(screen.off).toHaveBeenCalledWith('display-removed', displayRemovedHandler)
+    expect(screen.off).toHaveBeenCalledWith('display-metrics-changed', displayRemovedHandler)
   })
 })
 

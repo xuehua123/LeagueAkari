@@ -104,7 +104,7 @@ describe('environment diagnostics matrix', () => {
     expect(summarizeEnvironmentChecks(checks)).toBe('unknown')
   })
 
-  it('fails closed for environments outside the frozen phase-one support matrix', () => {
+  it('keeps independent blockers unavailable while accepting adaptive resolution and DPI', () => {
     const input = createSupportedInput()
     input.isElevated = false
     input.nativeInputStatus = 'requires-elevation'
@@ -140,8 +140,8 @@ describe('environment diagnostics matrix', () => {
     )
 
     expect(statusById).toMatchObject({
-      resolution: 'unavailable',
-      dpi: 'unavailable',
+      resolution: 'available',
+      dpi: 'available',
       hdr: 'unavailable',
       windowMode: 'unavailable',
       roi: 'unavailable',
@@ -152,6 +152,35 @@ describe('environment diagnostics matrix', () => {
       audioOutput: 'unavailable',
       nativeShortcuts: 'unavailable'
     })
+  })
+
+  it.each([
+    ['4:3', 1024, 768, 1],
+    ['5:4', 1280, 1024, 1.25],
+    ['720p', 1280, 720, 1.5],
+    ['1366×768', 1366, 768, 1.75],
+    ['16:10', 1920, 1200, 2],
+    ['21:9', 3440, 1440, 1.5],
+    ['4K', 3840, 2160, 2],
+    ['32:9', 5120, 1440, 2],
+    ['portrait capture', 320, 2160, 2]
+  ])('accepts adaptive %s resolution and Windows scaling', (_, width, height, dpiScale) => {
+    const input = createSupportedInput()
+    input.capture.resolution = { width, height }
+    if (input.probes.preview.state === 'success') {
+      input.probes.preview.value.fingerprint = {
+        ...input.probes.preview.value.fingerprint,
+        width,
+        height,
+        dpiScale
+      }
+    }
+
+    const statusById = Object.fromEntries(
+      buildEnvironmentChecks(input).map((check) => [check.id, check.status])
+    )
+
+    expect(statusById).toMatchObject({ resolution: 'available', dpi: 'available' })
   })
 
   it('keeps native capture permission unknown until a real backend is actively running', () => {

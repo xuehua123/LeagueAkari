@@ -109,6 +109,71 @@ export interface ResolvedReplayFileGrant extends ReplaySelectedFileGrant {
 
 const MAX_REPLAY_JSON_BYTES = 64 * 1024 * 1024
 const MAX_REPLAY_SIDECAR_BYTES = 8 * 1024 * 1024
+const MAX_REPLAY_CALIBRATION_FRAME_WIDTH = 1280
+const MAX_REPLAY_CALIBRATION_FRAME_HEIGHT = 720
+const MAX_REPLAY_PREVIEW_WIDTH = 640
+const MAX_REPLAY_PREVIEW_HEIGHT = 360
+const DEFAULT_REPLAY_MINIMAP_HEIGHT_RATIO = 0.28
+
+export interface ReplayCalibrationFrameSize {
+  width: number
+  height: number
+}
+
+interface ReplayCalibrationFrame extends ReplayCalibrationFrameSize {
+  pixels: Uint8Array
+}
+
+export function calculateReplayCalibrationFrameSize(
+  sourceWidth: number,
+  sourceHeight: number,
+  maxWidth = MAX_REPLAY_CALIBRATION_FRAME_WIDTH,
+  maxHeight = MAX_REPLAY_CALIBRATION_FRAME_HEIGHT
+): ReplayCalibrationFrameSize {
+  if (
+    !Number.isFinite(sourceWidth) ||
+    !Number.isFinite(sourceHeight) ||
+    !Number.isFinite(maxWidth) ||
+    !Number.isFinite(maxHeight) ||
+    sourceWidth <= 0 ||
+    sourceHeight <= 0 ||
+    maxWidth <= 0 ||
+    maxHeight <= 0
+  ) {
+    throw new Error('录像标定帧尺寸必须为正数')
+  }
+
+  const scale = Math.min(1, maxWidth / sourceWidth, maxHeight / sourceHeight)
+  return {
+    width: Math.max(1, Math.round(sourceWidth * scale)),
+    height: Math.max(1, Math.round(sourceHeight * scale))
+  }
+}
+
+export function createReplayFallbackRoi(
+  sourceWidth: number,
+  sourceHeight: number,
+  side: 'left' | 'right'
+): MinimapCalibration['roi'] {
+  if (
+    !Number.isFinite(sourceWidth) ||
+    !Number.isFinite(sourceHeight) ||
+    sourceWidth <= 0 ||
+    sourceHeight <= 0
+  ) {
+    throw new Error('录像源尺寸必须为正数')
+  }
+
+  const edge = Math.min(sourceWidth, sourceHeight * DEFAULT_REPLAY_MINIMAP_HEIGHT_RATIO)
+  const width = edge / sourceWidth
+  const height = edge / sourceHeight
+  return {
+    x: side === 'left' ? 0 : 1 - width,
+    y: 1 - height,
+    width,
+    height
+  }
+}
 
 export function discoverReplaySidecarPath(videoPath: string): string | null {
   const extension = path.extname(videoPath)
@@ -370,36 +435,44 @@ export class ReplayImportController {
     const loadedSidecar = await this._loadAndVerifySidecar(videoPath, sidecarPath, artifactSha256)
     const sidecarSha256 = loadedSidecar.path ? await this._hashFile(loadedSidecar.path) : null
     this._throwIfCancelled()
-    const previewFrame = await this._extractCalibrationFrame(videoPath, probe)
+    const calibrationFrame = await this._extractCalibrationFrame(videoPath, probe)
     this._throwIfCancelled()
-    const detected = detectMinimapRoi(previewFrame, 640, 360)
-    const persisted = this._context.settings.manualCalibration
+    const detected = detectMinimapRoi(
+      calibrationFrame.pixels,
+      calibrationFrame.width,
+      calibrationFrame.height
+    )
     const fallbackSide =
       this._context.settings.minimapSide === 'left' ? ('left' as const) : ('right' as const)
-    const fallbackRoi =
-      loadedSidecar.data?.calibration?.roi ??
-      persisted?.roi ??
-      (fallbackSide === 'left'
-        ? { x: 0, y: 0.72, width: 0.18, height: 0.28 }
-        : { x: 0.82, y: 0.72, width: 0.18, height: 0.28 })
+    const fallbackRoi = createReplayFallbackRoi(probe.width, probe.height, fallbackSide)
     const calibration: MinimapCalibration = loadedSidecar.data?.calibration ?? {
       schemaVersion: 1,
       id: `replay_calibration_${Date.now()}`,
       fingerprintHash: `replay_${probe.width}x${probe.height}`,
       roi: detected?.roi ?? fallbackRoi,
       transform: 'blue-normal',
-      source: detected ? 'automatic' : persisted ? persisted.source : 'automatic',
-      confidence: detected?.confidence ?? persisted?.confidence ?? 0,
+      source: 'automatic',
+      confidence: detected?.confidence ?? 0,
       createdAt: Date.now()
     }
     const metadata = this._resolveReplayMetadata(loadedSidecar.data, undefined, calibration.roi)
 
-    const image = nativeImage.createFromBitmap(Buffer.from(previewFrame), {
-      width: 640,
-      height: 360,
+    const calibrationImage = nativeImage.createFromBitmap(Buffer.from(calibrationFrame.pixels), {
+      width: calibrationFrame.width,
+      height: calibrationFrame.height,
       scaleFactor: 1
     })
-    const jpeg = image.toJPEG(70)
+    const previewSize = calculateReplayCalibrationFrameSize(
+      calibrationFrame.width,
+      calibrationFrame.height,
+      MAX_REPLAY_PREVIEW_WIDTH,
+      MAX_REPLAY_PREVIEW_HEIGHT
+    )
+    const previewImage =
+      previewSize.width === calibrationFrame.width && previewSize.height === calibrationFrame.height
+        ? calibrationImage
+        : calibrationImage.resize({ ...previewSize, quality: 'good' })
+    const jpeg = previewImage.toJPEG(70)
     if (jpeg.byteLength > 512 * 1024) throw new Error('录像标定预览超过 512 KiB 安全上限')
 
     return {
@@ -516,8 +589,9 @@ export class ReplayImportController {
   private async _extractCalibrationFrame(
     videoPath: string,
     probe: ReplayVideoProbeResult
-  ): Promise<Uint8Array> {
+  ): Promise<ReplayCalibrationFrame> {
     const runtime = resolveFfmpegRuntime()
+    const frameSize = calculateReplayCalibrationFrameSize(probe.width, probe.height)
     const sampleTime = Math.max(
       0,
       Math.min(Math.max(10, probe.durationSeconds * 0.25), Math.max(0, probe.durationSeconds - 0.5))
@@ -533,7 +607,7 @@ export class ReplayImportController {
         '-frames:v',
         '1',
         '-vf',
-        'scale=640:360',
+        `scale=${frameSize.width}:${frameSize.height}`,
         '-f',
         'rawvideo',
         '-pix_fmt',
@@ -556,7 +630,7 @@ export class ReplayImportController {
         this._activeProcess = null
         if (code !== 0) return reject(new Error(`录像标定帧提取失败 (${code}): ${stderr}`))
         const frame = Buffer.concat(chunks)
-        const expectedBytes = 640 * 360 * 4
+        const expectedBytes = frameSize.width * frameSize.height * 4
         if (frame.byteLength !== expectedBytes) {
           return reject(
             new Error(
@@ -564,7 +638,7 @@ export class ReplayImportController {
             )
           )
         }
-        resolve(new Uint8Array(frame))
+        resolve({ pixels: new Uint8Array(frame), ...frameSize })
       })
     })
   }
@@ -772,8 +846,10 @@ export class ReplayImportController {
 
     let roi = replayRoi ?? loadedSidecar.data?.calibration?.roi ?? null
     if (!roi) {
-      const previewFrame = await this._extractCalibrationFrame(videoPath, probe)
-      roi = detectMinimapRoi(previewFrame, 640, 360)?.roi ?? null
+      const calibrationFrame = await this._extractCalibrationFrame(videoPath, probe)
+      roi =
+        detectMinimapRoi(calibrationFrame.pixels, calibrationFrame.width, calibrationFrame.height)
+          ?.roi ?? null
     }
     if (!roi || !this._isValidRoi(roi)) {
       throw new Error('录像小地图自动标定失败，请在录像预览中手动框选小地图后再开始分析')

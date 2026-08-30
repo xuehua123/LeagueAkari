@@ -855,11 +855,11 @@ liveCoach:
         realtimeBackendMissing: 一次性桌面预览可用，但没有发现原生实时采集后端。
         captureUnsupported: 当前没有可用的受支持游戏窗口采集路径。
         resolutionUnknown: 需要正在运行的游戏窗口预览或实时采集状态才能确认分辨率。
-        resolutionSupported: 当前分辨率位于一期冻结的 16:9 支持矩阵内。
-        resolutionUnsupported: 一期仅验证 1920×1080 和 2560×1440。
+        resolutionSupported: 当前分辨率会使用归一化坐标和自动缩放适配。
+        resolutionUnsupported: 当前画面尺寸过小或无效，无法可靠采集。
         dpiUnknown: 需要当前环境指纹才能确认显示缩放。
-        dpiSupported: 当前显示缩放位于一期 100%–150% 范围内。
-        dpiUnsupported: 当前显示缩放超出一期 100%–150% 范围。
+        dpiSupported: 当前 Windows 缩放比例会自动换算。
+        dpiUnsupported: 无法读取有效的 Windows 缩放比例。
         hdrUnknown: 尚未确认当前游戏环境的 HDR/SDR 状态。
         hdrNotDetectable: 当前环境指纹 API 不能可靠检测 Windows HDR 是否开启，因此看似 SDR 的值也不能自动通过。
         sdrSupported: 当前环境指纹报告为 SDR。
@@ -911,8 +911,8 @@ liveCoach:
         installNativeCapture: 应用会自动使用兼容采集继续运行；修复或重新安装 Windows 原生运行时可获得更高性能。
         useSupportedCaptureEnvironment: 使用受支持的 Windows 游戏窗口环境，或改用离线复盘。
         enterGameAndRerun: 进入受支持对局并保持游戏窗口可见，再重检未就绪项。
-        useSupportedResolution: 标定前把游戏或显示器切换为 1920×1080 或 2560×1440。
-        useSupportedDpi: 把 Windows 显示缩放设为 100%–150%，随后重新标定。
+        useSupportedResolution: 请把游戏窗口调整到至少 320×240 的有效尺寸后重新进入对局。
+        useSupportedDpi: 请恢复有效的 Windows 显示缩放设置后重新进入对局。
         preferSdr: 一期发布验证请使用 SDR；HDR 目前只完成部分确认。
         confirmSdrManually: 实时教练启动前请自行确认 Windows HDR 已关闭；当前构建无法自动验证该设置。
         disableHdr: 启动实时教练前关闭 HDR。

@@ -5,6 +5,11 @@ import { detectMinimapRoi } from './calibration-detection'
 import type { MinimapObserverMainContext } from './context'
 import { formatSanitizedErrorLog } from './public-error'
 
+const DEFAULT_MINIMAP_HEIGHT_RATIO = 0.28
+const DEFAULT_CAPTURE_ASPECT_RATIO = 16 / 9
+const MAX_AUTOMATIC_ROI_PIXEL_ASPECT_ERROR = 0.1
+const CURRENT_AUTOMATIC_CALIBRATION_ID_PREFIX = 'calib_auto_v2_'
+
 export interface CaptureTargetEnvironment {
   displayId: string
   clientBounds: { x: number; y: number; width: number; height: number }
@@ -20,9 +25,13 @@ export class MinimapCalibrationController {
 
   public setTargetEnvironment(environment: CaptureTargetEnvironment | null): boolean {
     const normalized = this._normalizeTargetEnvironment(environment)
-    if (JSON.stringify(normalized) === JSON.stringify(this._targetEnvironment)) return false
+    const calibrationEnvironmentChanged = !this._hasSameCalibrationEnvironment(
+      normalized,
+      this._targetEnvironment
+    )
 
     this._targetEnvironment = normalized
+    if (!calibrationEnvironmentChanged) return false
     // A calibration is display-, DPI-, HDR- and window-size-specific. Never retain the active
     // calibration when the target moves to another display or its environment becomes unknown.
     this._context.state.setCurrentCalibration(null)
@@ -56,7 +65,6 @@ export class MinimapCalibrationController {
       this._context.liveCoach.settings.minimapSide === 'auto'
         ? [this._fingerprintHash(fingerprint, 'left'), this._fingerprintHash(fingerprint, 'right')]
         : [this._fingerprintHash(fingerprint, fingerprint.minimapSide)]
-    const expectedHash = this._fingerprintHash(fingerprint, fingerprint.minimapSide)
     const hasTargetBinding =
       fingerprint.displayId !== null &&
       fingerprint.width !== null &&
@@ -65,7 +73,9 @@ export class MinimapCalibrationController {
     const matchesFingerprint = (
       calibration: MinimapCalibration | null
     ): calibration is MinimapCalibration =>
-      calibration !== null && expectedHashes.includes(calibration.fingerprintHash)
+      calibration !== null &&
+      expectedHashes.includes(calibration.fingerprintHash) &&
+      this._isReusableCalibration(calibration, fingerprint)
 
     const current = this._context.state.currentCalibration
     if (matchesFingerprint(current)) {
@@ -78,24 +88,12 @@ export class MinimapCalibrationController {
       return persisted
     }
 
-    const isLeft = fingerprint.minimapSide === 'left'
-
-    // 经典召唤师峡谷小地图归一化坐标仅用于生成可编辑的候选框。
-    // 未检查真实游戏画面前绝不能把屏幕长宽比当成“标定成功”的证据。
-    const defaultRoi = isLeft
-      ? { x: 0.0, y: 0.72, width: 0.18, height: 0.28 }
-      : { x: 0.82, y: 0.72, width: 0.18, height: 0.28 }
-
-    const calibration: MinimapCalibration = {
-      schemaVersion: 1,
-      id: `calib_${Date.now()}_${randomUUID()}`,
-      fingerprintHash: expectedHash,
-      roi: defaultRoi,
-      transform: 'blue-normal',
-      source: 'automatic',
-      confidence: 0,
-      createdAt: Date.now()
-    }
+    const calibration = this._createFallbackCalibration(
+      fingerprint,
+      fingerprint.minimapSide,
+      fingerprint.width,
+      fingerprint.height
+    )
 
     this._context.state.setCurrentCalibration(calibration)
     return calibration
@@ -107,7 +105,13 @@ export class MinimapCalibrationController {
     height: number
   ): MinimapCalibration {
     const detected = detectMinimapRoi(pixels, width, height)
-    if (!detected) return this.getOrCreateCalibration()
+    if (!detected) {
+      const fingerprint = this.getEnvironmentFingerprint()
+      const side = this._context.liveCoach.settings.minimapSide === 'left' ? 'left' : 'right'
+      const calibration = this._createFallbackCalibration(fingerprint, side, width, height)
+      this._context.state.setCurrentCalibration(calibration)
+      return calibration
+    }
 
     const fingerprint = this.getEnvironmentFingerprint()
     const configuredSide = this._context.liveCoach.settings.minimapSide
@@ -118,7 +122,7 @@ export class MinimapCalibrationController {
     }
     const calibration: MinimapCalibration = {
       schemaVersion: 1,
-      id: `calib_auto_${Date.now()}_${randomUUID()}`,
+      id: `${CURRENT_AUTOMATIC_CALIBRATION_ID_PREFIX}${Date.now()}_${randomUUID()}`,
       fingerprintHash: this._fingerprintHash(fingerprint, side),
       roi,
       transform: 'blue-normal',
@@ -198,6 +202,89 @@ export class MinimapCalibrationController {
     ]
       .map((value) => encodeURIComponent(value))
       .join('_')
+  }
+
+  private _createFallbackCalibration(
+    fingerprint: CaptureEnvironmentFingerprint,
+    side: 'left' | 'right',
+    captureWidth: number | null,
+    captureHeight: number | null
+  ): MinimapCalibration {
+    // 经典召唤师峡谷小地图归一化坐标仅用于生成可编辑的候选框。
+    // 未检查真实游戏画面前绝不能把屏幕长宽比当成“标定成功”的证据。
+    // 候选框在像素空间必须保持正方形；固定的归一化宽度会在 21:9/32:9 上
+    // 把小地图横向扩展数倍。DPI 只改变像素密度，不应改变这个归一化形状。
+    const resolvedCaptureSize =
+      captureWidth !== null &&
+      captureHeight !== null &&
+      Number.isFinite(captureWidth) &&
+      Number.isFinite(captureHeight) &&
+      captureWidth > 0 &&
+      captureHeight > 0
+        ? { width: captureWidth, height: captureHeight }
+        : { width: DEFAULT_CAPTURE_ASPECT_RATIO, height: 1 }
+    const defaultEdge = Math.min(
+      resolvedCaptureSize.width,
+      resolvedCaptureSize.height * DEFAULT_MINIMAP_HEIGHT_RATIO
+    )
+    const defaultWidth = defaultEdge / resolvedCaptureSize.width
+    const defaultHeight = defaultEdge / resolvedCaptureSize.height
+
+    return {
+      schemaVersion: 1,
+      id: `${CURRENT_AUTOMATIC_CALIBRATION_ID_PREFIX}${Date.now()}_${randomUUID()}`,
+      fingerprintHash: this._fingerprintHash(fingerprint, side),
+      roi: {
+        x: side === 'left' ? 0 : 1 - defaultWidth,
+        y: 1 - defaultHeight,
+        width: defaultWidth,
+        height: defaultHeight
+      },
+      transform: 'blue-normal',
+      source: 'automatic',
+      confidence: 0,
+      createdAt: Date.now()
+    }
+  }
+
+  private _isReusableCalibration(
+    calibration: MinimapCalibration,
+    fingerprint: CaptureEnvironmentFingerprint
+  ): boolean {
+    // A user-confirmed rectangle is authoritative even when it intentionally includes padding.
+    // Automatic detections created before the boundary-fitting algorithm are not trustworthy even
+    // when their guessed rectangle happens to be square. Version automatic IDs independently so
+    // old guesses are replaced without discarding user-confirmed manual rectangles.
+    if (calibration.source === 'manual') return true
+    if (!calibration.id.startsWith(CURRENT_AUTOMATIC_CALIBRATION_ID_PREFIX)) return false
+
+    if (fingerprint.width === null || fingerprint.height === null) {
+      // A successful one-shot detection may precede native target inspection. Keep that result;
+      // confidence-zero templates can be checked against the historical 16:9 assumption.
+      if (calibration.confidence >= 0.65) return true
+    }
+
+    const captureWidth = fingerprint.width ?? DEFAULT_CAPTURE_ASPECT_RATIO
+    const captureHeight = fingerprint.height ?? 1
+    const pixelWidth = calibration.roi.width * captureWidth
+    const pixelHeight = calibration.roi.height * captureHeight
+    const aspectError = Math.abs(pixelWidth - pixelHeight) / Math.max(pixelWidth, pixelHeight)
+    return Number.isFinite(aspectError) && aspectError <= MAX_AUTOMATIC_ROI_PIXEL_ASPECT_ERROR
+  }
+
+  private _hasSameCalibrationEnvironment(
+    left: CaptureTargetEnvironment | null,
+    right: CaptureTargetEnvironment | null
+  ): boolean {
+    if (left === null || right === null) return left === right
+    return (
+      left.displayId === right.displayId &&
+      left.clientBounds.width === right.clientBounds.width &&
+      left.clientBounds.height === right.clientBounds.height &&
+      left.dpiScale === right.dpiScale &&
+      left.hdr === right.hdr &&
+      left.windowMode === right.windowMode
+    )
   }
 
   private _normalizeTargetEnvironment(

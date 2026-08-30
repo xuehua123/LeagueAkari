@@ -5,9 +5,15 @@ import os from 'node:os'
 import path from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 
+import { detectMinimapRoi } from '../minimap-observer/calibration-detection'
 import { resolveFfmpegRuntime } from './ffmpeg-runtime'
 import type { ReplayCvSessionFactory } from './replay-cv-worker-executor'
-import { ReplayImportController, discoverReplaySidecarPath } from './replay-import-controller'
+import {
+  ReplayImportController,
+  calculateReplayCalibrationFrameSize,
+  createReplayFallbackRoi,
+  discoverReplaySidecarPath
+} from './replay-import-controller'
 import { CoachReplaySimulator } from './replay-simulator'
 
 describe('ReplayImportController Real Pipeline & Edge Cases Test', () => {
@@ -46,6 +52,96 @@ describe('ReplayImportController Real Pipeline & Edge Cases Test', () => {
     },
     stop() {}
   })
+
+  function createTexturedCorner(
+    width: number,
+    height: number,
+    side: 'left' | 'right',
+    edge: number
+  ) {
+    const pixels = new Uint8Array(width * height * 4)
+    const startX = side === 'left' ? 0 : width - edge
+    for (let y = height - edge; y < height; y++) {
+      for (let x = startX; x < startX + edge; x++) {
+        const index = (y * width + x) * 4
+        const bright = (x + y) % 8 < 4 ? 230 : 25
+        pixels[index] = bright
+        pixels[index + 1] = 255 - bright
+        pixels[index + 2] = (x * 3 + y * 5) % 255
+        pixels[index + 3] = 255
+      }
+    }
+    return pixels
+  }
+
+  const non16By9ReplaySizes = [
+    ['1024x768 4:3', 1024, 768, 960, 720, 480, 360],
+    ['1920x1200 16:10', 1920, 1200, 1152, 720, 576, 360],
+    ['3440x1440 21:9', 3440, 1440, 1280, 536, 640, 268],
+    ['5120x1440 32:9', 5120, 1440, 1280, 360, 640, 180]
+  ] as const
+
+  it.each(non16By9ReplaySizes)(
+    'keeps the calibration and preview aspect ratio for %s',
+    (
+      _,
+      sourceWidth,
+      sourceHeight,
+      calibrationWidth,
+      calibrationHeight,
+      previewWidth,
+      previewHeight
+    ) => {
+      const calibrationSize = calculateReplayCalibrationFrameSize(sourceWidth, sourceHeight)
+      expect(calibrationSize).toEqual({ width: calibrationWidth, height: calibrationHeight })
+
+      const previewSize = calculateReplayCalibrationFrameSize(
+        calibrationSize.width,
+        calibrationSize.height,
+        640,
+        360
+      )
+      expect(previewSize).toEqual({ width: previewWidth, height: previewHeight })
+      expect(
+        Math.abs(previewSize.width / previewSize.height - sourceWidth / sourceHeight)
+      ).toBeLessThan(0.003)
+    }
+  )
+
+  it.each(non16By9ReplaySizes)(
+    'maps an automatically detected normalized ROI back to a square source ROI for %s',
+    (_, sourceWidth, sourceHeight) => {
+      const calibrationSize = calculateReplayCalibrationFrameSize(sourceWidth, sourceHeight)
+      const edge = Math.round(calibrationSize.height * 0.26)
+      const pixels = createTexturedCorner(
+        calibrationSize.width,
+        calibrationSize.height,
+        'right',
+        edge
+      )
+      const detected = detectMinimapRoi(pixels, calibrationSize.width, calibrationSize.height)
+
+      expect(detected?.side).toBe('right')
+      expect(detected).not.toBeNull()
+      const projectedWidth = (detected?.roi.width ?? 0) * sourceWidth
+      const projectedHeight = (detected?.roi.height ?? 0) * sourceHeight
+      expect(Math.abs(projectedWidth - projectedHeight)).toBeLessThanOrEqual(4)
+      expect((detected?.roi.x ?? 0) + (detected?.roi.width ?? 0)).toBeCloseTo(1, 10)
+      expect((detected?.roi.y ?? 0) + (detected?.roi.height ?? 0)).toBeCloseTo(1, 10)
+    }
+  )
+
+  it.each(non16By9ReplaySizes)(
+    'keeps the source-pixel fallback square for %s',
+    (_, sourceWidth, sourceHeight) => {
+      for (const side of ['left', 'right'] as const) {
+        const roi = createReplayFallbackRoi(sourceWidth, sourceHeight, side)
+        expect(roi.width * sourceWidth).toBeCloseTo(roi.height * sourceHeight, 8)
+        expect(roi.y + roi.height).toBeCloseTo(1, 10)
+        expect(side === 'left' ? roi.x : roi.x + roi.width).toBeCloseTo(side === 'left' ? 0 : 1, 10)
+      }
+    }
+  )
 
   it('discovers only the two documented adjacent sidecar names', () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'akari-sidecar-discovery-'))

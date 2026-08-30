@@ -360,8 +360,10 @@ function buildResolutionCheck(
     )
   }
   const supported =
-    (resolution.width === 1920 && resolution.height === 1080) ||
-    (resolution.width === 2560 && resolution.height === 1440)
+    Number.isInteger(resolution.width) &&
+    Number.isInteger(resolution.height) &&
+    resolution.width >= 320 &&
+    resolution.height >= 240
   return check(
     'resolution',
     supported ? 'available' : 'unavailable',
@@ -380,7 +382,7 @@ function buildDpiCheck(fingerprint: CaptureEnvironmentFingerprint | null): Envir
       'preview'
     ])
   }
-  const supported = fingerprint.dpiScale >= 1 && fingerprint.dpiScale <= 1.5
+  const supported = Number.isFinite(fingerprint.dpiScale) && fingerprint.dpiScale > 0
   return check(
     'dpi',
     supported ? 'available' : 'unavailable',

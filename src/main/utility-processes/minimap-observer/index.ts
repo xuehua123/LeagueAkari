@@ -1,4 +1,5 @@
 import {
+  MAX_LIVE_MINIMAP_FRAME_AGE_MS,
   MainToWorkerMessage,
   MinimapEntityObservation,
   MinimapObservationBatch,
@@ -128,7 +129,6 @@ function sendMessage(msg: WorkerToMainMessage) {
 
 // Electron compatibility capture and first-run antivirus/model overhead can exceed 300 ms on
 // low-end PCs. Keep the safety gate bounded, but allow enough headroom for a 5 FPS fallback frame.
-const MAX_LIVE_FRAME_AGE_MS = 750
 const OPTIONAL_IDENTITY_MODEL_LOAD_DELAY_MS = 250
 const OPTIONAL_IDENTITY_MODEL_LOAD_TIMEOUT_MS = 10_000
 
@@ -150,7 +150,7 @@ export function finalizeLiveObservationFreshness(
   const sourceAgeMs = observedAt > 0 ? completedAt - observedAt : 0
   const processingAgeMs = completedAt - processingStartedAt
   const ageMs = Math.max(0, sourceAgeMs, processingAgeMs)
-  const stale = ageMs > MAX_LIVE_FRAME_AGE_MS
+  const stale = ageMs > MAX_LIVE_MINIMAP_FRAME_AGE_MS
 
   return {
     receivedAt: completedAt,
@@ -400,7 +400,7 @@ export async function runDetectionTick(): Promise<void> {
   // 推理前快速拒绝已经超龄的输入；完成时还会再次计算以覆盖采集阻塞与推理耗时。
   const frameReceiveAgeMs =
     sourceFrameReceivedAt > 0 ? processingStartedAt - sourceFrameReceivedAt : 9999
-  const isFrameStale = frameReceiveAgeMs > MAX_LIVE_FRAME_AGE_MS
+  const isFrameStale = frameReceiveAgeMs > MAX_LIVE_MINIMAP_FRAME_AGE_MS
   const isDuplicateOrOutOfOrder =
     lastProcessedSequence !== -1 && sourceFrameSequence <= lastProcessedSequence
   const rejectedBeforeInference =

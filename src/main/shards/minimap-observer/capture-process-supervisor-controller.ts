@@ -456,12 +456,10 @@ export class CaptureProcessSupervisorController {
       }
     }
 
-    // “自动”侧边设置必须在真正开局时读取一次游戏窗口，不能把未检测的右下角模板
-    // 当成自动检测结果。手动标定始终优先，检测失败时则继续使用安全的模板 ROI。
-    if (
-      this._context.liveCoach.settings.minimapSide === 'auto' &&
-      calibration.source !== 'manual'
-    ) {
+    // Every unconfirmed automatic ROI is measured from the real game window at session start.
+    // A fixed left/right preference only chooses the anchor; it must not disable zero-click size
+    // calibration on windowed, 4:3, ultrawide, or desktopCapturer-only systems.
+    if (calibration.source !== 'manual') {
       try {
         const source = await this._findGameCaptureSource(1280, 720)
         if (!this._isCurrentLifecycle(lifecycleVersion, sessionId)) return
@@ -1223,13 +1221,15 @@ export class CaptureProcessSupervisorController {
           }
         }
         break
-      case 'status':
+      case 'status': {
         if ((msg.backend === 'wgc' || msg.backend === 'dda') && msg.fps > 0) {
           this._markNativeCaptureRecovered()
         }
+        // Calibration fingerprints use the effective backend. Publish it before selecting a
+        // replacement for a moved target so the new calibration is not bound to the old backend.
+        this._context.state.setBackend(msg.backend)
+        const targetEnvironmentChanged = this._refreshTargetEnvironment()
         {
-          const targetEnvironmentChanged = this._refreshTargetEnvironment()
-          const hasManualCalibration = this._currentCalibration?.source === 'manual'
           const sourceResolution = msg.sourceResolution ?? null
           const sourceResolutionChanged = Boolean(
             sourceResolution &&
@@ -1237,14 +1237,21 @@ export class CaptureProcessSupervisorController {
             (this._lastCaptureResolution.width !== sourceResolution.width ||
               this._lastCaptureResolution.height !== sourceResolution.height)
           )
-          if (targetEnvironmentChanged && !hasManualCalibration) {
-            this._currentCalibration = null
+          if (targetEnvironmentChanged) {
+            // setTargetEnvironment invalidates the old active calibration. Re-select against the
+            // new display/DPI/window fingerprint even when the old ROI was manual, then restart the
+            // worker so DDA/WGC cannot remain bound to the previous monitor or capture item.
+            this._currentCalibration = this._calibrationController.getOrCreateCalibration()
             this._context.state.setRoiHealth('unknown')
             this._context.liveCoach.state.setCaptureState({
               roiState: 'unknown',
               confidence: null
             })
+            if (this._currentSessionId) {
+              this._postWorkerStart(this._currentSessionId, this._currentCalibration)
+            }
           }
+          const hasManualCalibration = this._currentCalibration?.source === 'manual'
           if (
             !hasManualCalibration &&
             (targetEnvironmentChanged ||
@@ -1262,9 +1269,13 @@ export class CaptureProcessSupervisorController {
           }
           this._lastCaptureResolution = sourceResolution ? { ...sourceResolution } : null
         }
+        const calibrationReady = this._isCurrentCalibrationReady()
         const publishedRoiHealth =
-          this._isSupervising && !this._currentCalibration ? 'unknown' : msg.roiHealth
-        this._context.state.setBackend(msg.backend)
+          targetEnvironmentChanged ||
+          (this._isSupervising && !this._currentCalibration) ||
+          (!calibrationReady && msg.roiHealth === 'healthy')
+            ? 'unknown'
+            : msg.roiHealth
         this._context.state.setFps(msg.fps)
         this._context.state.setRoiHealth(publishedRoiHealth)
         this._context.liveCoach.state.setCaptureState({
@@ -1305,17 +1316,24 @@ export class CaptureProcessSupervisorController {
             details: '小地图区域被遮挡、冻结或标定置信度不足，相关提醒已暂停'
           })
           this._tryAutomaticRecalibration()
+        } else if (!calibrationReady && publishedRoiHealth === 'unknown') {
+          // A textured but unconfirmed template must not become healthy merely because CCL ran.
+          // Keep sampling bounded one-shot previews until a real square boundary is established.
+          this._tryAutomaticRecalibration()
         }
         break
+      }
       case 'observation-batch':
-        // Moving the game window to another display invalidates the calibration synchronously.
-        // Drop observations until a preview from that exact target establishes a replacement.
-        if (this._isSupervising && !this._currentCalibration) {
+        // A missing or unconfirmed automatic template cannot publish facts. The worker may see
+        // texture in a fallback corner and call it healthy even though no square minimap boundary
+        // was established, so apply the same readiness gate used by status publication.
+        if (!this._isCurrentCalibrationReady()) {
           this._context.state.setRoiHealth('unknown')
           this._context.liveCoach.state.setCaptureState({
             roiState: 'unknown',
             confidence: null
           })
+          this._tryAutomaticRecalibration()
           return
         }
         this._context.state.setFrameAgeMs(msg.batch.frame.ageMs)
@@ -1444,6 +1462,14 @@ export class CaptureProcessSupervisorController {
       return
     }
     this._context.liveCoach.state.setLastError(sanitizedError)
+  }
+
+  private _isCurrentCalibrationReady(): boolean {
+    return (
+      !this._isSupervising ||
+      this._currentCalibration?.source === 'manual' ||
+      (this._currentCalibration?.confidence ?? 0) >= 0.65
+    )
   }
 
   private _tryAutomaticRecalibration(): void {

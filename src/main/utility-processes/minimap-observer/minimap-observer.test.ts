@@ -8,6 +8,7 @@ import {
   deriveMinimapEvents,
   extractConnectedComponents,
   getMapRegion,
+  normalizeMinimapFrameForAnalysis,
   processMinimapFrameWithState
 } from './minimap-cv'
 
@@ -135,6 +136,54 @@ describe('Minimap Observer CV & Tracking Algorithms (minimap-cv)', () => {
     expect(detections[0].x).toBeCloseTo(0.22, 2)
     expect(detections[0].y).toBeCloseTo(0.32, 2)
   })
+
+  it.each([128, 256, 512])(
+    'normalizes a %sx%s calibrated ROI before pixel-sized CV rules run',
+    async (sourceEdge) => {
+      const buffer = new Uint8Array(sourceEdge * sourceEdge * 4)
+      for (let y = 0; y < sourceEdge; y++) {
+        for (let x = 0; x < sourceEdge; x++) {
+          const normalizedX = Math.floor((x * 256) / sourceEdge)
+          const normalizedY = Math.floor((y * 256) / sourceEdge)
+          const index = (y * sourceEdge + x) * 4
+          const value = ((normalizedX * 7 + normalizedY * 13) % 60) + 30
+          buffer[index] = value
+          buffer[index + 1] = value
+          buffer[index + 2] = value
+          buffer[index + 3] = 255
+        }
+      }
+      const iconEdge = Math.max(3, Math.round((sourceEdge * 6) / 256))
+      const iconStartX = Math.round(sourceEdge * 0.4)
+      const iconStartY = Math.round(sourceEdge * 0.6)
+      for (let y = iconStartY; y < iconStartY + iconEdge; y++) {
+        for (let x = iconStartX; x < iconStartX + iconEdge; x++) {
+          const index = (y * sourceEdge + x) * 4
+          buffer[index] = 0
+          buffer[index + 1] = 0
+          buffer[index + 2] = 255
+          buffer[index + 3] = 255
+        }
+      }
+
+      const normalized = normalizeMinimapFrameForAnalysis(buffer, sourceEdge, sourceEdge)
+      const result = await processMinimapFrameWithState(
+        buffer,
+        sourceEdge,
+        sourceEdge,
+        1_000,
+        'bgra',
+        new Map<string, TrackedEntity>(),
+        () => `enemy-${sourceEdge}`
+      )
+
+      expect(normalized).toMatchObject({ width: 256, height: 256 })
+      expect(result.health).toBe('healthy')
+      expect(result.entities).toHaveLength(1)
+      expect(result.entities[0].point.x).toBeCloseTo(0.41, 2)
+      expect(result.entities[0].point.y).toBeCloseTo(0.61, 2)
+    }
+  )
 
   it('distinguishes two adjacent enemy heroes and maintains distinct tracks in production processMinimapFrameWithState', async () => {
     const width = 100
@@ -485,6 +534,9 @@ describe('Minimap Observer CV & Tracking Algorithms (minimap-cv)', () => {
     // 验证全量 32-bit 双哈希能够精确捕获 5x5 小图标运动，产生不同哈希值
     const hashA = computeFrameHash(frameA)
     const hashB = computeFrameHash(frameB)
+    const normalizedHashB = computeFrameHash(
+      normalizeMinimapFrameForAnalysis(frameB, width, height).buffer
+    )
     expect(hashA).not.toBe(hashB)
 
     const trackedEntities = new Map<string, TrackedEntity>()
@@ -506,7 +558,7 @@ describe('Minimap Observer CV & Tracking Algorithms (minimap-cv)', () => {
       cvState
     )
     expect(cvState.consecutiveFrozenFrames).toBe(1)
-    expect(cvState.lastFrameHash).toBe(hashB)
+    expect(cvState.lastFrameHash).toBe(normalizedHashB)
     expect(res.health).toBe('healthy')
   })
 

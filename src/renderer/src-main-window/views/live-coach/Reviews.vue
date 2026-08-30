@@ -1,7 +1,7 @@
 <template>
   <div class="h-full w-full">
     <NScrollbar class="relative h-full max-w-full">
-      <div class="mx-auto flex w-full max-w-6xl flex-col gap-4 p-6">
+      <div class="mx-auto box-border flex w-full max-w-6xl flex-col gap-4 p-6">
         <NCard size="small" :title="t('liveCoach.reviews.history.title')">
           <div class="mb-3 flex flex-wrap justify-end gap-2">
             <NButton size="tiny" :loading="historyLoading" @click="loadReplayHistory()">
@@ -419,6 +419,7 @@
               :image-alt="t('liveCoach.reviews.calibrationPreviewAlt')"
               :empty-text="t('liveCoach.reviews.calibrationPreviewExpired')"
               :roi-aria-label="t('liveCoach.reviews.calibrationRoiAriaLabel')"
+              :source-size="preparedReplay.probe"
             />
             <NAlert v-if="preparedReplay.calibration.confidence === 0" type="warning">
               {{ t('liveCoach.reviews.calibrationRequired') }}
